@@ -1,0 +1,41 @@
+{
+  "environment": "Separate X11 display on the actual InstaBox, isolated TigerVNC over a private Unix socket, synthetic document and clipboard. Official Debian packages were hash-verified and unpacked under the private temporary directory. Mousepad, GTK and Fcitx ran in that guest environment. The observer used the normal browser viewer, with the test lease routed only to that display.",
+  "inputMethod": "Fcitx5 5.1.12-2, Debian Pinyin engine and dictionary",
+  "candidateScreenshot": "../desktop-native-pinyin.png",
+  "afterSaveScreenshot": "../desktop-native-pinyin-saved.png",
+  "mousepad": "debian-trixie-amd64-private-0.6.3-1",
+  "original": "HEAD [OLD] tail\nuntouched: 月光\n",
+  "selection": "OLD",
+  "after": "HEAD [你好] tail\nuntouched: 月光\n",
+  "utf8Sha256": "ad45feadc2443e6086687dd945dff636e0f7c2c8eab4f4470befa404d6765721",
+  "candidateWindow": [
+    {
+      "title": "Fcitx5 Input Window",
+      "width": 331,
+      "height": 31
+    }
+  ],
+  "candidateHiddenAfterSpace": true,
+  "inputEngineBefore": "keyboard-us",
+  "inputEngineDuring": "pinyin",
+  "browser": "156.0.8078.79",
+  "remoteClipboardPreserved": true,
+  "privateRfbSocket": true,
+  "serverTCP": false,
+  "controlFixtureActions": [
+    "status",
+    "takeover",
+    "handback"
+  ],
+  "physicalWebKeys": "Ctrl+Home, Right×6, Shift+Right×3, Ctrl+Space, n i h a o, Space, Ctrl+S",
+  "viewerSha256": "ca12f9caf4ca8e78f9f0dfd50ad6c1d9070a62cb6db72f665f3f557b3a4463f8",
+  "fixtureStopped": true,
+  "guestDirectoryRemoved": true,
+  "packageSource": {
+    "source": "direct",
+    "verifiedFiles": 57,
+    "archives": 22,
+    "bytes": 46866076
+  },
+  "execRounds": 38
+}

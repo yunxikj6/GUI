@@ -1,0 +1,1087 @@
+{
+  "existingCloudDesktop": {
+    "test": "viewer only (manual reconnect), CSS scroll offsets, current user desktop via official InstaBox RFB, instrumented to prevent remote keyboard/pointer/resize, no screen or clipboard content captured",
+    "before": {
+      "initialRoute": {
+        "status": 302,
+        "location": "/desktop/"
+      },
+      "browser": "156.0.8078.79",
+      "captureSaved": false,
+      "remoteController": "agent",
+      "action": "Original size, pan locally, then click Reconnect and wait for a decoded and painted new framebuffer.",
+      "before": {
+        "offset": [
+          93,
+          39
+        ],
+        "range": [
+          433,
+          196
+        ],
+        "source": [
+          823,
+          512
+        ],
+        "sockets": 1,
+        "rects": 39,
+        "paints": 13
+      },
+      "after": {
+        "offset": [
+          0,
+          0
+        ],
+        "range": [
+          433,
+          196
+        ],
+        "source": [
+          823,
+          512
+        ],
+        "sockets": 2,
+        "rects": 41,
+        "paints": 16
+      },
+      "scale": "original",
+      "zeroRemoteInputResizeClipboard": true
+    },
+    "release": {
+      "initialRoute": {
+        "status": 302,
+        "location": "/desktop/"
+      },
+      "browser": "156.0.8078.79",
+      "captureSaved": false,
+      "remoteController": "agent",
+      "action": "Original size, pan locally, then click Reconnect and wait for a decoded and painted new framebuffer.",
+      "before": {
+        "offset": [
+          93,
+          39
+        ],
+        "range": [
+          433,
+          196
+        ],
+        "source": [
+          823,
+          512
+        ],
+        "sockets": 1,
+        "rects": 35,
+        "paints": 9
+      },
+      "after": {
+        "offset": [
+          93,
+          39
+        ],
+        "range": [
+          433,
+          196
+        ],
+        "source": [
+          823,
+          512
+        ],
+        "sockets": 2,
+        "rects": 36,
+        "paints": 11
+      },
+      "scale": "original",
+      "zeroRemoteInputResizeClipboard": true
+    }
+  },
+  "isolatedChromium": {
+    "test": "320px-wide Linux Chromium with a private RFB 3.8 peer. Coordinates are tuples of transition step, x, y, maxX, maxY and visible viewer status. Retry is the local toolbar action, manual is explicit frames and back to live, drop is a real TCP socket close and manual return to live.",
+    "previous": [
+      {
+        "transition": "retry",
+        "resolutionChanged": false,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "retry",
+        "resolutionChanged": false,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "retry",
+        "resolutionChanged": true,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "live",
+            0,
+            0,
+            704,
+            224,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "retry",
+        "resolutionChanged": true,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "live",
+            0,
+            0,
+            704,
+            266,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": false,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            960,
+            384,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": false,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            960,
+            436,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": true,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            704,
+            224,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": true,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            704,
+            276,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": false,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            960,
+            384,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": false,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            960,
+            436,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": true,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            704,
+            224,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": true,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            0,
+            0,
+            704,
+            276,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            0,
+            0,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      }
+    ],
+    "release": [
+      {
+        "transition": "retry",
+        "resolutionChanged": false,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "live",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "retry",
+        "resolutionChanged": false,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "live",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "retry",
+        "resolutionChanged": true,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "live",
+            704,
+            224,
+            704,
+            224,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "retry",
+        "resolutionChanged": true,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "live",
+            704,
+            266,
+            704,
+            266,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": false,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            960,
+            384,
+            960,
+            384,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": false,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            960,
+            426,
+            960,
+            437,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": true,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            704,
+            224,
+            704,
+            224,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            704,
+            224,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "manual",
+        "resolutionChanged": true,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            704,
+            277,
+            704,
+            277,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            704,
+            277,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": false,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            960,
+            384,
+            960,
+            384,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": false,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            960,
+            426,
+            960,
+            437,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": true,
+        "controlled": false,
+        "coordinates": [
+          [
+            "before",
+            960,
+            384,
+            960,
+            384,
+            "正在观看"
+          ],
+          [
+            "frames",
+            704,
+            224,
+            704,
+            224,
+            "逐帧观看"
+          ],
+          [
+            "live",
+            704,
+            224,
+            960,
+            384,
+            "正在观看"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "start"
+        ]
+      },
+      {
+        "transition": "drop",
+        "resolutionChanged": true,
+        "controlled": true,
+        "coordinates": [
+          [
+            "before",
+            960,
+            426,
+            960,
+            426,
+            "已接管输入"
+          ],
+          [
+            "frames",
+            704,
+            277,
+            704,
+            277,
+            "逐帧控制"
+          ],
+          [
+            "live",
+            704,
+            277,
+            960,
+            426,
+            "已接管输入"
+          ]
+        ],
+        "rfbInputs": [
+          0,
+          0
+        ],
+        "frameInputs": [],
+        "actions": [
+          "start",
+          "takeover",
+          "start"
+        ]
+      }
+    ]
+  },
+  "independentLiveConnectionBaseline": {
+    "environment": "isolated Linux Chromium process for each sample, existing running InstaBox, view only. Navigation times include an additional provider status read before the normal start request. WebSocket creation and later timing do not include that status read. Browser measurements are software events, not physical display measurements.",
+    "currentRevision": "c984507bca40e200c113e7ba7f77ac7b18d40455",
+    "samples": [
+      {
+        "timingsFromNavigationMs": {
+          "wsConstructMs": 1173,
+          "wsOpenMs": 1613.8,
+          "firstWsMessageMs": 1614.3,
+          "firstRealRectMs": 2103,
+          "afterDecodeDrawMs": 2138.4,
+          "animationFrameAfterDrawMs": 2139.7
+        },
+        "timingsFromWebSocketCreationMs": {
+          "wsOpenMs": 440.8,
+          "firstWsMessageMs": 441.3,
+          "firstRealRectMs": 930,
+          "afterDecodeDrawMs": 965.4,
+          "animationFrameAfterDrawMs": 966.7
+        },
+        "wsOpened": 1,
+        "paintCount": 4,
+        "source": [
+          823,
+          512
+        ]
+      },
+      {
+        "timingsFromNavigationMs": {
+          "wsConstructMs": 871,
+          "wsOpenMs": 1337.5,
+          "firstWsMessageMs": 1338,
+          "firstRealRectMs": 1852.4,
+          "afterDecodeDrawMs": 1883.7,
+          "animationFrameAfterDrawMs": 1884.1
+        },
+        "timingsFromWebSocketCreationMs": {
+          "wsOpenMs": 466.5,
+          "firstWsMessageMs": 467,
+          "firstRealRectMs": 981.4,
+          "afterDecodeDrawMs": 1012.7,
+          "animationFrameAfterDrawMs": 1013.1
+        },
+        "wsOpened": 1,
+        "paintCount": 4,
+        "source": [
+          823,
+          512
+        ]
+      },
+      {
+        "timingsFromNavigationMs": {
+          "wsConstructMs": 980.2,
+          "wsOpenMs": 1436.7,
+          "firstWsMessageMs": 1437.4,
+          "firstRealRectMs": 1994.2,
+          "afterDecodeDrawMs": 2029.4,
+          "animationFrameAfterDrawMs": 2030
+        },
+        "timingsFromWebSocketCreationMs": {
+          "wsOpenMs": 456.5,
+          "firstWsMessageMs": 457.2,
+          "firstRealRectMs": 1014.0,
+          "afterDecodeDrawMs": 1049.2,
+          "animationFrameAfterDrawMs": 1049.8
+        },
+        "wsOpened": 1,
+        "paintCount": 4,
+        "source": [
+          823,
+          512
+        ]
+      }
+    ]
+  }
+}

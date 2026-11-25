@@ -59,7 +59,7 @@ class ScreenPeer(rfb_fixture.ClipboardPeer):
 
 
 @unittest.skipUnless(sync_playwright and BROWSER, 'browser acceptance requires Playwright and Chromium')
-class DesktopScale(unittest.TestCase):
+class DesktopScaleFixture(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         driver = sync_playwright().start()
@@ -170,6 +170,8 @@ class DesktopScale(unittest.TestCase):
             self.swipe(dx, dy)
         self.fail(f'Corner {index} could not be reached by touch: {self.markers()}')
 
+
+class DesktopScale(DesktopScaleFixture):
     def test_live_window_corners_and_controlled_pointer_after_touch_pan(self):
         self.wait_markers([0, 1, 2, 3], original=False)
         scale = self.page.get_by_role('combobox', name='桌面显示比例')

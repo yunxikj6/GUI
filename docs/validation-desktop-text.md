@@ -2,6 +2,16 @@
 
 接管实时桌面后，可以向云端剪贴板发送中文、emoji 和多行正文。打开顶栏“剪贴板”，粘贴到“发送到云端的文本”并点击“发送到云端”，然后在原应用中使用它的“粘贴”命令。已经配置云端输入法的桌面也可以在原应用内选字。此次核对的实例装有中文字体，系统包清单中没有 IBus 或 Fcitx。[实时剪贴板验收](validation-desktop-clipboard.md) · [系统包和输入实测](measurements/desktop-frame-text.json)
 
+## 原版软件里的拼音候选窗
+
+在实际 InstaBox 的独立测试桌面中运行 Debian 原版 Mousepad 0.6.3 和 Fcitx5 拼音。浏览器只转发正常按键。在 Mousepad 里选中 `OLD` 后，按测试桌面已配置的 Ctrl+Space 切换到拼音，再输入 `nihao`。X11 记录到由云端输入法绘制的 `Fcitx5 Input Window`（331 × 31 像素）。下图是当时查看器收到的桌面画面。[云端候选窗与保存记录](measurements/desktop-native-pinyin.json)
+
+![原版 Mousepad 内正在输入 ni hao，云端候选窗第一项为你好](desktop-native-pinyin.png)
+
+按空格选“你好”，随后在原应用按 Ctrl+S。云机磁盘上的第一行从 `HEAD [OLD] tail` 变成 `HEAD [你好] tail`，第二行 `untouched: 月光` 及末尾换行完整保留。云端剪贴板也保留了原文。[保存后的原软件窗口](desktop-native-pinyin-saved.png)
+
+已有 Fcitx5 拼音的桌面可在实时画布中用自己的输入法切换键复核这组动作。本次实验在独立目录内临时解包并校验 Debian 软件和词库，退出后确认目录已清理。当前已有桌面的系统包清单里没有 Fcitx5，日常使用这台实例时可走上面的实时剪贴板路径。
+
 ## 逐帧模式
 
 在连接受限而切到逐帧查看后，“发送文字”模拟键盘输入，支持 1 至 2048 个可打印 ASCII 字符（空格至 `~`）。输入中文、emoji、控制字符、多行文字或超长文本时，查看器在发送前保留整段原文，并说明下一步操作。可以先复制输入框中的文字，再切回实时桌面。交还控制或重新连接会清空这个输入框。

@@ -51,6 +51,28 @@ let session = 0, rfb, timer, frameUrl, desktop, controlled = false, stills = fal
 let liveConnected = false, clipboardVersion = 0, receivedText = '';
 
 let panRequested = false, panDrag = null;
+let visibleSurface = null, viewLeft = 0, viewTop = 0;
+
+// noVNC removes its canvas before emitting disconnect. Save offsets while the source still exists.
+function rememberView() {
+  if (screen.dataset.scale === 'original' && visibleSurface && screen.contains(visibleSurface)) {
+    viewLeft = screen.scrollLeft; viewTop = screen.scrollTop;
+  }
+}
+screen.addEventListener('scroll', rememberView);
+
+function releaseSurface() {
+  rememberView();
+  visibleSurface = null; panDrag = null;
+}
+
+function restoreView() {
+  if (visibleSurface && desktopScale.value === 'original') {
+    // Native scrolling clamps both axes to this surface and the current viewport.
+    screen.scrollTo(viewLeft, viewTop);
+    rememberView();
+  }
+}
 
 function syncPan() {
   const original = desktopScale.value === 'original';
@@ -67,9 +89,12 @@ function syncPan() {
 }
 
 desktopScale.onchange = () => {
+  rememberView();
   syncPan();
-  if (rfb) rfb.scaleViewport = desktopScale.value === 'fit';
-  screen.scrollTo(0, 0);
+  const fit = desktopScale.value === 'fit';
+  if (rfb) rfb.scaleViewport = fit;
+  if (fit) screen.scrollTo(0, 0);
+  else restoreView();
 };
 panView.onclick = () => {
   panRequested = !panRequested;
@@ -90,6 +115,7 @@ screen.addEventListener('pointerdown', e => {
 screen.addEventListener('pointermove', e => {
   if (panDrag?.id === e.pointerId && screen.dataset.localPan === 'true') {
     screen.scrollTo(panDrag.left + panDrag.x - e.clientX, panDrag.top + panDrag.y - e.clientY);
+    rememberView();
   }
 });
 screen.addEventListener('lostpointercapture', () => { panDrag = null; });
@@ -167,6 +193,7 @@ async function call(action, body) {
 }
 
 function cleanup() {
+  releaseSurface();
   ++session;
   liveConnected = false; syncClipboard();
   clearTimeout(timer);
@@ -195,6 +222,7 @@ function openLiveSocket(n) {
   // A noVNC instance retains its offered text for delayed clipboard requests.
   // Retire the old connection when ownership changes so it cannot answer a later lease.
   const previous = rfb;
+  releaseSurface();
   rfb = null; liveConnected = false; syncClipboard();
   if (previous) previous.disconnect();
   const url = new URL('/desktop/vnc', location.href);
@@ -207,6 +235,7 @@ function openLiveSocket(n) {
     if (!current()) return;
     liveConnected = true; syncPan(); syncClipboard();
     status.textContent = controlled ? '已接管输入' : '正在观看';
+    visibleSurface = screen.querySelector('canvas'); restoreView();
   });
   client.addEventListener('clipboard', e => {
     if (!current() || !canExchange() || typeof e.detail?.text !== 'string') return;
@@ -245,6 +274,9 @@ async function showFrames() {
   syncControl(desktop); status.textContent = '连接逐帧模式…';
   const img = new Image(); img.tabIndex = 0; img.draggable = false; img.alt = '云端 Linux 屏幕';
   screen.replaceChildren(img); syncPan();
+  img.addEventListener('load', () => {
+    if (n === session) { visibleSurface = img; restoreView(); }
+  }, {once:true});
   let reading = false, frameWidth = 0, frameHeight = 0;
   async function refresh() {
     clearTimeout(timer);

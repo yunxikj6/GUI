@@ -2,9 +2,9 @@
 
 连接 InstaBox 后，浏览器直接打开云机的完整 Linux 桌面。点击“接管输入”，就可以从 Xfce 的应用程序菜单打开原版软件。窗口、菜单和对话框由云机上的程序绘制，通过 noVNC 显示在本机。
 
-菜单或文件名太小时，在“显示比例”选择“原始大小”。观看时可以拖动或滑动画面。已接管时，先打开“本地平移”，移到想看的位置，再关闭平移继续操作软件。选回“适应窗口”就能看到全桌面。[窄屏实测](docs/validation-desktop-scale.md)
+菜单或文件名太小时，在“显示比例”选择“原始大小”。观看时可以拖动或滑动画面。已接管时，先打开“本地平移”，移到想看的位置，再关闭平移继续操作软件。选回“适应窗口”就能看到全桌面。同一页面内重新连接或切换到逐帧查看时，会回到刚才看的位置。[窄屏实测](docs/validation-desktop-scale.md)
 
-输入中文时，云机已配置的输入法可以在原应用窗口中使用。也可以在实时桌面点“剪贴板”，发送本机输入的文字，再在原应用中粘贴。逐帧模式的“发送文字”支持一行英文字母、半角数字、空格和 ASCII 符号。遇到中文、emoji 或换行时会保留整段草稿，方便复制到实时桌面。[输入与保存实测](docs/validation-desktop-text.md)
+云机已配置拼音输入法时，可以像在本机一样在原应用窗口中选字。已在 InstaBox 原版 Mousepad 中核对了候选窗和保存的文件。也可以在实时桌面点“剪贴板”，发送本机输入的文字，再在原应用中粘贴。逐帧模式的“发送文字”支持一行英文字母、半角数字、空格和 ASCII 符号。遇到中文、emoji 或换行时会保留整段草稿，方便复制到实时桌面。[输入与保存实测](docs/validation-desktop-text.md)
 
 桌面顶栏的“工作台”可打开本项目提供的文件树、编辑器、Git 差异和助手记录。也可以用 `python3 launcher.py --workbench` 直接进入这个界面。
 
@@ -83,6 +83,7 @@ python3 launcher.py --local --project "$(mktemp -d)/project"
 
 - [架构调研与选型依据](docs/technology-review.md)
 - [GTK 图形工具包实验](docs/toolkit-experiment.md)
+- [重连后恢复云桌面中的阅读位置](docs/validation-desktop-view-recovery.md)
 - [云桌面原始大小、平移与点击位置验收](docs/validation-desktop-scale.md)
 - [默认进入完整 Linux 桌面与原版 Thunar 实机记录](docs/validation-desktop-entry.md)
 - [实时桌面双向文本剪贴板验收](docs/validation-desktop-clipboard.md)
