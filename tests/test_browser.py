@@ -306,10 +306,12 @@ class BrowserAcceptance(BrowserFixture):
         content = [event["text"].strip() for event in result["events"]
                    if event["kind"] == "output" and event.get("text", "").strip()]
         self.assertTrue(content, "The project check returned no visible output")
-        for snippet in content:
-            expect(page.locator("#eventLog")).to_contain_text(snippet, timeout=15000)
-        rendered = page.locator("#eventLog .event").all_text_contents()
-        self.assertEqual(rendered, [e["text"] for e in result["events"]])
+        # The direct API read may see completion one poll before the browser receives
+        # the final status event. Wait for that row, then compare the exact transcript.
+        expected = [event["text"] for event in result["events"]]
+        rows = page.locator("#eventLog .event")
+        expect(rows).to_have_count(len(expected), timeout=15000)
+        self.assertEqual(rows.all_text_contents(), expected)
 
 
     def test_desktop_route_in_local_mode(self):
