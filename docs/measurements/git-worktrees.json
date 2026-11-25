@@ -1,0 +1,226 @@
+{
+  "previous_commit": "17f50f1220d7d741166384a8b28917005cf482f6",
+  "git_versions": {
+    "2.47": "git version 2.47.3",
+    "2.56": "git version 2.56.1"
+  },
+  "worktree_matrix": {
+    "2.47-default": {
+      "baseline": {
+        "state": null,
+        "branch": "",
+        "diffError": null,
+        "diffChars": 0
+      },
+      "current": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "current_after_move": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "manually_moved_workbench": {
+        "state": "error",
+        "branch": "",
+        "diffError": "git_error",
+        "diffChars": 0
+      },
+      "current_after_repair": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      }
+    },
+    "2.47-bare": {
+      "baseline": {
+        "state": null,
+        "branch": "",
+        "diffError": null,
+        "diffChars": 0
+      },
+      "current": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "current_after_move": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "manually_moved_workbench": {
+        "state": "error",
+        "branch": "",
+        "diffError": "git_error",
+        "diffChars": 0
+      },
+      "current_after_repair": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      }
+    },
+    "2.56-default": {
+      "baseline": {
+        "state": null,
+        "branch": "",
+        "diffError": null,
+        "diffChars": 0
+      },
+      "current": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "current_after_move": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "manually_moved_workbench": {
+        "state": "error",
+        "branch": "",
+        "diffError": "git_error",
+        "diffChars": 0
+      },
+      "current_after_repair": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      }
+    },
+    "2.56-bare": {
+      "baseline": {
+        "state": null,
+        "branch": "",
+        "diffError": null,
+        "diffChars": 0
+      },
+      "current": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "current_after_move": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "manually_moved_workbench": {
+        "state": "error",
+        "branch": "",
+        "diffError": "git_error",
+        "diffChars": 0
+      },
+      "current_after_repair": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      }
+    },
+    "2.56-relative": {
+      "baseline": {
+        "state": null,
+        "branch": "",
+        "diffError": null,
+        "diffChars": 0
+      },
+      "current": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "current_after_move": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      },
+      "manually_moved_workbench": {
+        "state": "error",
+        "branch": "",
+        "diffError": "git_error",
+        "diffChars": 0
+      },
+      "current_after_repair": {
+        "state": "ready",
+        "branch": "topic",
+        "diffError": null,
+        "diffChars": 153
+      }
+    }
+  },
+  "instabox_ui": {
+    "git": "2.47.3",
+    "linkedBranch": "review-cloud",
+    "detachedHead": "7432720",
+    "mainBranch": "main",
+    "linkedOnlyChanges": [
+      "staged",
+      "unstaged",
+      "untracked"
+    ],
+    "parentChangeExcluded": true,
+    "linkedCheck": "succeeded",
+    "linkedIndexWhitespace": "failed",
+    "workTreeWhitespacePassed": true,
+    "replayAfterRefresh": true,
+    "subdirectoryGitState": "none",
+    "damagedRegistrationGitState": "error",
+    "draftRestored": true,
+    "dynamicRepairReflectedOnOpenDiff": true,
+    "relativeFormatCreator": "2.56.1",
+    "relativeFormatOnCloud": "当前系统 Git 不支持此仓库格式，请升级云服务器上的 Git。",
+    "readmeWithUnsupportedFormat": "readable"
+  },
+  "instabox_regression": {
+    "tests": 76,
+    "passed": 73,
+    "skipped": [
+      [
+        "test_native_relative_worktree_with_configured_git_on_narrow_path (test_git_worktrees.GitWorktreeTests.test_native_relative_worktree_with_configured_git_on_narrow_path)",
+        "'no installed Git supports worktree add --relative-paths'"
+      ],
+      [
+        "test_chat_keeps_custom_provider_and_excludes_mcp_on_new_and_legacy_turns (test_native_codex.NativeCodexTests.test_chat_keeps_custom_provider_and_excludes_mcp_on_new_and_legacy_turns)",
+        "'Bubblewrap is unavailable for the system MCP fixture'"
+      ],
+      [
+        "test_proposal_excludes_system_mcp_before_starting_codex (test_native_codex.NativeCodexTests.test_proposal_excludes_system_mcp_before_starting_codex)",
+        "'Bubblewrap is unavailable for the system MCP fixture'"
+      ]
+    ],
+    "elapsedSeconds": 26.195,
+    "modules": [
+      "test_git_worktrees",
+      "test_tree_pages",
+      "test_tree_transport.CloudFilenameTransport",
+      "test_workspace",
+      "test_bridge",
+      "test_history",
+      "test_output_pages",
+      "test_tasks",
+      "test_proposals",
+      "test_task_cancel",
+      "test_native_claude",
+      "test_claude_isolation",
+      "test_native_codex"
+    ]
+  }
+}

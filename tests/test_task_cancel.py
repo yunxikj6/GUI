@@ -20,6 +20,8 @@ class TaskCancellationTests(unittest.TestCase):
         self.base = Path(temp.name)
         self.root = self.base / "project"
         self.root.mkdir()
+        self.git = workspace.system_git()
+        subprocess.run([self.git, "init", "--quiet", str(self.root)], check=True)
         self.bin = self.base / "bin"
         self.bin.mkdir()
         env = patch.dict(os.environ, {"XDG_STATE_HOME": str(self.base / "state"),
@@ -31,6 +33,10 @@ class TaskCancellationTests(unittest.TestCase):
 
     def cli(self, name, body, inventory="print('[]')"):
         file = self.bin / name
+        if name == "git":
+            os.environ["CLOUD_WORKSPACE_GIT"] = str(file)
+            body = ("if 'ls-files' not in sys.argv or '--cached' not in sys.argv:\n"
+                    f"    os.execv({self.git!r}, [{self.git!r}, *sys.argv[1:]])\n" + body)
         file.write_text(f"#!{sys.executable}\nfrom pathlib import Path\nimport os, sys, json, signal, subprocess, time\n"
                         "if sys.argv[1:3] == ['mcp', 'list']:\n" + textwrap.indent(inventory, "    ")
                         + "\n    sys.exit(0)\n" + body)
@@ -132,7 +138,7 @@ sys.stdout.buffer.write(line[cut:] + b'\\r\\n{"type":"turn.completed"}')
 
     def test_git_and_proposal_finish_despite_inherited_output_pipes(self):
         git_child = self.base / "git-child"
-        self.cli("git", "if 'ls-files' not in sys.argv: sys.exit(0)\n" + self.helper(git_child)
+        self.cli("git", self.helper(git_child)
                  + "sys.stdout.buffer.write(b'a\\0b\\0' * 20000)")
         page = self.terminal(tasks.start_task(self.root, "files", "check", "")["id"])
         self.assertEqual(page["task"]["status"], "succeeded")

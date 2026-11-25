@@ -48,9 +48,10 @@ def capabilities(root: Path) -> dict:
     result = {}
     for provider, binary in (("check", "git"), ("codex", "codex"), ("claude", "claude"),
                              ("proposal", "codex")):
-        available = shutil.which(binary) is not None
+        available = (workspace.system_git() if provider == "check" else shutil.which(binary)) is not None
         if not available:
-            detail = f"请在云服务器安装 {binary} 并确认已加入 PATH。"
+            detail = ("请检查云服务器的 Git 安装和 CLOUD_WORKSPACE_GIT 配置。" if provider == "check" else
+                      f"请在云服务器安装 {binary} 并确认已加入 PATH。")
         elif provider == "check":
             detail = "用 Git 检查项目，无需模型账户。"
         elif provider == "proposal":
@@ -452,10 +453,18 @@ def decide_proposal(root: Path, task_id: str, decision: str) -> dict:
 
 
 def _git_check(root, emit):
+    try:
+        git_dir = workspace.repository_dir(root)
+        if git_dir is None:
+            return False, "当前项目根目录没有 Git 工作区，请打开仓库或工作树根目录后重试。"
+        overrides = workspace.disabled_filters(root, git_dir=git_dir)
+        git, env = workspace.git_command(root, git_dir=git_dir, overrides=overrides)
+    except workspace.WorkspaceError as exc:
+        return False, str(exc)
+    paths = ["--", *workspace.VISIBLE_PATHS]
     emit("正在统计 Git 跟踪的项目文件。")
-    git = ["git", "--no-optional-locks"]
-    with subprocess.Popen(git + ["ls-files", "--cached", "-z"], cwd=root, stdout=subprocess.PIPE,
-                          stderr=subprocess.DEVNULL) as listing:
+    with subprocess.Popen(git + ["ls-files", "--cached", "-z", *paths], cwd=root, env=env,
+                          stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as listing:
         count = sum(chunk.count(b"\0") for chunk in codex_tools.output_chunks(listing))
         if listing.wait():
             return False, "无法读取 Git 项目，请检查远端工作区和 Git 权限。"
@@ -464,13 +473,15 @@ def _git_check(root, emit):
     for name, args in (("工作区", []), ("暂存区", ["--cached"])):
         emit(f"正在检查{name}改动中的空白错误与冲突标记。")
         checked = subprocess.run(git + ["diff", "--check", "--no-ext-diff", "--no-textconv",
-                                        "--ignore-submodules=all", *args, "--"], cwd=root,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if checked.returncode:
+                                        "--ignore-submodules=all", *args, *paths], cwd=root, env=env,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if checked.returncode == 0:
+            emit(f"{name}检查通过。")
+        elif checked.returncode in (1, 2, 3):
             clean = False
             emit(f"{name}检查未通过，可在云端执行 git diff {'--cached ' if args else ''}--check 查看详情。")
         else:
-            emit(f"{name}检查通过。")
+            return False, f"Git 无法完成{name}检查，请检查当前工作树和索引是否可读。"
     return (True, "项目检查通过。") if clean else (False, "Git 检查发现问题，请查看上方结果。")
 
 

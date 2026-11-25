@@ -105,7 +105,7 @@ function fileSync(message = '', stale = false) {
   taskControls();
 }
 const state = {
-  project: null, workspaceId: null, providers: {}, ready: false, view: 'files', file: null,
+  project: null, workspaceId: null, providers: {}, gitIssue: '', ready: false, view: 'files', file: null,
   fileScope: null, fileVersion: 0, treeVersion: 0, refreshVersion: 0, taskListVersion: 0, taskVersion: 0,
   tasks: [], historyAnchors: [], historyNext: null, historyTarget: null,
   selectedTask: null, selectedRecord: null, timer: null,
@@ -389,19 +389,57 @@ async function openFile(path) {
     } else $('fileNotice').textContent = asError(err);
   }
 }
+function updateGitStatus({gitState,gitMessage,branch}) {
+  const label = $('branch');
+  if (gitState === 'none' || gitState === 'error') {
+    label.textContent = gitState === 'none' ? '项目根目录没有 Git 仓库' : 'Git 仓库不可用';
+    state.gitIssue = gitMessage || label.textContent + '。';
+  } else {
+    label.textContent = branch || '未获取分支';
+    state.gitIssue = '';
+  }
+  label.title = state.gitIssue || label.textContent;
+}
+async function recheckDiffRepository(current) {
+  try {
+    const status = await rpc('status',{},current);
+    if (!current() || workspaceScope(status) !== state.loadedKey) return;
+    updateGitStatus(status);
+    if (status.providers?.check) state.providers.check = status.providers.check;
+    taskControls();
+    return state.gitIssue;
+  } catch { /* Keep the diff result and last confirmed repository status. */ }
+}
 async function openDiff() {
   const ticket = ++state.fileVersion;
+  const current = () => ticket === state.fileVersion;
   viewButtons('diff'); resetPreview(); $('preview').hidden = false;
   fileHeading('版本控制', 'Git 差异', state.project || '');
   $('fileNotice').textContent = '正在读取改动…';
   try {
-    const data = await rpc('diff');
-    if (ticket !== state.fileVersion) return;
-    $('fileNotice').textContent = data.diff ? '' : '当前工作区没有 Git 差异。';
+    const data = await rpc('diff',{},current);
+    if (!current()) return;
+    if (data.gitState === 'none' || data.gitState === 'error') {
+      updateGitStatus(data); taskControls();
+      $('fileNotice').textContent = state.gitIssue;
+      return;
+    }
+    if (typeof data.diff !== 'string') throw new Error('未能读取 Git 差异，请重试。');
+    let issue = '';
+    if (state.gitIssue) {
+      issue = await recheckDiffRepository(current) ?? '差异结果为空，暂时无法核对 Git 仓库状态。';
+      if (!current()) return;
+    }
+    $('fileNotice').textContent = data.diff ? '' : issue || '当前工作区没有 Git 差异。';
     if (data.diff) drawLines(data.diff, true);
     if (data.truncated) $('fileNotice').textContent = '云端差异较长，当前仅显示开头部分。';
   } catch(err) {
-    if (ticket === state.fileVersion) $('fileNotice').textContent = asError(err);
+    if (!current()) return;
+    $('fileNotice').textContent = asError(err);
+    if (err.code === 'git_error') {
+      const issue = await recheckDiffRepository(current);
+      if (current() && issue) $('fileNotice').textContent = issue;
+    }
   }
 }
 function beginEdit() {
@@ -587,7 +625,10 @@ function taskControls() {
   updateProposalButtons();
   $('runAgent').disabled = blocked || !caps[provider]?.available || !$('prompt').value.trim() ||
     (provider === 'proposal' && !proposalTarget);
-  $('runCheck').disabled = blocked || !caps.check?.available;
+  const checkIssue = state.gitIssue || (caps.check?.available === false ? caps.check.detail : '');
+  $('runCheck').disabled = blocked || !caps.check?.available || Boolean(state.gitIssue);
+  $('checkHint').textContent = state.ready ? checkIssue || '' : '';
+  $('checkHint').hidden = !$('checkHint').textContent;
   $('providerHint').textContent = !state.ready ? '等待连接' :
     caps[provider]?.available ? 'Ctrl / ⌘ + Enter' : '云机未提供此助手';
   $('pendingWrap').hidden = !state.pending || state.sending;
@@ -1093,6 +1134,7 @@ function sendReply() {
 }
 function run(provider) {
   if (state.pending || state.sending || !state.ready || !state.providers[provider]?.available) return;
+  if (provider === 'check' && state.gitIssue) return;
   const prompt = provider === 'check' ? '' : $('prompt').value.trim();
   if (provider !== 'check' && !prompt) return;
   const target = provider === 'proposal' ? drawProposalTarget() : {};
@@ -1107,7 +1149,8 @@ function restore(status) {
   state.mode = status.mode;
   const firstCapabilities = !state.providers.codex && Boolean(status.providers?.codex);
   state.project = projectName; state.providers = status.providers || {};
-  $('topProject').textContent = projectName; $('branch').textContent = status.branch || '未获取分支';
+  $('topProject').textContent = projectName;
+  updateGitStatus(status);
   if (state.loadedKey === scope) {
     if (!stored(scope + '.provider') && $('provider').value === 'codex' &&
         !state.providers.codex?.available && state.providers.claude?.available) $('provider').value = 'claude';

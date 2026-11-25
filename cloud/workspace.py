@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import resource
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
@@ -282,53 +283,145 @@ def save(root, path, content, revision):
     return {"path": path, "size": len(data), "kind": "text", "revision": hashlib.sha256(data).hexdigest()}
 
 
-def git(root, *arguments, limit=MAX_DIFF, check=True, overrides=()):
-    # A file size limit bounds even a diff of a huge tracked file. A file descriptor
-    # avoids buffering the child process's complete output in this service.
-    def limit_output():
-        resource.setrlimit(resource.RLIMIT_FSIZE, (limit + 1, limit + 1))
+def system_git():
+    configured = os.environ.get("CLOUD_WORKSPACE_GIT")
+    if configured is not None:
+        return shutil.which(configured) if os.path.isabs(configured) else None
+    return shutil.which("git", path="/usr/local/bin" + os.pathsep + os.defpath)
 
+
+def git_command(root, *arguments, git_dir=None, overrides=()):
     env = {"PATH": os.defpath, "LC_ALL": "C.UTF-8", "GIT_CONFIG_GLOBAL": os.devnull,
            "GIT_CONFIG_NOSYSTEM": "1", "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0",
            "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_ALLOW_PROTOCOL": "",
-           "GIT_DIR": str(root / ".git"), "GIT_WORK_TREE": str(root)}
-    with tempfile.TemporaryFile() as output:
-        command = ["git", "--no-pager", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
-                   "-c", "core.preloadIndex=false", "-c", "core.quotePath=false", *overrides, *arguments]
-        result = subprocess.run(command, cwd=root, env=env, stdin=subprocess.DEVNULL, stdout=output,
-                                stderr=subprocess.DEVNULL, timeout=12, preexec_fn=limit_output)
+           "GIT_DIR": str(git_dir or root / ".git"), "GIT_WORK_TREE": str(root)}
+    binary = system_git()
+    if binary is None:
+        if "CLOUD_WORKSPACE_GIT" in os.environ:
+            raise WorkspaceError("git_error", "请检查 CLOUD_WORKSPACE_GIT 配置的 Git 绝对路径及执行权限。")
+        raise WorkspaceError("git_error", "未找到系统 Git，请在云服务器安装 Git。")
+    command = [binary, "--no-pager", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+               "-c", "core.preloadIndex=false", "-c", "core.quotePath=false", *overrides, *arguments]
+    return command, env
+
+
+def git(root, *arguments, git_dir=None, limit=MAX_DIFF, check=True, overrides=()):
+    # Bound even a diff of a huge tracked file without buffering it in the worker.
+    def limit_output():
+        resource.setrlimit(resource.RLIMIT_FSIZE, (limit + 1, limit + 1))
+
+    command, env = git_command(root, *arguments, git_dir=git_dir, overrides=overrides)
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        try:
+            result = subprocess.run(command, cwd=root, env=env, stdin=subprocess.DEVNULL, stdout=output,
+                                    stderr=errors, timeout=12, preexec_fn=limit_output)
+        except FileNotFoundError:
+            raise WorkspaceError("git_error", "未找到系统 Git，请在云服务器安装 Git。") from None
+        if result.returncode:
+            errors.seek(0)
+            lines = errors.read(4096).lower().splitlines()
+            unsupported = (b"fatal: unknown repository extension", b"fatal: expected git repo version")
+            if any(line.startswith(unsupported) for line in lines):
+                raise WorkspaceError("git_error", "当前系统 Git 不支持此仓库格式，请升级云服务器上的 Git。")
         output.seek(0)
         data = output.read(limit + 1)
     truncated = len(data) > limit
     if check and result.returncode and not truncated:
-        raise WorkspaceError("git_error", "Git 无法完成工作区仓库操作。")
+        raise WorkspaceError("git_error", "Git 无法完成工作区仓库操作，请检查仓库或系统 Git 版本。")
     return data[:limit], truncated, result.returncode
 
 
-def has_repo(root):
+def _git_path_record(path, prefix=b""):
+    # Git's worktree pointer and backlink each contain a single filesystem path.
+    # O_NONBLOCK also prevents a concurrently replaced marker from opening a FIFO.
+    fd = os.open(path, NO_LINK | os.O_NONBLOCK)
     try:
-        return stat.S_ISDIR((root / ".git").lstat().st_mode)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise ValueError()
+        data = os.read(fd, 8193)
+    finally:
+        os.close(fd)
+    target = data.removesuffix(b"\n").removesuffix(b"\r")
+    if len(data) > 8192 or not target.startswith(prefix) or len(target) == len(prefix):
+        raise ValueError()
+    return (path.parent / os.fsdecode(target[len(prefix):])).resolve(strict=True)
+
+
+def _linked_git_dir(root, marker):
+    try:
+        admin = _git_path_record(marker, b"gitdir: ")
+        # Registered worktrees have a private directory in the common repository's
+        # worktrees/ and a backlink to their own .git marker.
+        if admin.parent.name != "worktrees":
+            raise WorkspaceError("git_error", "当前仅支持普通 Git 仓库和 Git 登记的关联工作树。")
+        if _git_path_record(admin / "gitdir") != root.resolve() / ".git":
+            raise ValueError()
+        common, cut, _ = git(root, "rev-parse", "--git-common-dir", git_dir=admin, limit=8192)
+        if cut or (root / os.fsdecode(common.removesuffix(b"\n"))).resolve(strict=True) != admin.parent.parent:
+            raise ValueError()
+        return admin
+    except (OSError, RuntimeError, ValueError):
+        raise WorkspaceError("git_error", "Git 工作树登记无效，请检查项目的 .git 或用 git worktree repair 修复。") from None
+
+
+def repository_dir(root):
+    """Return the selected root's Git directory, including registered linked worktrees."""
+    marker = root / ".git"
+    try:
+        mode = marker.lstat().st_mode
     except FileNotFoundError:
-        return False
+        return None
+    if stat.S_ISDIR(mode):
+        git_dir = marker
+    elif stat.S_ISREG(mode):
+        git_dir = _linked_git_dir(root, marker)
+    else:
+        raise WorkspaceError("git_error", "无法识别此项目的 .git 登记信息。")
+
+    _, _, code = git(root, "rev-parse", "--verify", "--quiet", "HEAD^{commit}", git_dir=git_dir, check=False)
+    if code:
+        # An unborn branch has no exact ref yet. A ref pointing at a lost object
+        # is different: Git diff --check can succeed even with that broken HEAD.
+        ref, _, _ = git(root, "symbolic-ref", "--quiet", "HEAD", git_dir=git_dir)
+        _, _, exists = git(root, "show-ref", "--verify", "--quiet", os.fsdecode(ref.removesuffix(b"\n")),
+                           git_dir=git_dir, check=False)
+        if exists != 1:
+            raise WorkspaceError("git_error", "Git 无法读取当前提交，请检查仓库的引用和对象。")
+    return git_dir
 
 
 def status(root):
-    import tasks
+    if __package__:
+        from . import tasks
+    else:
+        import tasks
 
+    providers = tasks.capabilities(root)
     branch = ""
-    if has_repo(root):
-        raw, _, code = git(root, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
-        if code:
-            raw, _, _ = git(root, "rev-parse", "--short", "HEAD", check=False)
-        branch = raw.decode("utf-8", "replace").strip()
-    return {"project": root.name, "branch": branch, "providers": tasks.capabilities(root)}
+    state, message = "none", "当前项目根目录没有 Git 仓库。"
+    try:
+        git_dir = repository_dir(root)
+        if git_dir is not None:
+            raw, _, code = git(root, "symbolic-ref", "--quiet", "--short", "HEAD", git_dir=git_dir, check=False)
+            if code:
+                raw, _, _ = git(root, "rev-parse", "--short", "HEAD", git_dir=git_dir)
+            branch = raw.decode("utf-8", "replace").removesuffix("\n")
+            state, message = "ready", ""
+    except WorkspaceError as exc:
+        state, message = "error", str(exc)
+    except (OSError, subprocess.TimeoutExpired):
+        state, message = "error", "无法读取工作区 Git 信息，请检查服务器的 Git 和文件权限。"
+    if state != "ready":
+        providers["check"] = {"available": False, "detail": message}
+    return {"project": root.name, "branch": branch, "providers": providers,
+            "gitState": state, "gitMessage": message}
 
 
-def disabled_filters(root):
+def disabled_filters(root, *, git_dir=None):
     # A repository's clean/process filter is an external command even when
     # --no-ext-diff is used. Ask Git for its names and override each before diffing.
     raw, truncated, code = git(root, "config", "--null", "--name-only", "--get-regexp",
-                               r"^filter\..*\.(clean|process|required)$", check=False)
+                               r"^filter\..*\.(clean|process|required)$", git_dir=git_dir, check=False)
     if truncated or code not in (0, 1):
         raise WorkspaceError("git_error", "无法检查仓库的 Git 过滤器设置。")
     overrides = []
@@ -352,17 +445,20 @@ def new_file_patch(root, path):
 
 
 def diff(root):
-    if not has_repo(root):
-        return {"diff": "", "truncated": False}
-    base, _, code = git(root, "rev-parse", "--verify", "HEAD", check=False)
+    git_dir = repository_dir(root)
+    if git_dir is None:
+        return {"diff": "", "truncated": False, "gitState": "none"}
+    base, _, code = git(root, "rev-parse", "--verify", "HEAD", git_dir=git_dir, check=False)
     if code:
-        base, _, _ = git(root, "hash-object", "-t", "tree", "--stdin")
+        git(root, "symbolic-ref", "--quiet", "HEAD", git_dir=git_dir)
+        base, _, _ = git(root, "hash-object", "-t", "tree", "--stdin", git_dir=git_dir)
     raw, truncated, _ = git(root, "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames",
                             "--ignore-submodules=all", base.decode("ascii").strip(), "--", *VISIBLE_PATHS,
-                            overrides=disabled_filters(root))
+                            git_dir=git_dir, overrides=disabled_filters(root, git_dir=git_dir))
     if truncated:
         return {"diff": raw.decode("utf-8", "replace"), "truncated": True}
-    paths, names_cut, _ = git(root, "ls-files", "--others", "--exclude-standard", "-z", "--", *VISIBLE_PATHS)
+    paths, names_cut, _ = git(root, "ls-files", "--others", "--exclude-standard", "-z", "--", *VISIBLE_PATHS,
+                              git_dir=git_dir)
     result = bytearray(raw)
     for name in paths.split(b"\x00")[:-1]:
         path = os.fsdecode(name)

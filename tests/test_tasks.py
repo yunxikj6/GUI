@@ -44,6 +44,8 @@ class RemoteTaskTests(unittest.TestCase):
 
     def executable(self, name, source, inventory="print('[]')"):
         path = self.bin / name
+        if name == "git":
+            os.environ["CLOUD_WORKSPACE_GIT"] = str(path)
         if name == "codex":
             source = ("import sys\nif sys.argv[1:3] == ['mcp', 'list']:\n"
                       + "    " + inventory + "\n    sys.exit(0)\n" + source)

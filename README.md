@@ -22,6 +22,10 @@ Windows 可双击 `Start.cmd`，macOS 可双击 `Start.command` 或从终端运�
 python3 launcher.py --remote-project /data/workspace/my-project
 ```
 
+用 `git worktree add` 创建的关联工作树也可直接作为项目打开。请把 `--remote-project` 指向该工作树的根目录。分支、Git 差异和项目检查都读取这份工作树自己的索引。分离 HEAD 时，侧栏显示当前提交的短标识。打开普通目录仍可浏览和编辑文件。
+
+工作台默认从云机的 `/usr/local/bin` 和系统目录查找 Git。需要指定版本时，在运行启动器前将 `CLOUD_WORKSPACE_GIT` 设为所选机器上 Git 可执行文件的绝对路径。本机模式使用本机路径，InstaBox 模式使用云机路径。
+
 密钥只交给本机启动器。云机工作进程、网页、交付包均不需要保留账户密钥。客户端监听 `127.0.0.1`，校验 HTTP Host 和网页 Origin。实例通信通过 InstaBox 官方 HTTPS API 完成。云机不用额外开放端口。选择项目意味着允许本机查看及编辑该目录中支持的文件。
 
 ## 首次使用
@@ -74,5 +78,6 @@ python3 launcher.py --local --project "$(mktemp -d)/project"
 - [任务历史翻页与云机升级验收](docs/validation-task-history.md)
 - [长任务输出与实时回放验收](docs/validation-output-windows.md)
 - [大目录浏览与云机验收](docs/validation-tree-pagination.md)
+- [Git 关联工作树与项目检查验收](docs/validation-git-worktrees.md)
 - [项目需求](docs/requirements.md)和[开发交接](AGENTS.md)
 - [桌面查看器第三方许可](desktop_assets/NOTICE.txt)

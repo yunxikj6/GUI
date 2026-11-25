@@ -1,11 +1,31 @@
 """Loopback browser boundary and API error reporting."""
 import http.client
 import json
+import os
 import threading
 import unittest
 from unittest.mock import patch
 
 import launcher
+from instabox import BridgeError, InstaBox
+
+
+class TestWorkerEnvironment(unittest.TestCase):
+    def test_remote_git_path_comes_from_launcher_and_survives_resume(self):
+        with patch.object(InstaBox, 'api', return_value={'machines': [{'id': 'm_test'}]}):
+            box = InstaBox('fixture', project='/data/project')
+        box.worker = '/data/runtime/workspace.py'
+        payload = {'op': 'status', 'CLOUD_WORKSPACE_GIT': '/ignored/browser/value'}
+        choice = '/opt/git current/bin/git'
+        with patch.dict(os.environ, {'CLOUD_WORKSPACE_GIT': choice}), patch.object(box, 'ensure_running'), \
+             patch.object(box, 'exec', side_effect=[BridgeError('machine_suspended', 'paused'), '{"ok":true}']) as run:
+            self.assertTrue(box.rpc(payload)['ok'])
+        self.assertEqual(len(run.call_args_list), 2)
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs['envs'], {'CLOUD_WORKSPACE_ROOT': box.project, 'CLOUD_WORKSPACE_GIT': choice})
+        with patch.dict(os.environ, {}, clear=True), patch.object(box, 'exec', return_value='{"ok":true}') as run:
+            self.assertTrue(box.rpc(payload)['ok'])
+            self.assertEqual(run.call_args.kwargs['envs'], {'CLOUD_WORKSPACE_ROOT': box.project})
 
 
 class TestHttpBoundary(unittest.TestCase):

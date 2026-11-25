@@ -4,6 +4,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 import socket
 import time
 import urllib.error
@@ -143,15 +144,18 @@ class InstaBox:
         # fragments and larger saves do not hit the guest's argv length limit.
         argv = ['python3', self.worker, '--stdin']
         stdin = json_bytes(request).decode('utf-8')
+        env = {'CLOUD_WORKSPACE_ROOT': self.project}
+        if 'CLOUD_WORKSPACE_GIT' in os.environ:
+            env['CLOUD_WORKSPACE_GIT'] = os.environ['CLOUD_WORKSPACE_GIT']
         try:
-            output = self.exec(argv, stdin, envs={'CLOUD_WORKSPACE_ROOT': self.project})
+            output = self.exec(argv, stdin, envs=env)
         except BridgeError as exc:
             if exc.code not in {'machine_not_running', 'machine_suspended'}:
                 raise
             # A rejected exec never entered the guest. A transport timeout is
             # ambiguous, so it is surfaced and never automatically resubmitted.
             self.ensure_running()
-            output = self.exec(argv, stdin, envs={'CLOUD_WORKSPACE_ROOT': self.project})
+            output = self.exec(argv, stdin, envs=env)
         try:
             result = json.loads(output)
             if not isinstance(result, dict) or not isinstance(result.get('ok'), bool):

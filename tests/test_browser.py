@@ -80,6 +80,7 @@ class BrowserFixture(unittest.TestCase):
             encoding="utf-8",
         )
         git.chmod(0o700)
+        env["CLOUD_WORKSPACE_GIT"] = str(git)
         # Persist a transcript in the fixture CLI's own directory across invocations.
         codex = binaries / "codex"
         codex.write_text(f"#!{sys.executable}\n" + """
