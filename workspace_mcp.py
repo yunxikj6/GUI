@@ -252,10 +252,14 @@ def main():
                 print(name + " = " + json.dumps(value, ensure_ascii=False).replace(chr(127), r"\u007f"))
             if args.allow_save:
                 print('tools.save_workspace_text.approval_mode = "prompt"')
+            # Codex filters the environment of stdio servers. urllib/OpenSSL need
+            # the host's HTTPS proxy and CA settings on managed networks.
+            inherit = ["HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR"]
             if args.credential_source == "environment":
-                print('env_vars = ["INSTABOX_API_KEY"]')
+                inherit.append("INSTABOX_API_KEY")
             elif sys.platform.startswith("linux"):
-                print('env_vars = ["DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "CLOUDWORKSPACE_NESTED_GNOME"]')
+                inherit.extend(("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "CLOUDWORKSPACE_NESTED_GNOME"))
+            print("env_vars = " + json.dumps(inherit))
         else:
             print(json.dumps({"mcpServers": {"instabox-workspace": config}}, ensure_ascii=True, indent=2))
         return 0

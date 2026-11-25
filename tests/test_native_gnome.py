@@ -2,6 +2,7 @@ import importlib.util
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -14,6 +15,27 @@ spec.loader.exec_module(gnome)
 
 
 class NativeGnome(unittest.TestCase):
+    def test_official_chatgpt_command_targets_this_session_and_keeps_open_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vendor_bin = root / "vendor's commands"
+            vendor_bin.mkdir()
+            client = vendor_bin / "chatgpt"
+            env = {"PATH": str(vendor_bin) + ":/usr/bin:/bin", "DISPLAY": ":45",
+                   "WAYLAND_DISPLAY": "outer-display", "WAYLAND_SOCKET": "21"}
+            display = str(root / "inner socket")
+            with socket.socket(socket.AF_UNIX) as wayland:
+                wayland.bind(display)
+                client.write_text("#!/bin/sh\n"
+                                  "printf '%s\\n' \"${DISPLAY-unset}\" \"${WAYLAND_SOCKET-unset}\" \"$WAYLAND_DISPLAY\" \"$@\"\n")
+                client.chmod(0o700)
+                gnome.configure_chatgpt_display(env, root, display)
+                output = subprocess.check_output(["chatgpt", "a file.csv", "file:///two%20files"], env=env, text=True)
+            self.assertEqual(output.splitlines(), ["unset", "unset", display, "--ozone-platform=wayland",
+                                                   "a file.csv", "file:///two%20files"])
+            self.assertEqual(env["DISPLAY"], ":45")
+            self.assertEqual(env["WAYLAND_DISPLAY"], "outer-display")
+
     def test_optional_shortcuts_run_on_the_new_bus_before_shell_even_if_setup_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

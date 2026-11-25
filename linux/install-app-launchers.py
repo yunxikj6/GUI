@@ -17,7 +17,12 @@ import time
 SCRIPT = Path(__file__).resolve()
 WINDOWS_DIR = SCRIPT.parent.parent / "windows"
 WINDOWS_HELPER = WINDOWS_DIR / "Open-OfficialApp.ps1"
-NATIVE_CLAUDE_ID = "com.anthropic.Claude.desktop"
+# Desktop IDs and commands shipped in the official Linux packages.
+NATIVE_APPS = {
+    "Claude": ("com.anthropic.Claude.desktop", "claude-desktop"),
+    "ChatGPT": ("chatgpt.desktop", "chatgpt"),
+}
+INSTALLER_MARKER = "X-CloudWorkspace-Installer=true"
 APP_IDS = {
     "ChatGPT": "cloudworkspace-windows-chatgpt.desktop",
     "Claude": "cloudworkspace-windows-claude.desktop",
@@ -33,22 +38,41 @@ def data_home():
     return directory if directory.is_absolute() else Path.home() / ".local" / "share"
 
 
-def native_claude_installed():
+def data_roots():
     dirs = os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
-    for base in [data_home(), *(Path(item) for item in dirs.split(":") if item.startswith("/"))]:
-        entry = base / "applications" / NATIVE_CLAUDE_ID
+    return [data_home(), *(Path(item) for item in dirs.split(":") if item.startswith("/"))]
+
+
+def application_entry(app_id, *, command=None):
+    for base in data_roots():
+        path = base / "applications" / app_id
         config = configparser.ConfigParser(interpolation=None, strict=False)
         try:
-            with entry.open(encoding="utf-8-sig") as reader:
+            with path.open(encoding="utf-8-sig") as reader:
                 config.read_file(reader)
-            desktop = config["Desktop Entry"]
-            # The vendor's Debian package ships this desktop ID with Exec=claude-desktop %U.
-            if (desktop.get("Type") == "Application" and desktop.get("Exec", "").split()[:1] == ["claude-desktop"]
-                    and shutil.which("claude-desktop")):
-                return True
-        except (OSError, KeyError, UnicodeError, configparser.Error):
+            entry = config["Desktop Entry"]
+            if entry.get("Type") != "Application" or entry.getboolean("Hidden", False) or entry.getboolean("NoDisplay", False):
+                return None
+            if command:
+                system_path = os.environ.get("CLOUDWORKSPACE_SYSTEM_PATH") if os.environ.get("CLOUDWORKSPACE_NESTED_GNOME") else None
+                if entry.get("Exec", "").split()[:1] != [command] or not shutil.which(command, path=system_path):
+                    return None
+            elif not entry.getboolean("X-CloudWorkspace-WindowsLauncher", False):
+                return None
+            icon = entry.get("Icon", "")
+            if not icon or any(c in icon for c in "\r\n\0"):
+                icon = GENERIC_ICON
+            return path, icon
+        except FileNotFoundError:
             continue
-    return False
+        except (OSError, KeyError, ValueError, UnicodeError, configparser.Error):
+            return None
+    return None
+
+
+def native_entry(app):
+    app_id, command = NATIVE_APPS[app]
+    return application_entry(app_id, command=command)
 
 
 def exec_path_argument(path):
@@ -78,7 +102,7 @@ def entry_text(app, icon):
     ))
 
 
-def update_entry(path, new_text):
+def update_entry(path, new_text, *, marker=MANAGED):
     if path.is_symlink():
         raise RuntimeError(f"已有同名符号链接，请检查后重试：{path}")
     try:
@@ -87,7 +111,7 @@ def update_entry(path, new_text):
         prior = None
     if prior == new_text:
         return
-    if prior is not None and MANAGED not in prior.splitlines():
+    if prior is not None and marker not in prior.splitlines():
         raise RuntimeError(f"已有其他程序创建的同名桌面项：{path}")
     if new_text is None:
         path.unlink(missing_ok=True)
@@ -102,6 +126,40 @@ def update_entry(path, new_text):
             tmp.replace(path)
         finally:
             tmp.unlink(missing_ok=True)
+
+
+def offer_app_setup():
+    if not SCRIPT.with_name("setup-vendor-apps.sh").is_file():
+        return
+    applications = data_home() / "applications"
+    applications.mkdir(parents=True, exist_ok=True)
+    entry = "\n".join((
+        "[Desktop Entry]", "Type=Application",
+        "Name=Install official desktop apps", "Name[zh_CN]=安装官方客户端",
+        "Comment=Install ChatGPT or Claude for Ubuntu",
+        "Comment[zh_CN]=在 Ubuntu 内安装 ChatGPT 或 Claude",
+        "Keywords=ChatGPT;Claude;install;", "Keywords[zh_CN]=ChatGPT;Claude;安装;",
+        "Icon=system-software-install", "Categories=Settings;", "Terminal=true",
+        f"Exec=/usr/bin/python3 {exec_path_argument(SCRIPT)} --setup-apps",
+        INSTALLER_MARKER, "",
+    ))
+    update_entry(applications / "cloudworkspace-install-apps.desktop", entry, marker=INSTALLER_MARKER)
+
+
+def setup_apps():
+    env = os.environ.copy()
+    env.pop("INSTABOX_API_KEY", None)
+    result = subprocess.run(["/bin/bash", str(SCRIPT.with_name("setup-vendor-apps.sh"))], env=env)
+    if result.returncode:
+        if result.returncode != 130 and sys.stdin.isatty():
+            try:
+                input("安装未完成。请查看上方的软件包管理器消息，按 Enter 关闭。")
+            except EOFError:
+                pass
+        return result.returncode
+    if os.environ.get("WSL_DISTRO_NAME"):
+        install()
+    return subprocess.run([sys.executable, str(SCRIPT.with_name("desktop-shortcuts.py"))], env=env).returncode
 
 
 def recent(path, seconds):
@@ -168,12 +226,14 @@ def installed_icon(app):
 
 
 def install():
-    native_launcher()
     directory = data_home() / "applications"
     directory.mkdir(parents=True, exist_ok=True)
-    apps = ["ChatGPT"] if native_claude_installed() else list(APP_IDS)
-    with ThreadPoolExecutor(max_workers=len(apps)) as pool:
-        icons = dict(zip(apps, pool.map(installed_icon, apps)))
+    apps = [app for app in APP_IDS if not native_entry(app)]
+    icons = {}
+    if apps:
+        native_launcher()
+        with ThreadPoolExecutor(max_workers=len(apps)) as pool:
+            icons = dict(zip(apps, pool.map(installed_icon, apps)))
     for app, filename in APP_IDS.items():
         update_entry(directory / filename, entry_text(app, icons[app]) if app in icons else None)
 
@@ -220,7 +280,7 @@ def activate(app):
     path = native_launcher()
     try:
         # WSL interop activates the PE directly. The Windows program displays its own app errors.
-        return subprocess.run([str(path), "--open-app", app]).returncode
+        return subprocess.run([str(path), "--open-app", app, "--offer-install"]).returncode
     except OSError as error:
         raise RuntimeError(f"WSL 无法执行 {path.name}。请确认已启用 Windows 互操作且文件可执行。\n{error}") from error
 
@@ -254,11 +314,15 @@ def show_error(app, message):
 
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--open", choices=APP_IDS, metavar="APP", help="Activate an official Windows app.")
+    action = cli.add_mutually_exclusive_group()
+    action.add_argument("--open", choices=APP_IDS, metavar="APP", help="Activate an official Windows app.")
+    action.add_argument("--setup-apps", action="store_true", help="Install native Ubuntu clients in a terminal.")
     args = cli.parse_args()
     try:
         if args.open:
             return activate(args.open)
+        if args.setup_apps:
+            return setup_apps()
         else:
             install()
     except (OSError, RuntimeError, UnicodeError, ValueError) as err:

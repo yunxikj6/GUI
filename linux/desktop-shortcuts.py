@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 """Offer each installed application a desktop shortcut once, in the GNOME user's session."""
-import configparser
 import ctypes
 import fcntl
 import hashlib
@@ -30,39 +29,8 @@ def desktop_dir():
     return Path(os.fsdecode(path)) if path else None
 
 
-def data_roots():
-    dirs = os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
-    return [launchers.data_home(), *(Path(p) for p in dirs.split(":") if p.startswith("/"))]
-
-
 def entry_for(app):
-    roots = data_roots()
-    ids = [launchers.APP_IDS[app]]
-    if app == "Claude":
-        ids.insert(0, launchers.NATIVE_CLAUDE_ID)
-    for app_id in ids:
-        for base in roots:
-            source = base / "applications" / app_id
-            if not source.is_file():
-                continue
-            config = configparser.ConfigParser(interpolation=None, strict=False)
-            try:
-                config.read(source, encoding="utf-8-sig")
-                entry = config["Desktop Entry"]
-                if entry.get("Type") != "Application" or entry.getboolean("Hidden", False) or entry.getboolean("NoDisplay", False):
-                    break
-                if app_id == launchers.NATIVE_CLAUDE_ID:
-                    if entry.get("Exec", "").split()[:1] != ["claude-desktop"] or not shutil.which("claude-desktop"):
-                        break
-                elif not entry.getboolean("X-CloudWorkspace-WindowsLauncher", False):
-                    break
-                icon = entry.get("Icon", "")
-                if not icon or any(ch in icon for ch in "\r\n\0"):
-                    icon = "application-x-executable"
-                return source, icon
-            except (KeyError, ValueError, OSError, configparser.Error):
-                break
-    return None
+    return launchers.native_entry(app) or launchers.application_entry(launchers.APP_IDS[app])
 
 
 def stable_entry(app, source, marker):
@@ -111,10 +79,10 @@ def icon_sources(icon):
             match = theme.lookup_icon(name, 512, 0)
             if match and match.get_filename():
                 yield Path(match.get_filename())
-        if name == "claude-desktop":
-            for base in data_roots():
-                yield base / "icons/hicolor/256x256/apps/claude-desktop.png"
-                yield base / "pixmaps/claude-desktop.png"
+        if name in ("claude-desktop", "chatgpt"):
+            for base in launchers.data_roots():
+                yield base / "icons/hicolor/256x256/apps" / (name + ".png")
+                yield base / "pixmaps" / (name + ".png")
     # Noble ships these fallback images even when the calling Python lacks GI.
     for theme_dir in ("Yaru/256x256@2x", "Yaru/256x256", "Adwaita/16x16"):
         yield Path("/usr/share/icons") / theme_dir / "mimetypes/application-x-executable.png"
@@ -204,6 +172,10 @@ def writable_desktop(state):
 
 
 def ensure_shortcuts():
+    try:
+        launchers.offer_app_setup()
+    except (OSError, RuntimeError) as error:
+        print(f"安装官方客户端的菜单项未能更新：{error}", file=sys.stderr)
     state = xdg_home("XDG_STATE_HOME", ".local/state") / "cloudworkspace/desktop-shortcuts"
     available = {app: info for app in APPS if (info := entry_for(app))}
     if not available:

@@ -209,7 +209,10 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
                                               *flags, "--allow-save", "--host", "codex", "--print-config"])
         flags_line = next(line for line in codex.decode().splitlines() if line.startswith("args = "))
         self.assertEqual(json.loads(flags_line.split(" = ",1)[1]), [str(ROOT / "workspace_mcp.py"), *flags, "--allow-save"])
-        self.assertIn(b'env_vars = ["INSTABOX_API_KEY"]', codex)
+        inherited = json.loads(next(line.partition(" = ")[2] for line in codex.decode().splitlines()
+                                    if line.startswith("env_vars = ")))
+        self.assertCountEqual(inherited, ["INSTABOX_API_KEY", "HTTPS_PROXY", "https_proxy", "NO_PROXY",
+                                          "no_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR"])
         self.assertIn(b'tools.save_workspace_text.approval_mode = "prompt"', codex)
         self.assertNotIn(KEY.encode(), codex)
         async with self.client("") as session:

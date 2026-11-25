@@ -112,7 +112,7 @@ Path(args[8][2:].replace(chr(92), "/")).write_bytes(base64.b64decode(os.environ[
                 end = time.monotonic() + 4
                 while not self.log.exists() and time.monotonic() < end:
                     time.sleep(.025)
-                self.assertEqual(json.loads(self.log.read_text()), [str(self.exe), "--open-app", app])
+                self.assertEqual(json.loads(self.log.read_text()), [str(self.exe), "--open-app", app, "--offer-install"])
 
     def test_registered_icons_cached_and_negative_results_rechecked_after_expiry(self):
         gate = self.bin.parent / "waiting-apps"
@@ -164,7 +164,7 @@ sys.exit(1)
         self.install()
         self.assertFalse(self.log.exists())
         subprocess.run([sys.executable, self.script, "--open", "ChatGPT"], env=self.env, check=True)
-        self.assertEqual(json.loads(self.log.read_text()), [str(self.exe), "--open-app", "ChatGPT"])
+        self.assertEqual(json.loads(self.log.read_text()), [str(self.exe), "--open-app", "ChatGPT", "--offer-install"])
 
     def test_vendor_linux_claude_entry_replaces_only_managed_fallback(self):
         self.install()

@@ -23,11 +23,12 @@ const help = `Cloud Linux Workspace
   --check-native    检查本机 Ubuntu、WSLg 和桌面依赖后退出
   --setup-native    在交互终端为 Ubuntu 24.04 安装缺少的 GNOME 依赖
   --open-app 名称   打开 Microsoft Store 版 ChatGPT 或 Claude；可并用 --check-native 仅检测
+  --offer-install   与 --open-app 一起使用，缺少应用时询问是否打开官方安装页
   --help            显示本说明`
 
 type options struct {
-	distro, app            string
-	check, setup, showHelp bool
+	distro, app                          string
+	check, setup, showHelp, offerInstall bool
 }
 type failure struct {
 	code, message string
@@ -42,6 +43,8 @@ func parse(args []string) (options, *failure) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--native":
+		case "--offer-install":
+			opt.offerInstall = true
 		case "--check-native":
 			opt.check = true
 		case "--setup-native":
@@ -63,6 +66,9 @@ func parse(args []string) (options, *failure) {
 		default:
 			return opt, fail("arguments", "启动参数无法识别。用 --help 查看用法。")
 		}
+	}
+	if opt.offerInstall && opt.app == "" {
+		return opt, fail("arguments", "--offer-install 需要与 --open-app 一起使用。")
 	}
 	if opt.setup && (opt.app != "" || opt.check) {
 		return opt, fail("arguments", "--setup-native 是交互式安装操作，请单独运行，可用 --distro 选择 Ubuntu。")

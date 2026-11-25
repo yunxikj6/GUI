@@ -34,5 +34,10 @@ start "" "%~dp0windows\CloudLinuxWorkspace-%target%.exe"
 exit /b %errorlevel%
 
 :native_args
+if /i "%~1"=="--open-app" goto open_app
 "%~dp0windows\CloudLinuxWorkspace-%target%.exe" %*
+exit /b %errorlevel%
+
+:open_app
+"%~dp0windows\CloudLinuxWorkspace-%target%.exe" %* --offer-install
 exit /b %errorlevel%

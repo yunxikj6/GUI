@@ -4,6 +4,7 @@ import ctypes
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -13,6 +14,26 @@ import tempfile
 
 class LaunchError(Exception):
     pass
+
+
+def configure_chatgpt_display(env, private_dir, child_display):
+    # OpenAI's desktop entry invokes "chatgpt %U". DING can pass the outer X11
+    # display as well as the nested Wayland socket. Select the documented native
+    # backend for this session, including Activities, file opens and the Dock.
+    system_path = env.get("CLOUDWORKSPACE_SYSTEM_PATH", env.get("PATH", os.defpath))
+    command = shutil.which("chatgpt", path=system_path) or "/usr/bin/chatgpt"
+    directory = Path(private_dir) / "app-bin"
+    directory.mkdir(mode=0o700)
+    launcher = directory / "chatgpt"
+    launcher.write_text(
+        "#!/bin/sh\nunset DISPLAY WAYLAND_SOCKET\n"
+        f"export WAYLAND_DISPLAY={shlex.quote(child_display)}\n"
+        f'exec {shlex.quote(command)} --ozone-platform=wayland "$@"\n',
+        encoding="utf-8",
+    )
+    launcher.chmod(0o700)
+    env["CLOUDWORKSPACE_SYSTEM_PATH"] = system_path
+    env["PATH"] = str(directory) + os.pathsep + system_path
 
 
 def executable(name):
@@ -202,6 +223,7 @@ def main():
                    CLOUDWORKSPACE_NESTED_GNOME="1",
                    XDG_SESSION_TYPE="wayland", GNOME_SHELL_SESSION_MODE=mode,
                    XDG_CURRENT_DESKTOP="ubuntu:GNOME" if mode == "ubuntu" else "GNOME")
+        configure_chatgpt_display(env, private_dir, child_display)
         # D-Bus activated Wayland applications must inherit the child display. Only the compositor
         # and its viewer need the outer display while constructing the nested window.
         parent_env = ["WAYLAND_DISPLAY=" + str(wayland)] if wayland else ["-u", "WAYLAND_DISPLAY"]

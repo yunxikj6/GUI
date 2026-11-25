@@ -44,6 +44,8 @@ py -3 -m venv .venv-mcp
 
 将生成的 `[mcp_servers.instabox-workspace]` 配置加入本机 `~/.codex/config.toml`，或放在已信任项目的 `.codex/config.toml`。在 ChatGPT Desktop 的本地 Codex 项目中打开 MCP 设置，确认工具已启用；同一主机的 Codex CLI 可用 `codex mcp list` 和 `codex mcp get instabox-workspace` 核对配置。默认 stdio 进程位于本机，使用本机的 Python、凭据库和出站网络。工具授权由官方客户端及组织策略控制。ChatGPT Work 的托管会话使用各自环境中的连接。[ChatGPT 本地 MCP 配置](https://learn.chatgpt.com/docs/extend/mcp) · [ChatGPT 开发者设置](https://learn.chatgpt.com/docs/developer-settings)
 
+在 Ubuntu 上，已用 OpenAI 官方 ChatGPT Linux 软件包自带的 Codex 组件读取授权的 InstaBox 项目。组件通过系统密钥环连接，列出三项只读工具，查询云端 Git 状态，读回 3,549 字节的文件并与对应提交逐字节比对。生成的 TOML 允许子进程继承系统 HTTPS 代理和证书设置，代理地址及凭据保留在运行环境中。这项测试没有发送模型请求。登录后的聊天界面调用仍待验收。[OpenAI Linux 客户端](https://learn.chatgpt.com/docs/linux/linux-app) · [调用与文件实测记录](measurements/native-linux-clients.json)
+
 ## 默认只读工具和可选保存
 
 - `list_workspace_directory` 按项目相对路径列出目录。根目录可省略路径；后续页使用返回的 `nextCursor` 及原路径。每页最多 400 项。

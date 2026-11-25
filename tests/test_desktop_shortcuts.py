@@ -174,12 +174,36 @@ class DesktopShortcuts(unittest.TestCase):
         desktop = self.home / "Desktop"
         self.offer()
         self.assertFalse(desktop.exists())
-        self.assertFalse(self.data.exists())
+        self.assertEqual([p.name for p in (self.data / "applications").iterdir()], ["cloudworkspace-install-apps.desktop"])
+        self.assertFalse(self.opened.exists())
         self.assertFalse((self.home / "state").exists())
         self.native_claude()
         self.offer()
         self.assertEqual([p.name for p in desktop.iterdir()], ["Claude.desktop"])
         self.launch(desktop / "Claude.desktop", "linux-claude")
+
+    def test_both_native_packages_replace_windows_shortcuts_and_honor_hidden_user_entry(self):
+        self.release("one")
+        self.offer()
+        desktop = self.home / "Desktop"
+        icon = desktop / "ChatGPT.desktop"
+        initial = icon.stat().st_ino, icon.read_bytes()
+        self.native_claude()
+        native = self.system / "applications/chatgpt.desktop"
+        native.write_text("[Desktop Entry]\nType=Application\nName=ChatGPT\nExec=chatgpt %U\nIcon=chatgpt\n")
+        self.executable(self.bin / "chatgpt", 'printf "linux-chatgpt\\n" >> "$TEST_OPENED"')
+        self.release("two")
+        self.offer()
+        self.launch(icon, "linux-chatgpt")
+        self.launch(desktop / "Claude.desktop", "linux-claude")
+        self.assertEqual(initial, (icon.stat().st_ino, icon.read_bytes()))
+        self.assertFalse(list((self.data / "applications").glob("cloudworkspace-windows-*.desktop")))
+        override = self.data / "applications/chatgpt.desktop"
+        override.write_text("[Desktop Entry]\nHidden=true\n")
+        self.release("three")
+        self.offer()
+        self.launch(icon, "three|--open-app|ChatGPT")
+        self.assertEqual(override.read_text(), "[Desktop Entry]\nHidden=true\n")
 
     @staticmethod
     def desktop_icon(path):

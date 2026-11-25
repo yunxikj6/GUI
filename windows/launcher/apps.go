@@ -25,14 +25,14 @@ type registeredApp struct {
 type appStatus struct {
 	App             string `json:"app"`
 	Status          string `json:"status"`
-	Channel         string `json:"channel"`
-	AUMID           string `json:"aumid"`
-	PackageFullName string `json:"packageFullName"`
+	Channel         string `json:"channel,omitempty"`
+	AUMID           string `json:"aumid,omitempty"`
+	PackageFullName string `json:"packageFullName,omitempty"`
 	ProcessID       uint32 `json:"processId,omitempty"`
 }
 
 // Return activation evidence only after Windows accepts the exact verified AUMID.
-func officialApp(opt options, inspect func(channel) (registeredApp, *failure), activate func(string) (uint32, *failure)) (appStatus, *failure) {
+func officialApp(opt options, inspect func(channel) (registeredApp, *failure), activate func(string) (uint32, *failure), offer func(string) (appStatus, *failure)) (appStatus, *failure) {
 	var empty appStatus
 	channels := appChannels[opt.app]
 	if len(channels) == 0 {
@@ -73,9 +73,34 @@ func officialApp(opt options, inspect func(channel) (registeredApp, *failure), a
 	if installed {
 		return empty, fail("app-unverified", "已找到相关包，但其 Microsoft Store 来源、应用注册或产品名称未通过验证。请在 Microsoft Store 中检查 "+opt.app+" 的更新。")
 	}
-	message := "当前 Windows 用户未安装可验证的 Microsoft Store 版 " + opt.app + "。请在 Microsoft Store 安装官方版，或从开始菜单使用已有的厂商直装版。"
-	if opt.app == "Claude" {
-		message += "Ubuntu 中也可使用 Anthropic 官方 Linux 客户端。"
+	if opt.offerInstall && !opt.check {
+		return offer(opt.app)
 	}
+	message := "当前 Windows 用户未安装可验证的 Microsoft Store 版 " + opt.app + "。可以在 Microsoft Store 安装、从开始菜单打开厂商直装版，或在 Ubuntu 的“安装官方客户端”中安装 Linux 版。"
 	return empty, fail("app-not-installed", message)
+}
+
+type installPage struct {
+	productID, website string
+}
+
+// These primary Store products match the current registered families in appChannels.
+var installPages = map[string]installPage{
+	"ChatGPT": {"9PLM9XGG6VKS", "https://chatgpt.com/download/"},
+	"Claude":  {"9P6K58THS811", "https://claude.com/download"},
+}
+
+func offerInstallPage(app string, confirm func(string) (bool, *failure), open func(string) bool) (appStatus, *failure) {
+	page := installPages[app]
+	accepted, problem := confirm(app)
+	if problem != nil {
+		return appStatus{}, problem
+	}
+	if !accepted {
+		return appStatus{App: app, Status: "cancelled"}, nil
+	}
+	if !open("ms-windows-store://pdp/?ProductId="+page.productID) && !open(page.website) {
+		return appStatus{}, fail("install-page-failed", "Windows 未能打开官方安装页。请在浏览器中访问 "+page.website+"。")
+	}
+	return appStatus{App: app, Status: "install-page-requested"}, nil
 }

@@ -1,0 +1,460 @@
+{
+  "platform": "Isolated Ubuntu 24.04.5 LTS on Linux, amd64",
+  "limits": {
+    "windows11OrWslgTested": false,
+    "arm64GuiTested": false,
+    "accountSignInTested": false,
+    "chatMessagesOrArtifactsTested": false
+  },
+  "chatgptPackage": {
+    "officialDocument": "https://learn.chatgpt.com/docs/linux/linux-app",
+    "inRelease": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/dists/stable/InRelease",
+    "signingFingerprint": "3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4",
+    "bootstrap": "The signing key was read from the bootstrap package served by the official HTTPS download link. The installation guide does not separately publish a pinned fingerprint.",
+    "checkedDownloads": {
+      "amd64": {
+        "Version": "26.1120.50957",
+        "officialLatest": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb",
+        "downloadBytes": 501426562,
+        "sha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
+        "signedIndexMatched": true
+      },
+      "arm64": {
+        "Version": "26.1120.50957",
+        "officialLatest": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb",
+        "downloadBytes": 486767614,
+        "sha256": "d11adb9a13d21bc5f514885924207af0e8689a978328550e3a43895a69603d89",
+        "signedIndexMatched": true
+      }
+    },
+    "aptInstall": {
+      "isolation": "Independent Ubuntu Base container without network. Ubuntu apt indexes and archives copied from signed Noble / Noble Updates repositories. Service autostart suppressed for container use.",
+      "desktopInstalledBeforeApplication": {
+        "gnome-shell": "46.0-0ubuntu6~24.04.17",
+        "ubuntu-session": "46.0-1ubuntu4",
+        "nautilus": "1:46.4-0ubuntu0.2",
+        "gnome-text-editor": "46.3-0ubuntu2",
+        "gnome-shell-extension-ubuntu-dock": "90ubuntu3"
+      },
+      "beforeApplication": {
+        "dpkgExit": 1,
+        "dpkgDiagnostic": "dpkg-query: no packages found matching chatgpt"
+      },
+      "aptCommand": "apt -y --no-remove install /tmp/chatgpt_amd64.deb",
+      "aptExit": 0,
+      "aptChanges": {
+        "upgraded": 3,
+        "newlyInstalled": 83,
+        "removed": 0
+      },
+      "afterApplication": "install ok installed\t26.1120.50957",
+      "dpkgAuditClean": true,
+      "installedKeyMatchedVerifiedInRelease": true
+    },
+    "installed": {
+      "desktop": {
+        "id": "chatgpt.desktop",
+        "Name": "ChatGPT",
+        "Exec": "chatgpt %U",
+        "Icon": "chatgpt",
+        "Type": "Application",
+        "commandLink": "../lib/chatgpt/codex-launcher",
+        "elfMachine": 62,
+        "elf": "/usr/lib/chatgpt/ChatGPT",
+        "icon": "/usr/share/pixmaps/chatgpt.png",
+        "iconDimensions": [
+          1024,
+          1024
+        ]
+      },
+      "verifiedInstalledFiles": 2814,
+      "sha256": {
+        "/usr/share/applications/chatgpt.desktop": "d65745ebbccb71dcdca03b15c7642d0ca1a07eb75f0b049271cd6dda8272cbc2",
+        "/usr/share/pixmaps/chatgpt.png": "cfe031774dd6aabdceca35338f329bc4844592767d043b7b4a56d8fb097dffd0",
+        "/usr/lib/chatgpt/codex-launcher": "8f983245c6c07070e2cdc480be50ec239e0f18ee36069126649d0692595c86ad",
+        "/usr/lib/chatgpt/ChatGPT": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7"
+      }
+    }
+  },
+  "claudePackage": {
+    "officialDocument": "https://support.claude.com/en/articles/10065433-install-claude-desktop",
+    "signedBy": {
+      "Ubuntu archive": "F6ECB3762474EDA9D21B7022871920D1991BC93C",
+      "Anthropic": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+    },
+    "base": "Ubuntu Base 24.04.5 LTS, amd64",
+    "apt": "2.8.3",
+    "initialAppInstalled": false,
+    "packageStatus": "install ok installed",
+    "version": "6.28899.6",
+    "arch": "amd64",
+    "independentSignedDebSha256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+    "aptInstallExit": 0,
+    "summary": "5 upgraded, 625 newly installed, 0 to remove and 8 not upgraded.",
+    "installRecommends": true,
+    "checkedRegularFiles": 100,
+    "checkedSymlinks": 1,
+    "binary": "/usr/lib/claude-desktop/claude-desktop",
+    "executablePayloadSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "linkedLibrariesMissing": false,
+    "desktopEntry": {
+      "Type": "Application",
+      "Name": "Claude",
+      "Exec": "claude-desktop %U",
+      "Icon": "claude-desktop"
+    },
+    "dpkgAuditEmpty": true,
+    "aptCheckExit": 0,
+    "installedKeyringBytesMatchPublished": true,
+    "sources": "Offline copies of original Ubuntu noble/noble-updates and Anthropic stable signed indices and packages"
+  },
+  "installerEntry": {
+    "ubuntu": "Ubuntu 24.04.5 LTS",
+    "arch": "amd64",
+    "gnomeShell": "GNOME Shell 46.0",
+    "terminalDebianVersion": "3.52.0-1ubuntu2",
+    "launcherSha256": "3025b8f46d838f345d70e25620686fe6e3b0a509acf2147121f585be0f75fcd7",
+    "installerSha256": "eb28dd28968eee0db48764f6f04d63de3f1d921cd239434fdd9c9358a757dcab",
+    "entryTerminal": true,
+    "origin": "GNOME Activities search -> Return",
+    "stdinStdoutStderr": [
+      "/dev/pts/0",
+      "/dev/pts/0",
+      "/dev/pts/0"
+    ],
+    "selected": null,
+    "cancelInput": "Enter (default)",
+    "installerExit": 130,
+    "launcherExit": 130,
+    "startedDownloadOrPrivilegeTools": [],
+    "aptAndDpkgStateUnchanged": true,
+    "screenshot": {
+      "image": "../native-ubuntu-app-installer.png",
+      "sha256": "6e8b3123759be0d571dd76c7682097fbe79d5e9eae2b386db3a195e247d4fcab"
+    },
+    "installation": {
+      "singleChatGPT": {
+        "scriptSha256": "eb28dd28968eee0db48764f6f04d63de3f1d921cd239434fdd9c9358a757dcab",
+        "before": [
+          "claude-desktop amd64 6.28899.6 install ok installed"
+        ],
+        "after": [
+          "chatgpt amd64 26.1120.50957 install ok installed",
+          "claude-desktop amd64 6.28899.6 install ok installed"
+        ],
+        "uid": 1000,
+        "events": [
+          "menu",
+          "explicit-install-confirmation",
+          "sudo-password",
+          "apt-plan-confirmation"
+        ],
+        "ttyConfirmed": true,
+        "sudoPasswordRequested": true,
+        "aptPlanConfirmationRequested": true,
+        "exitCode": 0,
+        "aptCheckExit": 0,
+        "dpkgAuditEmpty": true,
+        "aptLocalPackagePermissionWarning": false,
+        "installedMatchesSignedPackage": {
+          "chatgpt": {
+            "/usr/bin/chatgpt": "8f983245c6c07070e2cdc480be50ec239e0f18ee36069126649d0692595c86ad",
+            "/usr/lib/chatgpt/ChatGPT": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+            "/usr/share/applications/chatgpt.desktop": "d65745ebbccb71dcdca03b15c7642d0ca1a07eb75f0b049271cd6dda8272cbc2"
+          },
+          "claude-desktop": {
+            "/usr/lib/claude-desktop/claude-desktop": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c"
+          }
+        },
+        "network": "Private loopback-only stdio relay for ordinary HTTPS CONNECT to the two official origins via the environment’s CA-verified forward proxy. Ubuntu dependencies use original signed Canonical indices and unmodified packages from the private archive. No account/sessions; no inbound port."
+      },
+      "both": {
+        "scriptSha256": "eb28dd28968eee0db48764f6f04d63de3f1d921cd239434fdd9c9358a757dcab",
+        "before": [
+          "chatgpt amd64 26.1120.50957 deinstall ok config-files",
+          "claude-desktop amd64 6.28899.6 deinstall ok config-files"
+        ],
+        "after": [
+          "chatgpt amd64 26.1120.50957 install ok installed",
+          "claude-desktop amd64 6.28899.6 install ok installed"
+        ],
+        "events": [
+          "menu",
+          "explicit-install-confirmation",
+          "sudo-password"
+        ],
+        "exitCode": 0,
+        "aptCheckExit": 0,
+        "dpkgAuditEmpty": true,
+        "aptLocalPackagePermissionWarning": false,
+        "installedMatchesSignedPackage": {
+          "chatgpt": {
+            "/usr/bin/chatgpt": "8f983245c6c07070e2cdc480be50ec239e0f18ee36069126649d0692595c86ad",
+            "/usr/lib/chatgpt/ChatGPT": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+            "/usr/share/applications/chatgpt.desktop": "d65745ebbccb71dcdca03b15c7642d0ca1a07eb75f0b049271cd6dda8272cbc2"
+          },
+          "claude-desktop": {
+            "/usr/lib/claude-desktop/claude-desktop": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c"
+          }
+        }
+      }
+    }
+  },
+  "chatgptBundledMcp": {
+    "linuxPackageVersion": "26.1120.50957",
+    "appServer": "usr/lib/chatgpt/resources/codex",
+    "appServerSha256": "13f4960291147ba63dca2508920962f97dccf8710e11cb931125048b5436e9b2",
+    "appServerVersion": "codex-cli 0.171.0-alpha.13.2",
+    "transport": "Vendor app-server JSON-RPC over stdio, local workspace MCP over stdio",
+    "methods": [
+      "initialize",
+      "mcpServerStatus/list",
+      "thread/start",
+      "mcpServer/tool/call"
+    ],
+    "tools": [
+      "get_workspace_git_status",
+      "list_workspace_directory",
+      "read_workspace_text"
+    ],
+    "readOnly": true,
+    "ephemeralThread": true,
+    "modelTurns": 0,
+    "vendorLogin": false,
+    "cloudGit": {
+      "state": "ready",
+      "branch": "reviewed-edits",
+      "changedFiles": 0
+    },
+    "readback": {
+      "checkoutRevision": "7d2b706b590d74796c41aafab9f412d8d433b583",
+      "file": "docs/measurements/native-shortcut-icons.json",
+      "size": 3549,
+      "sha256": "d27ae825b249206186419ec068381dbedeea6579d7b6d872033a46b506cf1eec",
+      "matchesGit": true
+    }
+  },
+  "claudeWindow": {
+    "ubuntu": "24.04.5 LTS amd64",
+    "gnome": "GNOME Shell 46.0",
+    "entry": "GNOME DING Claude.desktop double click",
+    "vendorPackage": {
+      "Version": "6.28899.6",
+      "Filename": "pool/main/c/claude-desktop/claude-desktop_6.28899.6_amd64.deb",
+      "Size": "191718584",
+      "SHA256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+      "Package": "claude-desktop",
+      "Architecture": "amd64"
+    },
+    "mainExecutableSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "shellPid": 74,
+    "childMutterWindow": {
+      "id": "com.anthropic.Claude.desktop",
+      "title": "Claude",
+      "wmClass": "com.anthropic.Claude",
+      "type": "Wayland",
+      "pid": 353,
+      "focused": true,
+      "stableId": 2
+    },
+    "rootWindowManager": "Xfwm4",
+    "outerX11WindowList": [
+      "_NET_WM_NAME(UTF8_STRING) = \"Cloud Linux Workspace\"\nWM_CLASS:  not found.\n_NET_WM_PID(CARDINAL) = 74"
+    ],
+    "parentMappedBefore": true,
+    "parentUnmappedOnMinimize": true,
+    "parentMappedAfterRestore": true,
+    "sameClaudeMutterWindowAfterRestore": true,
+    "offlineNativeScreenReturned": true,
+    "externalRoutes": 0,
+    "observer": "global.get_window_actors() + Shell.WindowTracker.get_window_app() on private GNOME Shell, read-only"
+  },
+  "chatgptWindow": {
+    "launcher": "linux/start-workspace.sh (no arguments)",
+    "launcherHashes": {
+      "start-workspace.sh": "112ca4857023cfc14f9f62888842bb17669dd28e2827fd0056e137cb16fac79d",
+      "desktop-shortcuts.py": "6cf8d0507e14251e3c170461a822bc46bd98431fb1c3aea67dd179169d90c0f3",
+      "install-app-launchers.py": "3025b8f46d838f345d70e25620686fe6e3b0a509acf2147121f585be0f75fcd7",
+      "gnome_session.py": "4d88f81c5ddf7bd3b801457e41c3f306080da889ae852e4d3faf42bbab17be25",
+      "nested_window.py": "8484afa560bf3537e588f94a38bf6b0b543ae396605f688a77ad41bb05519ee6"
+    },
+    "entry": "double-click ChatGPT in GNOME desktop icons (DING); third-party Windows bridge absent",
+    "packageMount": "Entire read-only snapshot of Ubuntu Noble after real GNOME and ChatGPT APT transactions, including /usr, /etc and dpkg database. Supplemented by Claude app files taken from an independent successful Ubuntu APT transaction.",
+    "dpkgStatus": "install ok installed 26.1120.50957",
+    "outerWM": "Xfwm4",
+    "gnomeShellUsedNoX11": true,
+    "vendorDesktopEntrySha256": "d65745ebbccb71dcdca03b15c7642d0ca1a07eb75f0b049271cd6dda8272cbc2",
+    "runningSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+    "loginKeyring": "Ephemeral user keyring prepared and unlocked before the launch. Full standard GNOME may request that the user create or unlock a keyring.",
+    "desktopIcons": {
+      "Claude": {
+        "sourceDesktop": "/usr/share/applications/com.anthropic.Claude.desktop",
+        "imageSha256": "2188ade70c113978dbcc349468054dd948344a7b4497e2edac355b1b903c422d"
+      },
+      "ChatGPT": {
+        "sourceDesktop": "/usr/share/applications/chatgpt.desktop",
+        "imageSha256": "cfe031774dd6aabdceca35338f329bc4844592767d043b7b4a56d8fb097dffd0"
+      }
+    },
+    "offline": {
+      "mainPid": 382,
+      "shellPid": 86,
+      "freshHome": true,
+      "networkMode": "No external route, relay, or proxy. Offline cold start.",
+      "networkInterfaces": [
+        "lo"
+      ],
+      "ipv4MainRoutes": [],
+      "ipv6MainRoutes": [],
+      "authenticated": false,
+      "outerX11WhenSignedOut": [
+        {
+          "mapState": "IsViewable",
+          "size": [
+            1280,
+            860
+          ],
+          "name": "_NET_WM_NAME(UTF8_STRING) = \"Cloud Linux Workspace\""
+        }
+      ],
+      "menuRenderedInNestedMutterDrawable": true,
+      "desktopInteraction": "Opened local Sign in another way chooser in the same official process using the pointer. No credential entered, no account registered."
+    },
+    "online": {
+      "mainPid": 436,
+      "shellPid": 100,
+      "freshHome": true,
+      "networkMode": "Private loopback namespace plus host forwarding proxy limited to public OpenAI resources; system TLS/hostname checking preserved.",
+      "hostnameAndCertificateChainVerificationViaSameUpstream": {
+        "ab.chatgpt.com": true,
+        "chat.openai.com": true,
+        "chatgpt.com": true,
+        "files.openai.com": true,
+        "learn.chatgpt.com": true,
+        "persistent.oaistatic.com": true
+      },
+      "authenticated": false,
+      "outerX11WhenSignedOut": [
+        {
+          "mapState": "IsViewable",
+          "size": [
+            1280,
+            860
+          ],
+          "name": "_NET_WM_NAME(UTF8_STRING) = \"Cloud Linux Workspace\""
+        }
+      ],
+      "menuRenderedInNestedMutterDrawable": true,
+      "desktopInteraction": "Opened local Sign in another way chooser in the same official process using the pointer. No credential entered, no account registered."
+    },
+    "screenshots": [
+      {
+        "image": "../native-ubuntu-official-apps.png",
+        "sha256": "761fd757f3887193173dda6a278bd5d0ddff31138b32288699d7ec2af489507b"
+      },
+      {
+        "image": "../native-ubuntu-chatgpt-offline-options.png",
+        "sha256": "74f8f3bfa41a6719c9d97384113241c9d9fd6fab37bfeec27554c36d6afe9cd3"
+      }
+    ],
+    "windowOwnership": {
+      "regressionObservedBeforeFix": {
+        "parentWindowCount": 3,
+        "chatgptVisibleAfterWorkspaceMinimized": true,
+        "chatgptOwnsNestedWaylandToplevel": false
+      },
+      "host": "Isolated Xvfb/Xfwm4 on Linux; simulated WSLg X11 read-only mount",
+      "shellPid": 76,
+      "chatgptPid": 350,
+      "appSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+      "socketMount": "/tmp/.X11-unix",
+      "mountFlags": [
+        "ro",
+        "nosuid",
+        "nodev",
+        "relatime"
+      ],
+      "shellArgs": [
+        "--nested",
+        "--wayland",
+        "--wayland-display=/tmp/local-gnome-ojmg4n9j/wayland-0",
+        "--sm-disable",
+        "--no-x11"
+      ],
+      "parentWindows": [
+        {
+          "xid": "0x600005",
+          "title": "Cloud Linux Workspace",
+          "mapState": "IsViewable",
+          "width": 1280,
+          "height": 860
+        }
+      ],
+      "parentWindowsAfterMinimize": [
+        {
+          "xid": "0x600005",
+          "title": "Cloud Linux Workspace",
+          "mapState": "IsUnMapped",
+          "width": 1280,
+          "height": 860
+        }
+      ],
+      "parentWindowsAfterRestore": [
+        {
+          "xid": "0x600005",
+          "title": "Cloud Linux Workspace",
+          "mapState": "IsViewable",
+          "width": 1280,
+          "height": 860
+        }
+      ],
+      "compositorSO_PEERCRED": [
+        {
+          "compositor": "76",
+          "client": "350",
+          "peer": "350",
+          "uid": "1000",
+          "socket": "/tmp/local-gnome-ojmg4n9j/wayland-0",
+          "object": "42",
+          "request": "set_app_id",
+          "text": "chatgpt"
+        },
+        {
+          "compositor": "76",
+          "client": "350",
+          "peer": "350",
+          "uid": "1000",
+          "socket": "/tmp/local-gnome-ojmg4n9j/wayland-0",
+          "object": "42",
+          "request": "set_title",
+          "text": "ChatGPT"
+        }
+      ],
+      "loginTextObservedInsideWorkspace": true,
+      "appWindowVisibleOnParentAfterMinimize": false,
+      "chatgptOwnsNestedWaylandToplevel": true
+    },
+    "firstRunWithNoKeyring": {
+      "loginKeyring": {
+        "preExisting": false,
+        "uiActions": [
+          "dismissed local GNOME secret-service creation prompt with Escape"
+        ]
+      },
+      "desktopInteraction": "Opened local Sign in another way chooser in the same official process using the pointer. No credential entered, no account registered.",
+      "networkMode": "No external route, relay, or proxy. Offline cold start.",
+      "authenticated": false
+    },
+    "floatingWindow": {
+      "action": "Dragged the native ChatGPT title bar on the Ubuntu desktop. Both vendor launch icons and the Ubuntu Dock appear in a single unmodified 1712 x 1080 capture.",
+      "image": "../native-ubuntu-chatgpt.png",
+      "sha256": "09d9e9715d3925657db23ab3d3bbc3771734992f68955d90a40cacd6b4aa0028"
+    },
+    "activitiesRelaunch": {
+      "stage": "Ctrl+Q in ChatGPT, search from GNOME Activities, choose ChatGPT, press Enter",
+      "newMainPid": 804,
+      "packageELFMainSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+      "outerChatGPTX11Windows": 0
+    }
+  }
+}

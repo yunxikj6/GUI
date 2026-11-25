@@ -196,5 +196,33 @@ func windowsOfficialApp(opt options) (appStatus, *failure) {
 		return appStatus{}, winFailure("初始化应用激活服务", hr)
 	}
 	defer coUninit.Call()
-	return officialApp(opt, inspectChannel, activateApp)
+	return officialApp(opt, inspectChannel, activateApp, windowsInstallOffer)
+}
+
+func confirmInstallPage(app string) (bool, *failure) {
+	caption, _ := syscall.UTF16PtrFromString("打开官方安装页")
+	body, _ := syscall.UTF16PtrFromString("当前 Windows 用户未安装 Microsoft Store 版 " + app + "。打开它的官方安装页？")
+	// MB_OKCANCEL | MB_ICONINFORMATION | MB_DEFBUTTON2. Escape keeps the desktop unchanged.
+	result, _, _ := messageBox.Call(0, uintptr(unsafe.Pointer(body)), uintptr(unsafe.Pointer(caption)), 0x141)
+	switch result {
+	case 1: // IDOK
+		return true, nil
+	case 2: // IDCANCEL
+		return false, nil
+	default:
+		return false, fail("install-dialog-failed", "Windows 未能显示安装确认窗口。")
+	}
+}
+
+func openInstallURL(url string) bool {
+	// ShellExecute handles the registered Store protocol or the default HTTPS browser.
+	target, _ := syscall.UTF16PtrFromString(url)
+	openVerb, _ := syscall.UTF16PtrFromString("open")
+	open := syscall.NewLazyDLL("shell32.dll").NewProc("ShellExecuteW")
+	result, _, _ := open.Call(0, uintptr(unsafe.Pointer(openVerb)), uintptr(unsafe.Pointer(target)), 0, 0, 1)
+	return int(result) > 32
+}
+
+func windowsInstallOffer(app string) (appStatus, *failure) {
+	return offerInstallPage(app, confirmInstallPage, openInstallURL)
 }

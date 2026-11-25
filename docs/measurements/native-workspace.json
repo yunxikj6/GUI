@@ -40,7 +40,8 @@
     },
     "initialWindowSizeRecord": "native-gnome-window-size.json",
     "projectFilesRecord": "native-project-files.json",
-    "desktopShortcutIconsRecord": "native-shortcut-icons.json"
+    "desktopShortcutIconsRecord": "native-shortcut-icons.json",
+    "officialLinuxClientsRecord": "native-linux-clients.json"
   },
   "claudeDesktop": {
     "debianPackage": "claude-desktop",
@@ -142,16 +143,16 @@
     "windowsChatGptWindowObserved": false,
     "windowsClaudeWindowObserved": false,
     "launcherSha256": {
-      "x64": "1bbfcb7c6ae1d89df8c52cea002f23a2565d76ad339f301ebf70e513c7c6e117",
-      "arm64": "8df426624425ea00dbfdf5967b6fc09863f3e017872a951c69baf302c813ed19"
+      "x64": "1f55dcfc8d8f8015104c26a4ec10913534088a26e641aa71cb22ccd6fbac1af9",
+      "arm64": "f814906903b02321e27727aa58ef270a5b2f67c7ad0c33b6f496024878ffb016"
     },
     "workspaceWindowVerifierRecord": "native-windows-verifier.json"
   },
   "pythonRegression": {
-    "archiveRevision": "fbb517a4204dd47ae4141e95982182afa20ccc7d",
-    "passed": 259,
+    "archiveRevision": "7d2b706b590d74796c41aafab9f412d8d433b583",
+    "passed": 264,
     "skipped": 0,
-    "snapshotFiles": 198,
+    "snapshotFiles": 200,
     "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }
