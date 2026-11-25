@@ -368,6 +368,14 @@ def dispatch(request, root):
                                 request.get("prompt"), request.get("parentTaskId"),
                                 request.get("path"), request.get("revision"))
     if op == "events":
+        if "tail" in request or "before" in request:
+            if "after" in request or ("tail" in request and "before" in request):
+                raise WorkspaceError("invalid_request", "tail、before 和 after 只能使用一个。")
+            if "before" in request:
+                return tasks.event_window(root, request.get("taskId"), request["before"])
+            if request["tail"] is not True:
+                raise WorkspaceError("invalid_request", "获取最新输出时 tail 应为 true。")
+            return tasks.event_window(root, request.get("taskId"))
         return tasks.events(root, request.get("taskId"), request.get("after", 0))
     if op == "cancel":
         return tasks.cancel_task(root, request.get("taskId"))

@@ -1,0 +1,53 @@
+{
+  "baseline_source": "e943eda8311def570da3eceb13ab07b73c2d075f",
+  "baseline": {
+    "rows": 8000,
+    "chromium": "156.0.8078.79",
+    "samples": [
+      {
+        "last_rendered_ms": 11105.9,
+        "last_row_in_view": true,
+        "events_requests": 6,
+        "events_body_bytes": 1416550
+      },
+      {
+        "last_rendered_ms": 9793.6,
+        "last_row_in_view": true,
+        "events_requests": 6,
+        "events_body_bytes": 1416550
+      },
+      {
+        "last_rendered_ms": 11957.2,
+        "last_row_in_view": true,
+        "events_requests": 6,
+        "events_body_bytes": 1416550
+      }
+    ],
+    "median_last_rendered_ms": 11105.9
+  },
+  "with_output_windows": {
+    "rows": 8000,
+    "chromium": "156.0.8078.79",
+    "samples": [
+      {
+        "last_rendered_ms": 436.6,
+        "last_row_in_view": true,
+        "events_requests": 1,
+        "events_body_bytes": 30064
+      },
+      {
+        "last_rendered_ms": 425.0,
+        "last_row_in_view": true,
+        "events_requests": 1,
+        "events_body_bytes": 30064
+      },
+      {
+        "last_rendered_ms": 465.9,
+        "last_row_in_view": true,
+        "events_requests": 1,
+        "events_body_bytes": 30064
+      }
+    ],
+    "median_last_rendered_ms": 436.6
+  }
+}

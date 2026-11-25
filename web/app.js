@@ -108,7 +108,7 @@ const state = {
   project: null, workspaceId: null, providers: {}, ready: false, view: 'files', file: null,
   fileScope: null, fileVersion: 0, treeVersion: 0, refreshVersion: 0, taskListVersion: 0, taskVersion: 0,
   tasks: [], historyAnchors: [], historyNext: null, historyTarget: null,
-  selectedTask: null, selectedRecord: null, cursor: 0, timer: null, eventsSize: 0,
+  selectedTask: null, selectedRecord: null, timer: null,
   selection: null, sending: false, pending: null, feedbackParent: null, taskNavigation: 0, retryCount: 0, loadedKey: null, workspaceVersion: 0,
 };
 function el(tag, cls, content) {
@@ -532,7 +532,7 @@ function taskControls() {
     (task?.nextTaskId ? '已有下一轮，可复制此草稿。' : '此回合无法续聊，可复制此草稿。');
   const target = state.feedbackParent && state.feedbackParent === state.selectedTask ? $('replyFeedback') : $('newTaskFeedback');
   if ($('submissionFeedback').parentElement !== target) target.append($('submissionFeedback'));
-  drawPageControls();
+  drawPageControls(); drawOutputControls();
 }
 const taskTime = new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'});
 const taskDay = new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric'});
@@ -601,7 +601,8 @@ function drawTaskTitle(task, reloadProposal = false) {
   showProposalReview(task, reloadProposal);
   $('eventHeading').hidden = !task;
   $('taskRequest').hidden = !task?.prompt;
-  $('taskRequestText').textContent = task?.prompt || '';
+  const prompt = task?.prompt || '';
+  if ($('taskRequestText').textContent !== prompt) $('taskRequestText').textContent = prompt;
   $('turnNav').hidden = !task?.parentTaskId && !task?.nextTaskId;
   $('previousTurn').hidden = !task?.parentTaskId;
   $('nextTurn').hidden = !task?.nextTaskId;
@@ -611,26 +612,236 @@ function drawTaskTitle(task, reloadProposal = false) {
   $('taskStatus').textContent = labels[task.status] || task.status;
   $('taskStatus').dataset.status = task.status;
 }
-function appendEvent(event) {
-  const log = $('eventLog');
-  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 35;
+// Event cursors can refer to chunks of the same old database row. Treat them as
+// opaque positions and always take navigation boundaries from the unmerged events.
+let output = null;
+const outputEncoder = new TextEncoder();
+function resetOutput(taskId) {
+  output = taskId ? {
+    taskId, capability:null, events:[], earlier:false, history:null, liveCursor:0,
+    poll:0, nav:0, pending:null, retry:null, notice:'', legacySize:0, clipped:false, needTail:true,
+    reading:false, scrollTop:0, firstUnread:null, followOnReveal:false,
+  } : null;
+  $('eventLog').replaceChildren();
+  drawOutputControls();
+}
+function outputBookmark(view, query) {
+  remember(key('output.' + view.taskId),query ? JSON.stringify(query) : null,'sessionStorage');
+}
+function savedOutput(view) {
+  try {
+    const query = JSON.parse(stored(key('output.' + view.taskId),'null','sessionStorage'));
+    for (const field of ['before','after']) {
+      if (Number.isSafeInteger(query?.[field]) && query[field] > 0) return {[field]:query[field]};
+    }
+  } catch { /* The latest output is still accessible without a bookmark. */ }
+  return null;
+}
+function drawOutputControls() {
+  const view = output;
+  const native = view?.capability === 'native';
+  $('outputNav').hidden = !(native && (view.earlier || view.history || view.pending)) && !view?.clipped;
+  $('outputPosition').textContent = view?.clipped ? '兼容模式' : view?.history ? '历史输出' : '最新输出';
+  $('olderOutput').hidden = $('newerOutput').hidden = !native;
+  $('olderOutput').disabled = !state.ready || !view?.earlier || Boolean(view.pending?.before);
+  $('newerOutput').disabled = !state.ready || !view?.history || Boolean(view.pending?.after);
+  $('latestOutput').hidden = !native || (!view.history && !view.pending && !view.retry);
+  $('latestOutput').disabled = !state.ready || Boolean(view?.pending?.tail);
+  const notice = view?.notice || (view?.clipped ? '此工作进程仅支持顺序读取，页面只显示最近一部分输出。' : '');
+  $('outputFeedback').hidden = !notice;
+  if ($('outputNotice').textContent !== notice) $('outputNotice').textContent = notice;
+  $('retryOutput').hidden = !view?.retry;
+  $('retryOutput').disabled = !state.ready || Boolean(view?.pending);
+}
+function appendOutput(container,event) {
   const text = String(event.text ?? '').slice(0,30000);
-  if (!text) return;
-  let item = log.lastElementChild;
-  if (event.kind === 'delta' && item?.dataset.kind === 'delta' && item.textContent.length + text.length <= 30000) {
-    item.append(document.createTextNode(text));
+  if (!text) return 0;
+  const last = container.lastElementChild;
+  if (event.kind === 'delta' && last?.dataset.kind === 'delta' && last.firstChild.length + text.length <= 30000) {
+    last.firstChild.appendData(text);
   } else {
-    item = el('div','event',text); item.dataset.kind = event.kind; log.append(item);
+    const row = el('div','event',text);
+    row.dataset.kind = event.kind; container.append(row);
   }
-  state.eventsSize += text.length;
-  while ((state.eventsSize > 180000 || log.childElementCount > 400) && log.childElementCount > 1) {
-    const first = log.firstElementChild; state.eventsSize -= first.textContent.length; first.remove();
+  return text.length;
+}
+function nearOutputEnd(log) { return log.scrollHeight - log.scrollTop - log.clientHeight < 35; }
+function followOutputEnd(view, log) {
+  // A hidden mobile pane has no scrollable box until it becomes visible.
+  view.followOnReveal = !log.clientHeight;
+  if (!view.followOnReveal) {
+    log.scrollTop = log.scrollHeight;
+    view.scrollTop = log.scrollTop;
   }
-  if (stick) log.scrollTop = log.scrollHeight;
+}
+function preserveReading(view, firstUnread) {
+  if (!firstUnread || !view.events.length) return false;
+  const log = $('eventLog'), selection = window.getSelection();
+  const selected = selection && !selection.isCollapsed && log.contains(selection.anchorNode) && log.contains(selection.focusNode);
+  if (!view.pending && !selected && !(view.reading && (!log.clientHeight || !nearOutputEnd(log)))) return false;
+  // This is the first new event after exactly the content already on screen.
+  view.history = {before:firstUnread};
+  outputBookmark(view,view.history);
+  return true;
+}
+function renderWindow(view, events, atEnd) {
+  view.events = events;
+  view.reading = false;
+  const fragment = document.createDocumentFragment();
+  for (const event of events) appendOutput(fragment,event);
+  const log = $('eventLog');
+  log.replaceChildren(fragment);
+  if (atEnd) followOutputEnd(view,log);
+  else {
+    view.followOnReveal = false;
+    log.scrollTop = 0; view.scrollTop = 0;
+  }
+}
+// Forward replay may contain a full 256 KiB response. Use its prefix when moving
+// one window forward, or its suffix when following live output.
+function boundedOutput(events, newest) {
+  let count = 0, bytes = 0;
+  while (count < events.length && count < 160) {
+    const index = newest ? events.length - count - 1 : count;
+    const size = outputEncoder.encode(JSON.stringify(events[index])).length + 1;
+    if (count && bytes + size > 64 * 1024) break;
+    bytes += size; count++;
+  }
+  return newest ? events.slice(events.length - count) : events.slice(0,count);
+}
+function appendLiveOutput(view, added) {
+  if (!added.length) return;
+  const all = [...view.events,...added], events = boundedOutput(all,true);
+  const log = $('eventLog');
+  if (events.length < all.length) {
+    view.earlier = true;
+    renderWindow(view,events,true);
+  } else {
+    view.events = events;
+    for (const event of added) appendOutput(log,event);
+    followOutputEnd(view,log);
+  }
+}
+function appendLegacyOutput(view, events) {
+  const log = $('eventLog'), stick = nearOutputEnd(log);
+  for (const event of events) {
+    view.legacySize += appendOutput(log,event);
+    while ((view.legacySize > 180000 || log.childElementCount > 400) && log.childElementCount > 1) {
+      const first = log.firstElementChild;
+      view.legacySize -= first.textContent.length;
+      first.remove(); view.clipped = true;
+    }
+  }
+  if (stick) followOutputEnd(view,log);
 }
 function scheduleEvents(ticket,delay) {
   clearTimeout(state.timer);
   state.timer = setTimeout(() => pollEvents(ticket),delay);
+}
+function updateOutputTask(task) {
+  updateTask(task);
+  drawTaskTitle(selectedTurn()); drawHistory();
+}
+async function pollEvents(ticket) {
+  const view = output;
+  if (!view || ticket !== state.taskVersion) return;
+  const serial = ++view.poll;
+  const current = () => output === view && ticket === state.taskVersion && serial === view.poll;
+  const tail = view.needTail;
+  try {
+    const result = await rpc('events',{taskId:view.taskId,...(tail ? {tail:true} : {after:view.liveCursor})},current);
+    if (!current()) return;
+    const first = view.capability === null;
+    if (tail) {
+      view.capability = typeof result.hasEarlier === 'boolean' ? 'native' : 'legacy';
+      view.needTail = false;
+    }
+    view.liveCursor = result.cursor;
+    if (view.capability === 'legacy') {
+      if (tail) {
+        view.history = null; view.events = []; view.earlier = false; view.legacySize = 0;
+        $('eventLog').replaceChildren(); outputBookmark(view,null);
+      }
+      appendLegacyOutput(view,result.events);
+    } else if (!view.history) {
+      if (tail) {
+        if (!preserveReading(view,view.firstUnread)) {
+          view.earlier = result.hasEarlier;
+          renderWindow(view,result.events,true);
+        }
+        view.firstUnread = null;
+      } else if (!preserveReading(view,result.events[0]?.seq)) {
+        // A large live backlog is cheaper to replace with a tail request. Keep its
+        // first unseen boundary in case the reader scrolls away before that arrives.
+        if (result.hasMore) view.firstUnread = result.events[0]?.seq;
+        else appendLiveOutput(view,result.events);
+      }
+    }
+    view.needTail = view.capability === 'native' && result.hasMore === true;
+    state.retryCount = 0;
+    updateOutputTask(result.task);
+    $('taskNotice').textContent = !view.liveCursor && !isActive(selectedTurn()) ? '此任务没有输出。' : '';
+    const bookmark = first && view.capability === 'native' && savedOutput(view);
+    if (bookmark) navigateOutput(bookmark);
+    if (result.hasMore) scheduleEvents(ticket,0);
+    else if (isActive(result.task)) scheduleEvents(ticket,1000);
+  } catch(err) {
+    if (!current()) return;
+    if (['not_found','task_not_found','invalid_request','workspace_changed'].includes(err.code)) {
+      if (err.code !== 'workspace_changed' && !selectedTurn()) selectTask('');
+      $('taskNotice').textContent = asError(err);
+    } else {
+      state.retryCount++;
+      $('taskNotice').textContent = asError(err) + ' 正在重连…';
+      scheduleEvents(ticket,Math.min(12000,800 * (2 ** Math.min(4,state.retryCount))));
+    }
+  }
+}
+async function navigateOutput(query) {
+  const view = output;
+  if (!state.ready || view?.capability !== 'native') return;
+  const serial = ++view.nav;
+  const current = () => output === view && serial === view.nav;
+  view.pending = query; view.retry = null; view.notice = '正在读取输出…'; drawOutputControls();
+  try {
+    const result = await rpc('events',{taskId:view.taskId,...query},current);
+    if (!current()) return;
+    if (!query.after && typeof result.hasEarlier !== 'boolean') {
+      // The launcher now points to an older worker. Its tail/before response starts at zero.
+      resetOutput(view.taskId); outputBookmark(output,null);
+      scheduleEvents(state.taskVersion,0); return;
+    }
+    if (!query.tail && !result.events.length) {
+      return navigateOutput({tail:true});
+    }
+    const events = query.after ? boundedOutput(result.events,false) : result.events;
+    const history = query.before || (query.after && (result.hasMore || events.length < result.events.length));
+    view.history = history ? query : null;
+    view.earlier = query.after ? true : result.hasEarlier;
+    view.pending = null; view.notice = '';
+    outputBookmark(view,view.history);
+    if (!view.history) {
+      // Discard an in-flight poll from before the new live cursor.
+      ++view.poll; view.liveCursor = result.cursor; view.needTail = false; view.firstUnread = null;
+      clearTimeout(state.timer);
+    }
+    renderWindow(view,events,!view.history);
+    updateOutputTask(result.task);
+    $('taskNotice').textContent = !events.length && !isActive(selectedTurn()) ? '此任务没有输出。' : '';
+    // A delayed live snapshot can precede a terminal status observed by a separate
+    // poll. Read from this snapshot's cursor until its own terminal events arrive.
+    if (!view.history && isActive(result.task)) scheduleEvents(state.taskVersion,isActive(selectedTurn()) ? 1000 : 0);
+  } catch(err) {
+    if (!current()) return;
+    if (!query.tail && ['invalid_cursor','cursor_not_found'].includes(err.code)) {
+      return navigateOutput({tail:true});
+    }
+    view.pending = null; view.retry = query; view.notice = asError(err); drawOutputControls();
+  }
+}
+function browseOutput(query) {
+  ++state.taskNavigation;
+  navigateOutput(query);
 }
 async function cancelSelectedTask() {
   const task = selectedTurn();
@@ -655,44 +866,15 @@ async function cancelSelectedTask() {
     if (state.ready) scheduleEvents(++state.taskVersion,0);
   }
 }
-async function pollEvents(ticket) {
-  const taskId = state.selectedTask;
-  if (!taskId || ticket !== state.taskVersion) return;
-  try {
-    const result = await rpc('events',{taskId,after:state.cursor});
-    if (ticket !== state.taskVersion || taskId !== state.selectedTask) return;
-    for (const event of result.events) {
-      if (event.seq <= state.cursor) continue;
-      appendEvent(event); state.cursor = event.seq;
-    }
-    const more = result.hasMore === true;
-    const task = result.task;
-    state.retryCount = 0;
-    updateTask(task); drawTaskTitle(selectedTurn()); drawHistory();
-    $('taskNotice').textContent = !state.cursor && !isActive(task) ? '此任务没有输出。' : '';
-    if (more) scheduleEvents(ticket,0);
-    else if (isActive(task)) scheduleEvents(ticket,1000);
-  } catch(err) {
-    if (ticket !== state.taskVersion) return;
-    state.retryCount++;
-    if (['not_found','task_not_found','invalid_request','workspace_changed'].includes(err.code)) {
-      if (err.code !== 'workspace_changed' && !selectedTurn()) selectTask('');
-      $('taskNotice').textContent = asError(err);
-    } else {
-      $('taskNotice').textContent = asError(err) + ' 正在重连…';
-      scheduleEvents(ticket,Math.min(12000,800 * (2 ** Math.min(4,state.retryCount))));
-    }
-  }
-}
 function selectTask(id, userNavigation = false, record = null) {
   if (userNavigation) ++state.taskNavigation;
   const next = ++state.taskVersion;
   clearTimeout(state.timer);
   state.selectedRecord = record || state.tasks.find(t => t.id === id) || null;
-  state.selectedTask = id || null; state.cursor = 0; state.eventsSize = 0; state.retryCount = 0;
+  state.selectedTask = id || null; state.retryCount = 0;
   remember(key('task'),state.selectedTask);
   remember(key('task'),state.selectedTask,'sessionStorage');
-  $('eventLog').replaceChildren(); $('taskRequest').open = false;
+  resetOutput(state.selectedTask); $('taskRequest').open = false;
   $('replyPrompt').value = id ? stored(key('reply.' + id),'','sessionStorage') : '';
   $('followUp').open = Boolean($('replyPrompt').value);
   drawTaskTitle(selectedTurn()); drawHistory();
@@ -867,7 +1049,7 @@ function restore(status) {
   if (state.loadedKey) {
     ++state.taskVersion; ++state.fileVersion; ++state.taskListVersion;
     clearTimeout(state.timer); state.tasks = []; state.selectedTask = null; state.selectedRecord = null;
-    state.pending = null; state.sending = false; $('eventLog').replaceChildren();
+    state.pending = null; state.sending = false; resetOutput(null);
     $('fileNotice').textContent = ''; $('startNotice').textContent = '';
     $('replyPrompt').value = ''; $('followUp').open = false; $('taskRequest').open = false;
     $('pendingMessage').textContent = '';
@@ -943,6 +1125,22 @@ $('fileEditArea').addEventListener('keydown',event => {
   if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveEdit(); }
 });
 $('taskHistory').addEventListener('change',() => selectTask($('taskHistory').value,true));
+document.getElementById('olderOutput').addEventListener('click',() => browseOutput({before:output.events[0].seq}));
+document.getElementById('newerOutput').addEventListener('click',() => browseOutput({after:output.events.at(-1).seq}));
+document.getElementById('latestOutput').addEventListener('click',() => browseOutput({tail:true}));
+document.getElementById('retryOutput').addEventListener('click',() => browseOutput(output.retry));
+new ResizeObserver(() => {
+  const log = $('eventLog');
+  if (output?.followOnReveal && !output.history && log.clientHeight) followOutputEnd(output,log);
+}).observe($('eventLog'));
+document.getElementById('eventLog').addEventListener('scroll',event => {
+  if (!output || output.history || !output.events.length) return;
+  const log = event.currentTarget;
+  if (!log.clientHeight) return;
+  if (nearOutputEnd(log)) output.reading = false;
+  else if (log.scrollTop < output.scrollTop) output.reading = true;
+  output.scrollTop = log.scrollTop;
+});
 $('cancelTask').addEventListener('click',cancelSelectedTask);
 $('previousTurn').addEventListener('click',() => selectTask(selectedTurn().parentTaskId,true));
 $('nextTurn').addEventListener('click',() => selectTask(selectedTurn().nextTaskId,true));

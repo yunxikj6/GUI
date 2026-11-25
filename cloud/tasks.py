@@ -1,4 +1,5 @@
 """Detached, replayable tasks for a single-user Linux workspace."""
+from collections import deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -25,6 +26,8 @@ else:
 
 
 _PAGE_BYTES = 256 * 1024
+_WINDOW_BYTES = 64 * 1024
+_WINDOW_ITEMS = 160
 _CHUNK_CHARS = 8192
 _TASK_LIMIT = 80
 _FIRST_PAGE = object()
@@ -145,7 +148,7 @@ def _public(row):
     return result
 
 
-def _chunks(text):
+def _chunk_ranges(text):
     start = 0
     while len(text) - start > _CHUNK_CHARS:
         end = start + _CHUNK_CHARS
@@ -154,9 +157,14 @@ def _chunks(text):
             end = newline + 1
         elif text[end - 1:end + 1] == "\r\n":
             end -= 1
-        yield text[start:end]
+        yield start, end
         start = end
-    yield text[start:]
+    yield start, len(text)
+
+
+def _chunks(text):
+    for start, end in _chunk_ranges(text):
+        yield text[start:end]
 
 
 def _append(db, task_id, kind, text):
@@ -313,6 +321,13 @@ def _wire_size(value):
     return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
+def _packed_seq(row_seq, index):
+    value = _LEGACY_BASE + row_seq * _LEGACY_STRIDE + index
+    if index >= _LEGACY_STRIDE or not _LEGACY_BASE <= value < 1 << 53:
+        raise workspace.WorkspaceError("cursor_overflow", "此任务的事件序号超过浏览器可精确表示的范围。")
+    return value
+
+
 def _replay(db, task_id, after):
     packed = after >= _LEGACY_BASE
     start = (after - _LEGACY_BASE) // _LEGACY_STRIDE - 1 if packed else after
@@ -322,7 +337,7 @@ def _replay(db, task_id, after):
         packed = packed or oversized
         kind = "delta" if oversized and row["kind"] == "output" else row["kind"]
         for index, chunk in enumerate(_chunks(row["text"])):
-            seq = _LEGACY_BASE + row["seq"] * _LEGACY_STRIDE + index if packed else row["seq"]
+            seq = _packed_seq(row["seq"], index) if packed else row["seq"]
             if seq > after:
                 yield {"seq": seq, "kind": kind, "text": chunk}
 
@@ -346,6 +361,81 @@ def events(root: Path, task_id: str, after: int) -> dict:
             result["events"].append(item)
             result["cursor"] = item["seq"]
             remaining -= size
+        return result
+
+
+def _reverse_row(row, before_index=None):
+    text = row["text"]
+    kind = "delta" if row["kind"] == "output" and len(text) > _CHUNK_CHARS else row["kind"]
+    # Only old, unsplit rows have multiple ranges. Keep offsets, not copies of
+    # the full message. A cursor inside such a row must refer to a real chunk.
+    ranges = deque(maxlen=_WINDOW_ITEMS + 1)
+    for index, span in enumerate(_chunk_ranges(text)):
+        if index == before_index:
+            break
+        ranges.append((index, *span))
+    else:
+        if before_index is not None:
+            raise workspace.WorkspaceError("cursor_not_found", "任务中找不到这个输出位置，请重新加载。")
+    for index, start, end in reversed(ranges):
+        yield {"seq": _packed_seq(row["seq"], index), "kind": kind, "text": text[start:end]}
+
+
+def _reverse_events(db, task_id, before):
+    # Traverse just the primary key; SQLite may step its iterator ahead by a row.
+    # Fetching bodies lazily avoids materializing an unrelated large legacy record.
+    sql = "SELECT seq FROM event WHERE taskId=?"
+    values = [task_id]
+    if before is not _FIRST_PAGE:
+        # A raw cursor excludes its entire physical row, matching pre-upgrade readers.
+        row_seq, index = divmod(before - _LEGACY_BASE, _LEGACY_STRIDE) if before >= _LEGACY_BASE else (before, 0)
+        columns = "seq, kind, text" if index else "seq"
+        anchor = db.execute(f"SELECT {columns} FROM event WHERE taskId=? AND seq=?", (task_id, row_seq)).fetchone()
+        if not anchor:
+            raise workspace.WorkspaceError("cursor_not_found", "任务中找不到这个输出位置，请重新加载。")
+        if index:
+            yield from _reverse_row(anchor, index)
+        sql += " AND seq<?"
+        values.append(row_seq)
+    for (seq,) in db.execute(sql + " ORDER BY seq DESC LIMIT ?", (*values, _WINDOW_ITEMS)):
+        row = db.execute("SELECT seq, kind, text FROM event WHERE taskId=? AND seq=?",
+                         (task_id, seq)).fetchone()
+        yield from _reverse_row(row)
+
+
+def event_window(root: Path, task_id: str, before=_FIRST_PAGE) -> dict:
+    if not isinstance(task_id, str) or not 1 <= len(task_id) <= 128:
+        raise workspace.WorkspaceError("invalid_request", "请选择要查看输出的任务。")
+    if before is not _FIRST_PAGE and (type(before) is not int or not 0 < before < 1 << 53):
+        raise workspace.WorkspaceError("invalid_cursor", "before 应为已显示的首条事件序号。")
+    with _database(root) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        _recover(db)
+        row = db.execute("SELECT * FROM model_task_history WHERE id=?", (task_id,)).fetchone()
+        if not row:
+            raise workspace.WorkspaceError("not_found", "找不到该任务。")
+        result = {"task": _public(row), "events": [], "cursor": 0, "hasMore": False, "hasEarlier": False}
+        remaining = min(_WINDOW_BYTES - 2, _PAGE_BYTES - _wire_size(result) - 32)
+        if remaining < 0:
+            raise workspace.WorkspaceError("too_large", "任务信息超过输出回放的传输上限。")
+        for item in _reverse_events(db, task_id, before):
+            size = _wire_size(item) + 1
+            if size > remaining:
+                if not result["events"]:
+                    raise workspace.WorkspaceError("too_large", "单条记录和任务信息超过输出窗口上限。")
+                result["hasEarlier"] = True
+                break
+            result["events"].append(item)
+            remaining -= size
+            if len(result["events"]) == _WINDOW_ITEMS:
+                row_seq, index = divmod(item["seq"] - _LEGACY_BASE, _LEGACY_STRIDE)
+                result["hasEarlier"] = bool(index or db.execute(
+                    "SELECT 1 FROM event WHERE taskId=? AND seq<? LIMIT 1", (task_id, row_seq)
+                ).fetchone())
+                break
+        result["events"].reverse()
+        if result["events"]:
+            result["cursor"] = result["events"][-1]["seq"]
         return result
 
 

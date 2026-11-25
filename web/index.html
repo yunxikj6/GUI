@@ -74,6 +74,13 @@
         <nav class="turn-nav" id="turnNav" aria-label="对话回合" hidden><button id="previousTurn" hidden>← 上一轮</button><button id="nextTurn" hidden>下一轮 →</button></nav>
         <details id="taskRequest" class="task-request" hidden><summary>任务要求</summary><div id="taskRequestText"></div></details>
         <div class="event-log" id="eventLog" tabindex="0" aria-label="任务输出"></div>
+        <nav class="output-nav" id="outputNav" aria-label="任务输出分页" hidden>
+          <span id="outputPosition"></span>
+          <button id="olderOutput">较早输出</button><button id="newerOutput">较新输出</button>
+          <button id="latestOutput">回到最新输出</button>
+        </nav>
+        <div id="outputFeedback" hidden><span id="outputNotice" class="inline-note" role="status"></span>
+          <button id="retryOutput" class="subtle-button" hidden>重试读取</button></div>
         <p class="inline-note activity-note" id="taskNotice" role="status">加载任务记录…</p>
         <section class="proposal-review" id="proposalReview" aria-label="审核文件修改" hidden>
           <h3 id="proposalPath"></h3>

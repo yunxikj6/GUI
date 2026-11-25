@@ -115,10 +115,11 @@ textarea::placeholder {color:#7d8798}
 .activity {padding:15px 17px;display:flex;flex-direction:column;min-height:160px;flex:1}
 .activity-heading {margin-bottom:8px}
 #taskHistory {width:100%;flex:none}
-.history-nav {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px;font-size:12px}
-.history-nav span {margin-right:auto;color:var(--muted)}
-.history-nav button {color:var(--indigo);padding:4px 2px}
-.history-nav button:enabled:hover {text-decoration:underline}
+.history-nav,.output-nav {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px;font-size:12px}
+.history-nav span,.output-nav span {margin-right:auto;color:var(--muted)}
+.history-nav button,.output-nav button {color:var(--indigo);padding:4px 2px}
+.history-nav button:enabled:hover,.output-nav button:enabled:hover {text-decoration:underline}
+#outputFeedback {margin:4px 0}
 .event-heading {align-items:center;flex-wrap:wrap;margin-top:15px;font-size:12px;font-weight:640}
 #eventProvider {margin-right:auto}
 #cancelTask {margin:0;border-color:#cdd3df}
@@ -128,6 +129,7 @@ textarea::placeholder {color:#7d8798}
 .status-tag[data-status=cancelling] {border-color:#e7dbb9;color:#765a21;background:#fbf5e7}
 .event-log {overflow:auto;min-height:0;scrollbar-width:thin;font:12px/1.6 var(--mono);color:#364155}
 .event-log:empty {display:none}
+.activity:has(.output-nav:not([hidden])) .event-log {min-height:min(24vh,144px)}
 .event {padding:7px 0;border-bottom:1px solid #e3e7ee;white-space:pre-wrap;overflow-wrap:anywhere}
 .event[data-kind=error] {color:#a43a33}
 .event[data-kind=status] {color:#657085}
@@ -152,7 +154,7 @@ textarea::placeholder {color:#7d8798}
   .workbench[data-mobile=files] .task-pane,.workbench[data-mobile=tasks] .sidebar,.workbench[data-mobile=tasks] .editor {display:none}
   .workbench[data-mobile=tasks] {grid-template-columns:minmax(0,1fr)}
   .task-pane {border-left:0}
-  .history-nav button {min-width:44px;min-height:44px}
+  .history-nav button,.output-nav button {min-width:44px;min-height:44px}
   .compose,.activity {padding-left:20px;padding-right:20px}
   .sidebar {padding-top:17px}
   .editor-head {padding:18px}
