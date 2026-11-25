@@ -3,9 +3,17 @@ html,body{height:100%;margin:0}
 body{background:#182130;color:#f2f5fa;font:14px "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;display:flex;flex-direction:column}
 header{background:#fbfcff;color:#263345;display:flex;align-items:center;gap:16px;min-height:58px;padding:8px 20px;flex-wrap:wrap;border-bottom:1px solid #d6dce7}
 h1{font-size:17px;margin:0;letter-spacing:-.02em}.back{color:#40527b;text-decoration:none;font-weight:600}.separator{height:21px;border-left:1px solid #d9dfeb}#status{font-size:13px;color:#5c687c}
-.toolbar{margin-left:auto;display:flex;gap:6px}button{font:inherit;border:1px solid #ccd4e3;border-radius:6px;background:white;color:#23324b;padding:7px 11px;cursor:pointer}
+.toolbar{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px}button{font:inherit;border:1px solid #ccd4e3;border-radius:6px;background:white;color:#23324b;padding:7px 11px;cursor:pointer}
 button:hover{background:#eef1fb}button:disabled{opacity:.5;cursor:default}
 button:focus-visible,a:focus-visible,input:focus-visible,#screen img:focus-visible{outline:3px solid #7a8df2;outline-offset:1px}
+#clipboardPanel{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;overflow:auto;max-height:48vh;padding:12px 20px;background:#f1f4fa;color:#344056;border-bottom:1px solid #cbd3e1}
+#clipboardPanel[hidden]{display:none}
+#clipboardPanel label{display:block;font-weight:600}
+#clipboardPanel textarea{display:block;width:100%;margin:5px 0 7px;padding:7px 9px;border:1px solid #bac6da;border-radius:4px;resize:vertical;font:inherit;color:inherit;background:white}
+#clipboardPanel textarea:focus-visible{outline:3px solid #7a8df2;outline-offset:1px}
+#clipboardStatus{grid-column:1/-1;margin:0;font-size:13px}
+#clipboardStatus:empty{display:none}
+@media(max-width:550px){#clipboardPanel{grid-template-columns:1fr;padding:10px}#clipboardPanel textarea{height:3.6em}}
 #screen{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden}
 #screen img{display:block;max-width:100%;max-height:100%;width:auto;height:auto}
 #textForm{display:flex;align-items:center;gap:12px;background:#f1f4fa;color:#344056;padding:8px 16px}

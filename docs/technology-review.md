@@ -14,6 +14,8 @@
 
 项目已用原生 GTK 4 控件和 Chromium 验证这一边界。三次回环测试中，浏览器接收到了可操作的窗口，GTK 输入框获得完整选区，而浏览器原生文本选区始终为空。实验记录包含版本、完整输入序列及双向协议观测。[GTK Broadway 实验记录](toolkit-experiment.md)
 
+后续用同一 GTK 3 输入框对照了原生 X11、工作台逐帧、Broadway 和 TigerVNC。四条路径都能选中同样的 7 个字符。另一个 GTK 进程提供“中文✓”后，三条 X11 路径均粘贴到这段新文字，Broadway 中原输入框三次都粘贴到自己上次复制的文字。工作台实时查看器现已用 TigerVNC 在云机 GTK 与本机系统剪贴板间验证了用户主动的双向传递。[四种路径及实机验收](validation-desktop-clipboard.md)
+
 ## 首版的取舍
 
 1. **从单次代理任务起步。** Codex 的非交互模式提供 JSON 行事件，Claude Code 的无头模式也能发结构化输出。两者可以落到同一份“任务状态和输出”记录上。原始事件的粒度不同，CLI 也可能升级；任务退出、代理实际失败、工具被拒绝应分别处理。测试时至少区分“找到了可执行文件”“认证可用”“完成真实模型任务”。[Codex 非交互模式](https://developers.openai.com/codex/noninteractive/) · [Claude Code 无头模式](https://code.claude.com/docs/en/headless)

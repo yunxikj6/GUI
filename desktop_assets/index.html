@@ -3,7 +3,16 @@
 <title>Linux 桌面 · 云端工作区</title><link rel="stylesheet" href="/desktop/style.css"></head>
 <body><header><a class="back" href="/" aria-label="返回工作区">‹ 工作区</a><span class="separator"></span>
 <h1>Linux 桌面</h1><span id="status" role="status">正在连接</span>
-<div class="toolbar"><button id="control" disabled>接管输入</button><button id="mode" disabled>逐帧查看</button><button id="retry">重新连接</button></div></header>
+<div class="toolbar"><button id="control" disabled>接管输入</button><button id="clipboardToggle" hidden aria-controls="clipboardPanel" aria-expanded="false">剪贴板</button><button id="mode" disabled>逐帧查看</button><button id="retry">重新连接</button></div></header>
+<section id="clipboardPanel" aria-label="实时桌面剪贴板" hidden>
+  <div><label for="clipboardSendText">发送到云端的文本</label>
+    <textarea id="clipboardSendText" rows="3" placeholder="在此粘贴或输入文本" spellcheck="false" autocomplete="off"></textarea>
+    <button id="clipboardSend" disabled>发送到云端</button></div>
+  <div><label for="clipboardRemoteText">最近收到的云端文本</label>
+    <textarea id="clipboardRemoteText" rows="3" placeholder="在云端应用中复制文本后，可在此取出" readonly autocomplete="off"></textarea>
+    <button id="clipboardCopy" disabled>复制到本机</button></div>
+  <p id="clipboardStatus" role="status"></p>
+</section>
 <main id="screen" aria-label="云端 Linux 桌面"></main>
 <form id="textForm" hidden><label for="typing">发送到云端输入框</label><input id="typing" autocomplete="off" maxlength="2048"><button type="submit">发送文字</button></form>
 <script type="module" src="/desktop/viewer.js"></script></body></html>

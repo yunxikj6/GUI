@@ -1,0 +1,204 @@
+{
+  "cloudProduct": {
+    "privateGuest": {
+      "privateUnix": true,
+      "serverTCP": false,
+      "widget": {
+        "window": 2097155,
+        "text": "",
+        "selected": []
+      }
+    },
+    "results": {
+      "entry": {
+        "initiallyViewOnly": true,
+        "takeoverOpenedPanel": true
+      },
+      "receive": {
+        "rfbText": "云端文本，雪✓",
+        "browserClipboardBeforeExplicitCopy": "Browser-only sentinel",
+        "afterExplicitCopy": "云端文本，雪✓"
+      },
+      "send": {
+        "actualBrowserPaste": true,
+        "guestClipboardBeforeSend": "云端文本，雪✓",
+        "afterSend": "本机主动发送，月✓"
+      },
+      "denied": {
+        "browserPermission": "denied",
+        "manualTextSelected": true,
+        "browserClipboardUnchanged": true
+      },
+      "cleanup": {
+        "handbackClearedBothFields": true,
+        "reconnectDiscardedUnsentText": true
+      },
+      "controlActions": [
+        "start",
+        "takeover",
+        "handback",
+        "takeover",
+        "start"
+      ]
+    },
+    "transport": {
+      "authenticatedExecRounds": 37,
+      "uplinkBytes": 478,
+      "downlinkBytes": 1343,
+      "retriedRounds": 0,
+      "ws": "loopback",
+      "RFB": "private Unix socket",
+      "control": "fixture start/takeover/handback"
+    },
+    "fixtureStopped": true,
+    "assetSha256": {
+      "index.html": "ed9b2c7104e52b8a4a9a8e8210c0191be8e126d9bcef3dbc4044dbbe9445e6e3",
+      "style.css": "573a65c4a782587f93742fb96c3cf84bd79bacf1b4456e75023f7adb86dd149c",
+      "viewer.js": "dd1048ccbca9bdfb6f7ab84a13e76a5d9c62f3595ab312378ff2bda83db4665d"
+    },
+    "mode": "real-instabox-isolated-display"
+  },
+  "localGtkComparison": {
+    "gtk": "3.24.49",
+    "browser": "156.0.8078.79",
+    "repetitionsPerPath": 3,
+    "typed": "Probe42",
+    "secondClipboardOwnerText": "中文✓",
+    "browserClipboardSeed": "LocalOnlyFixture",
+    "paths": {
+      "nativeX11": {
+        "display": "Xorg dummy",
+        "selected": [
+          0,
+          7
+        ],
+        "otherGtkProcessRead": {
+          "clipboard": "Probe42",
+          "primary": "Probe42"
+        },
+        "pastedRemoteCopy": "Probe42Probe42",
+        "unicodePaste": "Probe42Probe42中文✓"
+      },
+      "frameViewer": {
+        "display": "Xorg dummy",
+        "desktopInput": "xdotool arguments applied with libXtst in the fixture",
+        "selected": [
+          0,
+          7
+        ],
+        "otherGtkProcessRead": {
+          "clipboard": "Probe42",
+          "primary": "Probe42"
+        },
+        "pastedRemoteCopy": "Probe42Probe42",
+        "unicodePaste": "Probe42Probe42中文✓",
+        "browserSelection": "",
+        "browserClipboardAfterRemoteCopy": "LocalOnlyFixture"
+      },
+      "gtkBroadway": {
+        "display": "GTK 3 Broadway",
+        "selected": [
+          0,
+          7
+        ],
+        "otherGtkProcessRead": {
+          "clipboard": null,
+          "primary": null
+        },
+        "pastedRemoteCopy": "Probe42Probe42",
+        "clipboardProviderReadOwnText": "中文✓",
+        "textAfterTryingSecondProcessPaste": "Probe42Probe42Probe42",
+        "browserSelection": "",
+        "browserClipboardAfterRemoteCopy": "LocalOnlyFixture"
+      },
+      "vnc": {
+        "display": "TigerVNC 1.15.0",
+        "client": {
+          "noVNC": "1.7.0",
+          "chromium": "156.0.8078.79",
+          "rfb": 3.8
+        },
+        "selected": [
+          0,
+          7
+        ],
+        "otherGtkProcessRead": {
+          "clipboard": "Probe42",
+          "primary": "Probe42"
+        },
+        "pastedRemoteCopy": "Probe42Probe42",
+        "unicodePaste": "Probe42Probe42中文✓",
+        "serverToClientClipboardEvents": [
+          "Probe42",
+          "Probe42",
+          "中文✓"
+        ],
+        "clientToServerClipboard": [
+          {
+            "sent": "RFB_COPY_42",
+            "GTKClipboard": "RFB_COPY_42"
+          },
+          {
+            "sent": "RFB_中文✓",
+            "GTKClipboard": "RFB_中文✓"
+          }
+        ],
+        "browserSystemClipboardAccessed": false
+      }
+    }
+  },
+  "browserRegression": {
+    "file": "tests/test_desktop_clipboard_ui.py",
+    "smallViewportWidthCssPixels": 320,
+    "classicRfb": {
+      "rejectedOutsideLatin1": "保留中文与 emoji 🙂",
+      "rejectedTextRetained": true,
+      "receivedAfterRejectedSend": [],
+      "acceptedAndEchoed": "café\nsecond"
+    },
+    "sessionChanges": [
+      "handback",
+      "frame mode",
+      "reconnect"
+    ]
+  },
+  "cloudGtkSelectionRoundTrip": {
+    "privateUnix": true,
+    "serverTCP": false,
+    "actualInteraction": {
+      "typedViaCanvas": {
+        "text": "GTK",
+        "selected": []
+      },
+      "pastedInGtk": {
+        "text": "GTK起雪✓尾",
+        "selected": []
+      },
+      "gtkSelection": {
+        "bounds": [
+          4,
+          6
+        ],
+        "text": "雪✓"
+      },
+      "localBeforeExplicitCopy": "起雪✓尾",
+      "localAfterExplicitCopy": "雪✓",
+      "receivedByPanel": "雪✓",
+      "leaseActions": [
+        "start",
+        "takeover"
+      ],
+      "browser": "156.0.8078.79"
+    },
+    "execRounds": 26,
+    "retriedRounds": 0,
+    "assetSha256": {
+      "index.html": "ed9b2c7104e52b8a4a9a8e8210c0191be8e126d9bcef3dbc4044dbbe9445e6e3",
+      "style.css": "573a65c4a782587f93742fb96c3cf84bd79bacf1b4456e75023f7adb86dd149c",
+      "viewer.js": "dd1048ccbca9bdfb6f7ab84a13e76a5d9c62f3595ab312378ff2bda83db4665d"
+    },
+    "fixtureStopped": true,
+    "mode": "instabox-private-gtk",
+    "viewerSha256": "dd1048ccbca9bdfb6f7ab84a13e76a5d9c62f3595ab312378ff2bda83db4665d"
+  }
+}
