@@ -7,6 +7,7 @@ import difflib
 import errno
 import fcntl
 import hashlib
+import heapq
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,9 @@ import tempfile
 ROOT = Path("/data/cloud-workspace/project")
 PRIVATE = {".git", ".cloudwork"}
 MAX_ENTRIES = 400
+_TREE_PAGE_BYTES = 256 * 1024
+_TREE_CURSOR_LIMIT = 8192
+_NO_TREE_CURSOR = object()
 MAX_TEXT = 128 * 1024
 MAX_IMAGE = 256 * 1024
 MAX_DIFF = 64 * 1024
@@ -54,7 +58,7 @@ def relative_parts(path):
 @contextmanager
 def open_path(root, parts, directory=False):
     """Traverse from a pinned directory. Never follow a link, including at the leaf."""
-    fd = os.open(root, DIRECTORY)
+    fd = os.dup(root) if isinstance(root, int) else os.open(root, DIRECTORY)
     try:
         for index, name in enumerate(parts):
             flags = DIRECTORY if directory or index < len(parts) - 1 else NO_LINK | os.O_NONBLOCK
@@ -66,31 +70,114 @@ def open_path(root, parts, directory=False):
         os.close(fd)
 
 
-def tree(root, path):
-    entries = []
-    with open_path(root, relative_parts(path), directory=True) as fd, os.scandir(fd) as listing:
+def _directory_id(fd):
+    info = os.fstat(fd)
+    birth = getattr(info, "st_birthtime_ns", None)
+    if birth is None and sys.platform.startswith("linux"):
+        # statx on an open descriptor supplies birth time on Linux filesystems
+        # that support it. Unlike ctime it survives insertion/deletion of children.
+        import ctypes
+        import struct
+        statx = getattr(ctypes.CDLL(None), "statx", None)
+        data = ctypes.create_string_buffer(256)  # Linux struct statx
+        if statx is not None and statx(fd, b"", 0x1000, 0x0800, data) == 0:  # AT_EMPTY_PATH, STATX_BTIME
+            mask, = struct.unpack_from("=I", data)
+            if mask & 0x0800:
+                seconds, nanos = struct.unpack_from("=qI", data, 80)  # stx_btime
+                birth = seconds * 1_000_000_000 + nanos
+    return f"{info.st_dev}:{info.st_ino}:{birth}".encode("ascii")
+
+
+def _tree_scope(root, path, root_fd, fd):
+    project_id = _directory_id(root_fd)
+    fields = (b"tree-v1", os.fsencode(os.path.abspath(root)), project_id, os.fsencode(path),
+              _directory_id(fd) if path else project_id)
+    return hashlib.sha256(b"\x00".join(fields)).digest()
+
+
+def _tree_cursor(scope, key):
+    is_file, _, name = key
+    anchor = (b"f" if is_file else b"d") + os.fsencode(name)
+    checksum = hashlib.sha256(scope + anchor).digest()[:16]
+    return base64.urlsafe_b64encode(checksum + anchor).decode("ascii")
+
+
+def _tree_boundary(cursor, scope):
+    error = WorkspaceError("invalid_cursor", "目录分页位置已失效，请重新加载此目录。")
+    if not isinstance(cursor, str) or not 0 < len(cursor) <= _TREE_CURSOR_LIMIT:
+        raise error
+    try:
+        raw = base64.b64decode(cursor, altchars=b"-_", validate=True)
+    except (ValueError, binascii.Error):
+        raise error from None
+    tag, name = raw[16:17], os.fsdecode(raw[17:])
+    key = (tag == b"f", name.casefold(), name)
+    if tag not in (b"d", b"f") or not name or _tree_cursor(scope, key) != cursor:
+        raise error
+    return key
+
+
+def _tree_keys(fd, boundary):
+    with os.scandir(fd) as listing:
         for entry in listing:
-            if entry.name in PRIVATE or entry.name.startswith(TEMP_PREFIX):
+            name = entry.name
+            if name in PRIVATE or name.startswith(TEMP_PREFIX):
                 continue
             try:
-                info = entry.stat(follow_symlinks=False)
+                if entry.is_dir(follow_symlinks=False):
+                    is_file = False
+                elif entry.is_file(follow_symlinks=False):
+                    is_file = True
+                else:
+                    continue
             except FileNotFoundError:
                 continue
-            if stat.S_ISDIR(info.st_mode):
-                kind = "dir"
-            elif stat.S_ISREG(info.st_mode):
-                kind = "file"
-            else:
-                continue
-            entries.append({
-                "name": entry.name, "path": f"{path}/{entry.name}" if path else entry.name,
-                "type": kind, "size": info.st_size if kind == "file" else 0,
-            })
-            if len(entries) > MAX_ENTRIES:
-                break
-    truncated = len(entries) > MAX_ENTRIES
-    entries = sorted(entries[:MAX_ENTRIES], key=lambda item: (item["type"] != "dir", item["name"].casefold()))
-    return {"path": path, "entries": entries, "truncated": truncated}
+            key = (is_file, name.casefold(), name)
+            if boundary is None or key > boundary:
+                yield key
+
+
+def _tree_wire_bytes(data):
+    return len(json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8", "backslashreplace"))
+
+
+def tree(root, path, cursor=_NO_TREE_CURSOR):
+    parts = relative_parts(path)
+    result = {"path": path, "entries": [], "truncated": False, "nextCursor": None}
+    remaining = _TREE_PAGE_BYTES - _tree_wire_bytes({"ok": True, "data": result}) - _TREE_CURSOR_LIMIT
+    try:
+        with open_path(root, [], directory=True) as root_fd, open_path(root_fd, parts, directory=True) as fd:
+            scope = None if cursor is _NO_TREE_CURSOR else _tree_scope(root, path, root_fd, fd)
+            boundary = None if scope is None else _tree_boundary(cursor, scope)
+            keys = heapq.nsmallest(MAX_ENTRIES + 1, _tree_keys(fd, boundary))
+            result["truncated"] = len(keys) > MAX_ENTRIES
+            last = None
+            for key in keys[:MAX_ENTRIES]:
+                is_file, _, name = key
+                try:
+                    info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not (stat.S_ISREG(info.st_mode) if is_file else stat.S_ISDIR(info.st_mode)):
+                    continue
+                item = {"name": name, "path": f"{path}/{name}" if path else name,
+                        "type": "file" if is_file else "dir", "size": info.st_size if is_file else 0}
+                size = _tree_wire_bytes(item) + 1
+                if size > remaining:
+                    result["truncated"] = True
+                    break
+                result["entries"].append(item)
+                remaining -= size
+                last = key
+            if result["truncated"]:
+                if last is None:
+                    raise WorkspaceError("invalid_cursor", "目录内容已变化，请重新加载此目录。")
+                result["nextCursor"] = _tree_cursor(scope or _tree_scope(root, path, root_fd, fd), last)
+    except OSError as exc:
+        if cursor is not _NO_TREE_CURSOR and exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+            raise WorkspaceError("invalid_cursor", "原目录已不存在，请重新加载文件目录。") from None
+        raise
+    return result
 
 
 def read_bytes(root, path, limit):
@@ -351,7 +438,7 @@ def dispatch(request, root):
     if op == "status":
         return status(root)
     if op == "tree":
-        return tree(root, request.get("path", ""))
+        return tree(root, request.get("path", ""), request.get("cursor", _NO_TREE_CURSOR))
     if op == "file":
         return file_preview(root, request.get("path"), request.get("ifRevision"))
     if op == "save":

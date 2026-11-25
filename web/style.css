@@ -56,7 +56,7 @@ h1 {font-size:17px;letter-spacing:.02em;font-weight:720}
 .inline-note,.action-note,.preview-note {font-size:12px;line-height:1.65;color:var(--muted);overflow-wrap:anywhere}
 .tree-column>.inline-note {padding:4px 9px}
 .tree-list {padding:0;list-style:none;margin:0}
-.tree-list .tree-list {border-left:1px solid #d4dae3;padding-left:7px;margin-left:13px}
+.tree-list .tree-directory {border-left:1px solid #d4dae3;padding-left:7px;margin-left:13px}
 .tree-button {border-radius:4px;display:flex;align-items:center;gap:8px;padding:6px;width:100%;text-align:left;font:12px/1.5 var(--mono);min-width:0}
 .tree-button[aria-current=true] {background:#e1e6f2;color:#313f64}
 .tree-name {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -64,6 +64,9 @@ h1 {font-size:17px;letter-spacing:.02em;font-weight:720}
 .tree-caret {width:8px;flex:none;display:inline-block;font:11px/1 system-ui;color:#657085}
 .tree-button[aria-expanded=true] .tree-caret {transform:rotate(90deg)}
 .tree-message {color:var(--muted);font-size:11px;margin:5px 10px}
+.tree-more {display:block;color:var(--indigo);font-size:12px;padding:5px 8px;margin:3px 0;border:1px solid #cdd3df;border-radius:4px}
+.tree-more[aria-disabled=true] {opacity:.55;cursor:default}
+.tree-more[aria-disabled=false]:hover {background:#e7eaf1}
 .branch-row {height:43px;flex:none;gap:8px;border-top:1px solid var(--line);margin-top:12px;padding:0 8px;color:#526176;font:11px var(--mono);overflow:hidden}
 .branch-row span:last-child {text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
 .branch-icon {font-size:19px;color:#647084}
@@ -154,7 +157,7 @@ textarea::placeholder {color:#7d8798}
   .workbench[data-mobile=files] .task-pane,.workbench[data-mobile=tasks] .sidebar,.workbench[data-mobile=tasks] .editor {display:none}
   .workbench[data-mobile=tasks] {grid-template-columns:minmax(0,1fr)}
   .task-pane {border-left:0}
-  .history-nav button,.output-nav button {min-width:44px;min-height:44px}
+  .history-nav button,.output-nav button,.tree-more {min-width:44px;min-height:44px}
   .compose,.activity {padding-left:20px;padding-right:20px}
   .sidebar {padding-top:17px}
   .editor-head {padding:18px}

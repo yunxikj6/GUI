@@ -34,6 +34,8 @@ python3 launcher.py --remote-project /data/workspace/my-project
 
 任务记录每页显示 80 项。点“较早”查找以前的任务，用“较新”往回翻，从第三页起也可以直接点“最近记录”。翻页时，正在阅读的任务和追问草稿会保留。选好一项旧任务后，在同一标签页刷新即可回到该页和该任务。
 
+文件树按目录优先、名称排序。大目录底部有“加载更多”，根目录和展开的子目录都能分别继续读取。翻页时连接中断，可以从原位置重试。其他程序移动或新增文件后，刷新目录可看到当前清单。
+
 长任务会先显示最新输出。用“较早输出”和“较新输出”逐段阅读，点“回到最新输出”可再次跟随任务。向上滚动阅读或选中文字时，新到的记录会保留在云机，当前文字和选区仍可阅读。在同一标签页刷新会重新打开已保存的历史输出窗口。
 
 Claude Code 问答向模型开放读取和搜索项目的 `Read`、`Glob`、`Grep`。任务记录会在调用时显示工具名称，刷新后仍能查看。工作台为本次调用指定空的 MCP 配置，并用安全模式停用普通用户、项目和插件的执行钩子。主机管理员配置的受管钩子仍可运行。云机需安装支持 `--safe-mode` 的 Claude Code，已验证版本为 2.1.288。Codex 问答保留云机模型和登录配置，使用只读沙箱内的项目命令，并为该次调用关闭外部 MCP 工具、应用扩展、插件和钩子。
@@ -71,5 +73,6 @@ python3 launcher.py --local --project "$(mktemp -d)/project"
 - [Claude Code 续聊与升级验收](docs/validation-claude-conversations.md)
 - [任务历史翻页与云机升级验收](docs/validation-task-history.md)
 - [长任务输出与实时回放验收](docs/validation-output-windows.md)
+- [大目录浏览与云机验收](docs/validation-tree-pagination.md)
 - [项目需求](docs/requirements.md)和[开发交接](AGENTS.md)
 - [桌面查看器第三方许可](desktop_assets/NOTICE.txt)

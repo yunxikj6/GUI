@@ -14,7 +14,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 
-from instabox import BridgeError, InstaBox
+from instabox import BridgeError, InstaBox, json_bytes
 
 APP = Path(__file__).resolve().parent
 PUBLIC_OPS = {'status', 'tree', 'file', 'diff', 'tasks', 'start', 'cancel', 'events', 'save',
@@ -38,7 +38,7 @@ class LocalWorkspace:
 
     def rpc(self, req):
         process = subprocess.run([sys.executable, str(APP / 'cloud' / 'workspace.py'), '--stdin'],
-                                 input=json.dumps(req, ensure_ascii=False).encode(),
+                                 input=json_bytes(req),
                                  capture_output=True, env=self.env, timeout=45)
         try:
             return json.loads(process.stdout)
@@ -61,7 +61,7 @@ def workspace_identity(workspace):
         project = PurePosixPath(workspace.project).name
         identity = workspace.machine_id + ':' + workspace.project
     return {'project': project, 'mode': mode,
-            'workspaceId': hashlib.sha256((mode + ':' + identity).encode()).hexdigest()[:20]}
+            'workspaceId': hashlib.sha256((mode + ':' + identity).encode('utf-8', 'surrogateescape')).hexdigest()[:20]}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -83,7 +83,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def send_json(self, status, payload):
-        self.send_bytes(status, json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode(),
+        self.send_bytes(status, json_bytes(payload),
                         'application/json; charset=utf-8')
 
     def error(self, status, code, message):

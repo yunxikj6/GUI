@@ -23,6 +23,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def json_bytes(value):
+    # Linux filenames can contain undecodable bytes. Preserve their surrogate escapes
+    # as JSON \uXXXX sequences while sending ordinary Unicode as UTF-8.
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8', 'backslashreplace')
+
+
 # Install an immutable worker directory in one rename. Another client may
 # install the same version while this one is connecting.
 WORKER_FILES = ('tasks.py', 'workspace.py', 'proposals.py', 'codex_tools.py')
@@ -77,7 +83,7 @@ class InstaBox:
         request_headers = {'Accept': 'application/json', 'X-API-Key': self.key}
         data = None
         if body is not None:
-            data = json.dumps(body, ensure_ascii=False).encode()
+            data = json_bytes(body)
             request_headers['Content-Type'] = 'application/json'
         request_headers.update(headers or {})
         request = urllib.request.Request(self.base + path, data=data, method=method, headers=request_headers)
@@ -136,15 +142,16 @@ class InstaBox:
         # Send arguments as stdin so project text and prompts are never shell
         # fragments and larger saves do not hit the guest's argv length limit.
         argv = ['python3', self.worker, '--stdin']
+        stdin = json_bytes(request).decode('utf-8')
         try:
-            output = self.exec(argv, json.dumps(request, ensure_ascii=False), envs={'CLOUD_WORKSPACE_ROOT': self.project})
+            output = self.exec(argv, stdin, envs={'CLOUD_WORKSPACE_ROOT': self.project})
         except BridgeError as exc:
             if exc.code not in {'machine_not_running', 'machine_suspended'}:
                 raise
             # A rejected exec never entered the guest. A transport timeout is
             # ambiguous, so it is surfaced and never automatically resubmitted.
             self.ensure_running()
-            output = self.exec(argv, json.dumps(request, ensure_ascii=False), envs={'CLOUD_WORKSPACE_ROOT': self.project})
+            output = self.exec(argv, stdin, envs={'CLOUD_WORKSPACE_ROOT': self.project})
         try:
             result = json.loads(output)
             if not isinstance(result, dict) or not isinstance(result.get('ok'), bool):

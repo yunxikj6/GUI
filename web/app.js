@@ -38,7 +38,7 @@ function restoreFileScope(scope) {
   drafts.clear(); fileCache.clear(); cachedBytes = 0;
   state.fileScope = scope;
   state.selection = stored(scope + '.path') || null;
-  viewButtons('files'); resetPreview(); $('tree').replaceChildren();
+  viewButtons('files'); resetPreview(); clearTree();
   $('fileEditArea').value = ''; fileHeading('文件预览','项目文件');
   const prefix = draftPrefix();
   try {
@@ -66,7 +66,7 @@ function drawDraftMenu() {
   const options = [];
   for (const [path, edit] of drafts) {
     if ((edit.content !== edit.base || edit.submitted !== undefined) && (state.view !== 'files' || state.selection !== path)) {
-      const option = el('option','',path);
+      const option = el('option','',displayPath(path));
       option.value = path;
       options.push(option);
     }
@@ -186,11 +186,14 @@ function viewButtons(view) {
 function prettySize(size) {
   return size < 1024 ? size + ' B' : (size / 1024).toFixed(1) + ' KiB';
 }
+function displayPath(path) {
+  // Python's filesystem decoder preserves non-UTF-8 bytes as lone low surrogates.
+  return path.replaceAll('\\','\\\\').replace(/[\uDC80-\uDCFF]/gu, ch => '\\x' + (ch.charCodeAt(0) - 0xDC00).toString(16));
+}
 function fileHeading(label, title, path = '', size = '') {
   $('viewLabel').textContent = label;
-  $('editorTab').textContent = title;
-  $('fileTitle').textContent = title;
-  $('filePath').textContent = path;
+  $('editorTab').textContent = $('fileTitle').textContent = displayPath(title);
+  $('filePath').textContent = displayPath(path);
   $('fileSize').textContent = size;
 }
 function resetPreview() {
@@ -304,7 +307,7 @@ function renderFile(f) {
       return;
     }
     const image = el('img','preview-image');
-    image.alt = f.path; image.src = 'data:' + f.mime + ';base64,' + f.content;
+    image.alt = displayPath(f.path); image.src = 'data:' + f.mime + ';base64,' + f.content;
     image.addEventListener('error', () => { $('fileNotice').textContent = '图片解码失败。'; }, {once:true});
     $('preview').replaceChildren(image);
   } else {
@@ -447,60 +450,131 @@ async function saveEdit() {
     if (drafts.has(f.path) && state.file?.path === f.path) drawEdit();
   }
 }
-function treeNodes(entries, ticket) {
-  const ul = el('ul','tree-list');
+let rootDirectory = null;
+const directoryReads = new Map();
+function drawDirectory(directory) {
+  const busy = directoryReads.has(directory);
+  directory.list.setAttribute('aria-busy',String(busy));
+  directory.notice.textContent = busy ? '正在读取目录…' : directory.message;
+  directory.notice.hidden = !directory.notice.textContent;
+  const action = directory.refreshRequired ? '刷新目录' : directory.retry ? '重试读取' : directory.cursor ? '加载更多' : '';
+  directory.more.hidden = !action;
+  directory.more.textContent = action;
+  // Keep keyboard focus on the paging control while a cloud read is outstanding.
+  directory.more.setAttribute('aria-disabled',String(busy));
+}
+function invalidateDirectoryReads(box) {
+  for (const directory of directoryReads.keys()) {
+    if (box.contains(directory.box)) {
+      directoryReads.delete(directory);
+      if (!directory.loaded) directory.retry = true;
+      drawDirectory(directory);
+    }
+  }
+}
+function clearTree() {
+  invalidateDirectoryReads($('tree'));
+  rootDirectory = null; $('tree').replaceChildren(); $('treeNotice').textContent = '';
+}
+function makeDirectory(path) {
+  const box = el('div','tree-directory'), list = el('ul','tree-list');
+  const notice = el('p','tree-message'), more = el('button','tree-more');
+  box.dataset.directory = path; box.setAttribute('role','group'); box.setAttribute('aria-label',displayPath(path) || '项目根目录');
+  notice.dataset.treeNotice = path; notice.setAttribute('role','status');
+  more.dataset.treeMore = path;
+  box.append(list,more,notice);
+  const directory = {path,box,list,notice,more,cursor:null,loaded:false,retry:false,refreshRequired:false,message:''};
+  more.addEventListener('click',() => {
+    if (!directoryReads.has(directory)) readDirectory(directory,directory.refreshRequired || !directory.loaded);
+  });
+  drawDirectory(directory);
+  return directory;
+}
+function treeNodes(entries) {
+  const fragment = document.createDocumentFragment();
   for (const entry of entries) {
     const li = el('li'), btn = el('button','tree-button');
     const dir = entry.type === 'dir';
-    btn.title = entry.path;
+    btn.title = displayPath(entry.path);
     const caret = el('span','tree-caret', dir ? '▸' : '');
     caret.setAttribute('aria-hidden','true');
     const icon = el('i','tree-symbol ' + (dir ? 'dir-symbol' : 'file-symbol'));
     icon.setAttribute('aria-hidden','true');
-    btn.append(caret,icon,el('span','tree-name',entry.name)); li.append(btn); ul.append(li);
+    btn.append(caret,icon,el('span','tree-name',displayPath(entry.name))); li.append(btn); fragment.append(li);
     if (!dir) {
       btn.dataset.file = entry.path;
       btn.setAttribute('aria-current', String(state.view === 'files' && state.selection === entry.path));
       btn.addEventListener('click', () => openFile(entry.path));
       continue;
     }
-    btn.setAttribute('aria-expanded','false');
-    let expanded = false, populated = false, busy = false;
-    const box = el('div'); box.hidden = true; li.append(box);
-    btn.addEventListener('click', async () => {
-      expanded = !expanded; box.hidden = !expanded;
+    btn.dataset.folder = entry.path; btn.setAttribute('aria-expanded','false');
+    let child = null;
+    btn.addEventListener('click', () => {
+      const expanded = btn.getAttribute('aria-expanded') !== 'true';
       btn.setAttribute('aria-expanded', String(expanded));
-      if (!expanded || populated || busy) return;
-      busy = true; box.replaceChildren(el('p','tree-message','读取中…'));
-      try {
-        const data = await rpc('tree',{path:entry.path});
-        if (ticket !== state.treeVersion) return;
-        box.replaceChildren(data.entries.length ? treeNodes(data.entries,ticket) : el('p','tree-message','空目录'));
-        if (data.truncated) box.append(el('p','tree-message','此目录仅显示前 400 项。'));
-        populated = true;
-      } catch (err) {
-        box.replaceChildren(el('p','tree-message',asError(err)));
-      } finally { busy = false; }
+      if (!child) { child = makeDirectory(entry.path); li.append(child.box); }
+      child.box.hidden = !expanded;
+      if (!expanded) invalidateDirectoryReads(child.box);
+      else if (!child.loaded) readDirectory(child,true);
     });
   }
-  return ul;
+  return fragment;
+}
+async function readDirectory(directory, reset) {
+  const {path,box,list,more} = directory;
+  if (reset) invalidateDirectoryReads(box);
+  const cursor = reset ? null : directory.cursor;
+  const generation = state.treeVersion, request = {};
+  directoryReads.set(directory,request); drawDirectory(directory);
+  const current = () => generation === state.treeVersion && directoryReads.get(directory) === request && box.isConnected;
+  try {
+    const data = await rpc('tree',cursor ? {path,cursor} : {path},current);
+    if (!current()) return;
+    if (data.path !== path || !Array.isArray(data.entries)) throw new Error('未能读取此目录，请重试。');
+    const legacy = !Object.hasOwn(data,'nextCursor');
+    const focused = document.activeElement === more;
+    const scroll = box.closest('.tree-column'), top = scroll.scrollTop;
+    // An older worker ignores the cursor and sends its first page again.
+    const nodes = treeNodes(cursor && legacy ? [] : data.entries);
+    const first = nodes.firstElementChild?.firstElementChild;
+    if (reset) { invalidateDirectoryReads(list); list.replaceChildren(nodes); }
+    else list.append(nodes);
+    directory.cursor = data.nextCursor || null;
+    directory.loaded = true; directory.retry = false; directory.refreshRequired = Boolean(cursor && legacy);
+    directory.message = directory.refreshRequired ? '当前工作进程不支持继续翻页，可刷新目录重读。' :
+      legacy && data.truncated ? '此目录仅显示前 400 项。' :
+      list.childElementCount ? '' : path ? '空目录' : '项目目录为空。';
+    if (focused) {
+      const target = first || list.lastElementChild?.firstElementChild;
+      if (target) {
+        target.focus({preventScroll:true});
+        if (reset) target.scrollIntoView({block:'nearest'});
+        else scroll.scrollTop = top;
+      }
+    }
+    return data;
+  } catch(err) {
+    if (!current()) return;
+    directory.refreshRequired = (reset && directory.loaded) || err.code === 'invalid_cursor' || err.code === 'cursor_not_found';
+    directory.retry = true;
+    directory.message = asError(err);
+  } finally {
+    if (directoryReads.get(directory) === request) { directoryReads.delete(directory); drawDirectory(directory); }
+  }
 }
 async function loadTree(autoOpen = false) {
-  const ticket = ++state.treeVersion;
-  $('treeNotice').textContent = '正在读取目录…';
-  try {
-    const data = await rpc('tree',{path:''});
-    if (ticket !== state.treeVersion) return;
-    $('tree').replaceChildren(treeNodes(data.entries,ticket));
-    $('treeNotice').textContent = data.truncated ? '此目录仅显示前 400 项。' : data.entries.length ? '' : '项目目录为空。';
-    if (autoOpen && state.view === 'files') {
-      const path = state.selection || data.entries.find(e => e.type === 'file' && e.name.toLowerCase() === 'readme.md')?.path || data.entries.find(e => e.type === 'file')?.path;
-      if (path) await openFile(path);
-      else $('fileNotice').textContent = '从目录中选择一个文件。';
-    }
-  } catch(err) {
-    if (ticket === state.treeVersion) $('treeNotice').textContent = asError(err);
+  ++state.treeVersion;
+  if (!rootDirectory) {
+    rootDirectory = makeDirectory(''); $('tree').replaceChildren(rootDirectory.box);
   }
+  $('treeNotice').textContent = '';
+  const version = state.fileVersion;
+  const data = await readDirectory(rootDirectory,true);
+  if (!data || !autoOpen || state.view !== 'files' || version !== state.fileVersion) return;
+  const path = state.selection || data.entries.find(e => e.type === 'file' && e.name.toLowerCase() === 'readme.md')?.path ||
+    data.entries.find(e => e.type === 'file')?.path;
+  if (path) await openFile(path);
+  else $('fileNotice').textContent = '从目录中选择一个文件。';
 }
 
 function selectedTurn() { return state.selectedRecord; }

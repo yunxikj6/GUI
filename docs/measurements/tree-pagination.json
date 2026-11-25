@@ -1,0 +1,472 @@
+{
+  "baseline_commit": "ab5ec95a899af5c3433d66beb13b59c1319390c0",
+  "baseline": {
+    "root": {
+      "folder": "",
+      "expected": 864,
+      "listed": 400,
+      "pages": [
+        400
+      ],
+      "dupes": 0,
+      "missing": 464,
+      "global_first_400_not_in_old_first_page": 205,
+      "manifest_sha256": "eb43d0eedded427368cf412bda404d57fce472916bbce0fe5d199e061f4bd4c0",
+      "disk_sha256": "a629560a44f5a245d2d20c09571e9bd6739cabf36111ebee0c09ddb146263a7a",
+      "opened_count": 4,
+      "opened": [
+        "É.txt",
+        "含 空格[1].txt",
+        "É.txt",
+        "é.txt"
+      ]
+    },
+    "child": {
+      "folder": "目录-00",
+      "expected": 836,
+      "listed": 400,
+      "pages": [
+        400
+      ],
+      "dupes": 0,
+      "missing": 436,
+      "global_first_400_not_in_old_first_page": 214,
+      "manifest_sha256": "57be957f88a366af89a86aa37052c46b0793701992a30d153a534e182543bd83",
+      "disk_sha256": "2b27384f8d456781718552771cceea3938cbb09052e581eef1e0edaff9bb99f2",
+      "opened_count": 5,
+      "opened": [
+        "child-0003.txt",
+        "含 空格[1].txt",
+        "É.txt",
+        "é.txt",
+        "É.txt"
+      ]
+    }
+  },
+  "paged": {
+    "root": {
+      "folder": "",
+      "expected": 864,
+      "listed": 864,
+      "pages": [
+        400,
+        400,
+        64
+      ],
+      "dupes": 0,
+      "missing": 0,
+      "global_first_400_not_in_old_first_page": 0,
+      "manifest_sha256": "a629560a44f5a245d2d20c09571e9bd6739cabf36111ebee0c09ddb146263a7a",
+      "disk_sha256": "a629560a44f5a245d2d20c09571e9bd6739cabf36111ebee0c09ddb146263a7a",
+      "opened_count": 13,
+      "opened": [
+        "É.txt",
+        "含 空格[1].txt",
+        "README.md",
+        "Straße.txt",
+        "STRASSE.txt",
+        "strasse.txt",
+        "É.txt",
+        "é.txt",
+        "root-0434.txt",
+        "root-0373.txt",
+        "root-0374.txt",
+        "root-0773.txt",
+        "root-0774.txt"
+      ]
+    },
+    "child": {
+      "folder": "目录-00",
+      "expected": 836,
+      "listed": 836,
+      "pages": [
+        400,
+        400,
+        36
+      ],
+      "dupes": 0,
+      "missing": 0,
+      "global_first_400_not_in_old_first_page": 0,
+      "manifest_sha256": "2b27384f8d456781718552771cceea3938cbb09052e581eef1e0edaff9bb99f2",
+      "disk_sha256": "2b27384f8d456781718552771cceea3938cbb09052e581eef1e0edaff9bb99f2",
+      "opened_count": 14,
+      "opened": [
+        "child-0000.txt",
+        "含 空格[1].txt",
+        "README.md",
+        "Straße.txt",
+        "STRASSE.txt",
+        "strasse.txt",
+        "É.txt",
+        "é.txt",
+        "É.txt",
+        "child-0399.txt",
+        "child-0389.txt",
+        "child-0390.txt",
+        "child-0789.txt",
+        "child-0790.txt"
+      ]
+    }
+  },
+  "baseline_worker_samples": {
+    "w08000": {
+      "first": {
+        "median_ms": 61.93,
+        "ms": [
+          63.17,
+          61.93,
+          60.47
+        ],
+        "VmHWM_KiB": [
+          14128,
+          14128,
+          14128
+        ],
+        "bytes": 28063,
+        "entries": 400,
+        "truncated": true,
+        "entry_stat_syscalls": 401,
+        "directory_getdents64_calls": 1
+      }
+    },
+    "w32000": {
+      "first": {
+        "median_ms": 60.5,
+        "ms": [
+          60.5,
+          60.25,
+          62.29
+        ],
+        "VmHWM_KiB": [
+          14128,
+          14132,
+          14128
+        ],
+        "bytes": 28065,
+        "entries": 400,
+        "truncated": true,
+        "entry_stat_syscalls": 401,
+        "directory_getdents64_calls": 1
+      }
+    },
+    "long": {
+      "first": {
+        "median_ms": 62.3,
+        "ms": [
+          71.61,
+          59.91,
+          62.3
+        ],
+        "VmHWM_KiB": [
+          14592,
+          14592,
+          14592
+        ],
+        "bytes": 216861,
+        "entries": 400,
+        "truncated": true
+      }
+    },
+    "escaped": {
+      "first": {
+        "median_ms": 61.61,
+        "ms": [
+          61.61,
+          60.24,
+          64.86
+        ],
+        "VmHWM_KiB": [
+          16512,
+          16512,
+          16512
+        ],
+        "bytes": 91,
+        "error": "too_large"
+      }
+    },
+    "deep": {
+      "first": {
+        "median_ms": 63.75,
+        "ms": [
+          70.2,
+          63.75,
+          63.22
+        ],
+        "VmHWM_KiB": [
+          18304,
+          18296,
+          18296
+        ],
+        "bytes": 91,
+        "error": "too_large"
+      }
+    }
+  },
+  "current_worker_samples": {
+    "w08000": {
+      "first": {
+        "median_ms": 70.85,
+        "ms": [
+          76.75,
+          69.35,
+          70.85
+        ],
+        "VmHWM_KiB": [
+          14432,
+          14436,
+          14436
+        ],
+        "bytes": 28101,
+        "entries": 400,
+        "truncated": true,
+        "entry_stat_syscalls": 400,
+        "directory_getdents64_calls": 9
+      },
+      "second": {
+        "median_ms": 67.5,
+        "ms": [
+          71.44,
+          67.5,
+          67.09
+        ],
+        "VmHWM_KiB": [
+          14444,
+          14444,
+          14448
+        ],
+        "bytes": 28117,
+        "entries": 400,
+        "truncated": true,
+        "entry_stat_syscalls": 400,
+        "directory_getdents64_calls": 9
+      },
+      "full": {
+        "pages": 20,
+        "payload_bytes": 562291,
+        "ms": 1430.13,
+        "unique_sorted": true
+      }
+    },
+    "w32000": {
+      "first": {
+        "median_ms": 84.99,
+        "ms": [
+          84.99,
+          80.81,
+          86.97
+        ],
+        "VmHWM_KiB": [
+          14436,
+          14436,
+          14436
+        ],
+        "bytes": 28101,
+        "entries": 400,
+        "truncated": true,
+        "entry_stat_syscalls": 400,
+        "directory_getdents64_calls": 33
+      },
+      "second": {
+        "median_ms": 102.43,
+        "ms": [
+          102.43,
+          93.08,
+          125.83
+        ],
+        "VmHWM_KiB": [
+          14448,
+          14440,
+          14448
+        ],
+        "bytes": 28117,
+        "entries": 400,
+        "truncated": true,
+        "entry_stat_syscalls": 400,
+        "directory_getdents64_calls": 33
+      },
+      "full": {
+        "pages": 80,
+        "payload_bytes": 2249311,
+        "ms": 7546.22,
+        "unique_sorted": true
+      }
+    },
+    "long": {
+      "first": {
+        "median_ms": 84.3,
+        "ms": [
+          84.3,
+          81.35,
+          84.81
+        ],
+        "VmHWM_KiB": [
+          14800,
+          14804,
+          14804
+        ],
+        "bytes": 217215,
+        "entries": 400,
+        "truncated": true
+      },
+      "second": {
+        "median_ms": 83.65,
+        "ms": [
+          83.65,
+          81.61,
+          88.97
+        ],
+        "VmHWM_KiB": [
+          14928,
+          14920,
+          14804
+        ],
+        "bytes": 217231,
+        "entries": 400,
+        "truncated": true
+      },
+      "full": {
+        "pages": 20,
+        "payload_bytes": 4344255,
+        "ms": 1735.76,
+        "unique_sorted": true
+      }
+    },
+    "escaped": {
+      "first": {
+        "median_ms": 63.72,
+        "ms": [
+          63.72,
+          67.9,
+          61.66
+        ],
+        "VmHWM_KiB": [
+          14928,
+          14924,
+          14928
+        ],
+        "bytes": 252979,
+        "entries": 87,
+        "truncated": true
+      },
+      "second": {
+        "median_ms": 64.48,
+        "ms": [
+          63.62,
+          65.58,
+          64.48
+        ],
+        "VmHWM_KiB": [
+          14936,
+          14936,
+          14940
+        ],
+        "bytes": 252995,
+        "entries": 87,
+        "truncated": true
+      },
+      "full": {
+        "pages": 8,
+        "payload_bytes": 1890057,
+        "ms": 521.27,
+        "unique_sorted": true
+      }
+    },
+    "deep": {
+      "first": {
+        "median_ms": 66.97,
+        "ms": [
+          66.97,
+          64.41,
+          67.52
+        ],
+        "VmHWM_KiB": [
+          14924,
+          14932,
+          14924
+        ],
+        "bytes": 253322,
+        "entries": 80,
+        "truncated": true
+      },
+      "second": {
+        "median_ms": 65.02,
+        "ms": [
+          66.63,
+          63.69,
+          65.02
+        ],
+        "VmHWM_KiB": [
+          15056,
+          15056,
+          15052
+        ],
+        "bytes": 253338,
+        "entries": 80,
+        "truncated": true
+      },
+      "full": {
+        "pages": 9,
+        "payload_bytes": 2060647,
+        "ms": 587.14,
+        "unique_sorted": true
+      }
+    }
+  },
+  "instabox_regression": {
+    "tests": 70,
+    "passed": 68,
+    "skipped": [
+      [
+        "test_chat_keeps_custom_provider_and_excludes_mcp_on_new_and_legacy_turns (test_native_codex.NativeCodexTests.test_chat_keeps_custom_provider_and_excludes_mcp_on_new_and_legacy_turns)",
+        "'Bubblewrap is unavailable for the system MCP fixture'"
+      ],
+      [
+        "test_proposal_excludes_system_mcp_before_starting_codex (test_native_codex.NativeCodexTests.test_proposal_excludes_system_mcp_before_starting_codex)",
+        "'Bubblewrap is unavailable for the system MCP fixture'"
+      ]
+    ],
+    "elapsedSeconds": 22.163,
+    "modules": [
+      "test_tree_pages",
+      "test_tree_transport.CloudFilenameTransport",
+      "test_workspace",
+      "test_bridge",
+      "test_history",
+      "test_output_pages",
+      "test_tasks",
+      "test_proposals",
+      "test_task_cancel",
+      "test_native_claude",
+      "test_claude_isolation",
+      "test_native_codex"
+    ]
+  },
+  "instabox_ui": {
+    "rootFiles": 418,
+    "nestedFiles": 432,
+    "rootNamesSha256": "646e548d4fd0e8d19cf9b9e20eec97633bf07b6c56a2d67ceafee15471b2d8cb",
+    "nestedNamesSha256": "a139e77bfe7758c72205ca985e2e0b5410f0de45137ee9094ac56757c04e2866",
+    "opened": [
+      "root-0400.txt",
+      "catalog/catalog-0431.txt"
+    ],
+    "retryUsedSameCursor": true,
+    "deepParentPathBytes": 2992,
+    "deepPageEntries": [
+      81,
+      81,
+      81,
+      81,
+      81,
+      5
+    ],
+    "deepPageJsonBytes": [
+      251372,
+      251372,
+      251372,
+      251372,
+      251372,
+      18395
+    ]
+  }
+}
