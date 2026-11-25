@@ -9,14 +9,14 @@
 | 需要继续的工作 | 从哪里进入 | 已有证据 |
 | --- | --- | --- |
 | 本机界面、文件编辑和 Git 差异 | [前端](web/app.js)通过 [本机桥接](launcher.py) 的同源 `POST /api/rpc` 调用[文件服务](cloud/workspace.py) | 真机读写和冲突已测试；[浏览器回归](tests/test_browser.py)覆盖中文草稿、图片、窄屏和断线。 |
-| 编程助手和任务恢复 | [任务执行器](cloud/tasks.py)启动独立子进程，把请求、状态和输出写入 SQLite。客户端从事件游标补读 | [任务测试](tests/test_tasks.py)覆盖真实 Git 检查、并发去重、分页、进程终止和模型 CLI 替身；两个真实模型 CLI 只验证到未认证响应。 |
+| 编程助手和任务恢复 | [任务执行器](cloud/tasks.py)启动独立子进程，把请求、状态和输出写入 SQLite。客户端从事件游标补读 | [任务测试](tests/test_tasks.py)覆盖真实 Git 检查、并发去重、分页、进程终止和模型 CLI 替身；真实 CLI 的会话协议可用回环模型服务验证。在线账号的历史结果见[认证记录](docs/validation-reviewed-edits.md)。 |
 | 云机生命周期及适配其他主机 | [InstaBox 接入](instabox.py)负责选择、唤醒、按内容摘要安装工作进程，并用官方 HTTPS exec API 传输请求 | 真机挂起再恢复后，测试进程仍在，同一请求找回同一任务及全部 9 条事件。[实机记录](docs/validation.md) |
 | 原有 Linux 图形软件 | [桌面代理](desktop.py)和[查看器](desktop_assets/viewer.js)提供 noVNC 实时连接、逐帧备用模式和输入交接 | 两种模式都操作过真实 Xfce；[桌面模块测试](tests/test_desktop.py)覆盖资源、连接和输入处理。 |
 | 调研、性能实验 | [选型依据](docs/technology-review.md)、[GTK 实验脚本](experiments/broadway_probe.py)、[暖读测量](tools/measure.py)和[热缓存显示实验](experiments/cache_revalidation.py) | [云端计时样本](docs/measurements/first-cloud-run.json)、[云机验收数据](docs/measurements/instabox-acceptance.json)和[三轮 GTK 原始记录](docs/measurements/broadway-runs.json)。 |
 
 ## 复现起点
 
-在 Linux 上准备 Python 3.10+ 和 Git。完整浏览器回归还需要 Python Playwright 和 Chromium；测试会从 PATH 寻找浏览器，也可用 `CLOUD_WORKSPACE_TEST_CHROMIUM` 指定可执行文件。测试会创建自己的临时 Git 项目，通常十几秒完成。
+在 Linux 上准备 Python 3.10+ 和 Git。完整浏览器回归还需要 Python Playwright 和 Chromium；测试会从 PATH 寻找浏览器，也可用 `CLOUD_WORKSPACE_TEST_CHROMIUM` 指定可执行文件。原生协议回归从 PATH 寻找 Codex 和 Claude Code，测试各自创建临时 Git 项目。
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -44,7 +44,9 @@ python3 launcher.py --remote-project /data/cloud-workspace/source
 
 ## 当前开发版
 
-Codex 的成功回合现在可以继续追问。SQLite 记录前后轮关系，工作进程用 Codex 返回的原生线程 ID 恢复上下文。早期临时会话仍可查看输出。单文件修改建议走单独的任务类型，生成器只接收所选文件的快照和修改要求。用户从差异视图作出决定后，服务端按原始内容摘要核对并应用修改。[任务执行器](cloud/tasks.py) · [提案与审批](cloud/proposals.py)
+Codex 和 Claude Code 成功后可用各自的原生会话继续追问。Codex 使用 CLI 返回的线程 ID。Claude 首轮由工作台分配 UUID，CLI 的初始化事件和成功结果都确认该 UUID 后才开放追问。两个提供方的回合关系分表保存，旧工作进程仍可读写原有 Codex 视图。早期临时会话仍可查看输出。[Claude 续聊与升级验收](docs/validation-claude-conversations.md)
+
+单文件修改建议走单独的任务类型，生成器只接收所选文件的快照和修改要求。用户从差异视图作出决定后，服务端按原始内容摘要核对并应用修改。[任务执行器](cloud/tasks.py) · [提案与审批](cloud/proposals.py)
 
 文件草稿保存到当前标签页的 sessionStorage。启动器在云机失联时也能确认项目身份，浏览器可恢复已编辑的内容。浏览器在工作区请求中带上已确认的 workspaceId，启动器切换项目时会拒绝旧页面的写入。草稿、重放和审批的故障验证见[开发版验收](docs/validation-reviewed-edits.md)。
 
@@ -53,5 +55,5 @@ Codex 的成功回合现在可以继续追问。SQLite 记录前后轮关系，�
 ## 下一轮从哪里开始
 
 1. **闭合两种模型的成功路径。** 在各自已登录的测试环境里，分别从图形界面发送一条只读请求。以“真实回复可见、最终状态正确、刷新后输出完整、相同请求只执行一次”作为验收。保留 CLI 版本、事件种类和观察结果，账号凭据通过运行环境提供。
-2. **扩展已可恢复的会话。** Claude 目前使用单轮执行。继续开发时，先验证所选 CLI 版本的原生会话标识、恢复命令和只读工具限制，再决定哪些成功回合可以追问。跨文件审批仍需单独设计并验证部分写入时的恢复。
+2. **找回较早任务。** 在本机项目发起 81 次独立 Git 检查后，干净标签页只列出最新 80 项。最早一项仍能按 ID 读到全部 9 个事件。为工作台增加翻页时，应检查并发插入、相同时间戳和刷新后的选择。跨文件审批仍需单独设计并验证部分写入时的恢复。
 3. **用对照实验证明下一类应用的收益。** 已有 GTK 实验显示，能显示原生控件和能获得本地文本选区是不同能力。以同一 Linux 应用比较工作区本地控件、完整 VNC 桌面、逐窗或工具包转发，再决定第二类应用和第二种主机后端。Windows、macOS 启动流程、真实中文输入法和公网弱网表现仍需实机覆盖。[实验条件与判据](docs/technology-review.md)

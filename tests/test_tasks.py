@@ -283,8 +283,165 @@ print(json.dumps({'type': 'turn.completed'}))
         task = tasks.start_task(self.root, "claude", "claude", "read project")
         result = self.terminal(task["id"])
         self.assertEqual(result["task"]["status"], "succeeded")
+        self.assertFalse(result["task"]["canContinue"])
         joined = "".join(e["text"] for e in result["events"] if e["kind"] in ("output", "delta"))
         self.assertEqual(joined, "hello")
+
+    def test_claude_tool_progress_streams_once_per_call_and_keeps_only_tool_names(self):
+        gate = self.base / "continue-tools"
+        def tool(name, key):
+            return {"type": "tool_use", "name": name, "id": key, "input": {"path": "private/path"}}
+        def started(block):
+            return {"type": "stream_event",
+                    "event": {"type": "content_block_start", "index": 1, "content_block": block}}
+        def assistant(blocks):
+            return {"type": "assistant", "message": {"content": blocks}}
+        read = tool("Read", "first")
+        first = [
+            {"type": "stream_event", "event": {"index": 0, "type": "content_block_delta",
+             "delta": {"type": "text_delta", "text": "先读取。"}}},
+            started(read),
+        ]
+        tail = [
+            {"type": "stream_event", "event": {"type": "content_block_delta",
+             "delta": {"type": "input_json_delta", "partial_json": "private-query"}}},
+            assistant([{"type": "text", "text": "先读取。"}, read, {"type": "text", "text": "再查找。"},
+                       tool("Glob", "find")]),
+            assistant([read]), started(tool("Grep", "search")), started(tool("Read", "second")),
+            started(tool("Bash", "unavailable")), assistant([tool("Read", None)]),
+            {**assistant([tool("Grep", "unexecuted")]), "error": "runtime error"},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "content": "private-file-body"}]}},
+            {"type": "result", "subtype": "success", "result": "先读取。再查找。"},
+        ]
+        self.executable("claude", f"""
+import json, time
+from pathlib import Path
+for frame in {first!r}: print(json.dumps(frame), flush=True)
+end = time.monotonic() + 6
+while not Path({str(gate)!r}).exists() and time.monotonic() < end: time.sleep(0.02)
+for frame in {tail!r}: print(json.dumps(frame))
+""")
+        task_id = tasks.start_task(self.root, "tools", "claude", "explain")["id"]
+        def live():
+            page = tasks.events(self.root, task_id, 0)
+            return page if any(e["text"] == "Claude 正在使用 Read 读取文件。" for e in page["events"]) else None
+        try:
+            prefix = self.wait(live)
+            self.assertEqual(prefix["task"]["status"], "running")
+        finally:
+            gate.touch()
+        page = self.terminal(task_id)
+        self.assertEqual(page["task"]["status"], "succeeded")
+        progress = [e["text"] for e in page["events"] if e["kind"] == "status" and "Claude 正在" in e["text"]]
+        self.assertEqual(progress, ["Claude 正在使用 Read 读取文件。", "Claude 正在使用 Glob 查找文件。",
+                                    "Claude 正在使用 Grep 搜索文本。", "Claude 正在使用 Read 读取文件。"])
+        self.assertEqual("".join(e["text"] for e in page["events"] if e["kind"] in ("output", "delta")),
+                         "先读取。再查找。")
+        self.assertNotIn("private", str(page))
+        self.assertEqual(prefix["events"] + tasks.events(self.root, task_id, prefix["cursor"])["events"],
+                         page["events"])
+
+    def test_claude_without_safe_mode_requires_upgrade(self):
+        calls = self.base / "calls"
+        self.executable("claude", f"""
+import sys
+with open({str(calls)!r}, 'a') as stream: print('called', file=stream)
+assert '--safe-mode' in sys.argv
+sys.exit("error: unknown option '--safe-mode'")
+""")
+        result = self.terminal(tasks.start_task(self.root, "old", "claude", "read")["id"])
+        self.assertEqual(result["task"]["status"], "failed")
+        self.assertIn("升级", result["events"][-1]["text"])
+        self.assertIn("--safe-mode", result["events"][-1]["text"])
+        self.assertEqual(calls.read_text().splitlines(), ["called"])
+
+    def test_claude_session_is_private_scoped_and_has_a_single_successor(self):
+        session = self.base / "session"
+        self.executable("claude", f"""
+import sys, json, uuid
+from pathlib import Path
+saved = Path({str(session)!r})
+prompt = sys.stdin.read().strip()
+assert '--no-session-persistence' not in sys.argv
+if prompt == 'first':
+    assert '--resume' not in sys.argv
+    sid = sys.argv[sys.argv.index('--session-id') + 1]
+    assert str(uuid.UUID(sid)) == sid and not saved.exists()
+    saved.write_text(sid)
+else:
+    assert '--session-id' not in sys.argv
+    sid = sys.argv[sys.argv.index('--resume') + 1]
+    assert sid == saved.read_text()
+print(json.dumps({{'type':'system','subtype':'init','session_id':sid}}))
+print(json.dumps({{'type':'result','subtype':'success','session_id':sid,'result':prompt}}))
+""")
+        first = self.terminal(tasks.start_task(self.root, "a", "claude", "first")["id"])["task"]
+        self.assertTrue(first["canContinue"])
+        self.assertNotIn(session.read_text(), json.dumps(first))
+        with tasks._database(self.root) as db:
+            # The previous worker's validation trusts canContinue without a provider check.
+            self.assertFalse(db.execute("SELECT canContinue FROM task_history WHERE id=?",
+                                        (first["id"],)).fetchone()[0])
+        with self.assertRaisesRegex(ValueError, "相同的模型"):
+            tasks.start_task(self.root, "cross", "codex", "next", first["id"])
+        with self.assertRaises(ValueError):
+            tasks.start_task(self.root, "raw", "claude", "next", session.read_text())
+        other = self.base / "other"
+        other.mkdir()
+        with self.assertRaises(ValueError):
+            tasks.start_task(other, "other", "claude", "next", first["id"])
+
+        def follow(request):
+            try:
+                return tasks.start_task(self.root, request, "claude", "next", first["id"])["id"]
+            except ValueError as exc:
+                self.assertIn("已经有追问", str(exc))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            ids = list(pool.map(follow, ["follow1", "follow2"] * 2))
+        self.assertEqual(ids.count(None), 2)
+        self.assertEqual(len(set(ids)), 2)
+        second = self.terminal(next(i for i in ids if i))["task"]
+        self.assertEqual(second["parentTaskId"], first["id"])
+        self.assertTrue(second["canContinue"])
+        self.assertEqual(tasks.start_task(self.root, second["requestId"], "claude", "next",
+                                          first["id"])["id"], second["id"])
+        self.assertEqual(tasks.list_tasks(self.root)[1]["nextTaskId"], second["id"])
+        with self.assertRaisesRegex(ValueError, "requestId"):
+            tasks.start_task(self.root, second["requestId"], "claude", "next")
+
+    def test_claude_refuses_missing_or_unconfirmed_native_history(self):
+        thread = "11111111-2222-4333-8444-555555555555"
+        cases = (("missing", "未找到"), ("unconfirmed", "未确认"), ("mismatch", "标识"))
+        with tasks._database(self.root) as db, db:
+            for key in ["legacy", *(key for key, _ in cases)]:
+                db.execute("""
+                    INSERT INTO task (id, requestId, provider, prompt, status, createdAt)
+                    VALUES (?, ?, 'claude', 'first', 'succeeded', ?)
+                """, (key, key, key))
+            db.executemany("INSERT INTO claude_turn (taskId, threadId) VALUES (?, ?)",
+                           ((key, thread) for key, _ in cases))
+        self.assertFalse(tasks.events(self.root, "legacy", 0)["task"]["canContinue"])
+        with self.assertRaises(ValueError):
+            tasks.start_task(self.root, "try", "claude", "follow", "legacy")
+        self.executable("claude", """
+import json, sys
+prompt = sys.stdin.read().strip()
+sid = sys.argv[sys.argv.index('--resume') + 1]
+if prompt == 'missing':
+    print(json.dumps({'type':'result','subtype':'error_during_execution','session_id':'other',
+                      'errors':['No conversation found with session ID: private-detail']}))
+    sys.exit(1)
+if prompt == 'mismatch':
+    print(json.dumps({'type':'system','subtype':'init','session_id':'other'}))
+print(json.dumps({'type':'result','subtype':'success','session_id':sid,'result':'wrong-transcript'}))
+""")
+        for key, hint in cases:
+            result = self.terminal(tasks.start_task(self.root, "resume-" + key, "claude", key, key)["id"])
+            self.assertEqual(result["task"]["status"], "failed")
+            self.assertFalse(result["task"]["canContinue"])
+            self.assertIn(hint, result["events"][-1]["text"])
+            self.assertNotIn("private-detail", str(result))
+            self.assertNotIn("wrong-transcript", str(result))
 
     def test_stale_process_does_not_reexecute(self):
         # Sleep inside this test's provider subprocess; the worker leads its private group.
