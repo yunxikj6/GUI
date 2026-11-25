@@ -1,0 +1,279 @@
+{
+  "instaboxBrowserComparison": {
+    "mode": "instabox",
+    "fixtureRemoved": true,
+    "previousRevision": "d78dbc06e1c86b1c02b333f95546f047207b03cb",
+    "fixtureBytes": {
+      "trace-3200-eof.txt": 19204,
+      "trace-3200-lf.txt": 19204,
+      "trace-5000-eof.txt": 30004,
+      "trace-5000-lf.txt": 30004
+    },
+    "chromium": "156.0.8078.79",
+    "previous": {
+      "appJS": "cc7c4ab75bd0505f",
+      "files": {
+        "trace-3200-eof.txt": {
+          "lastVisibleLine": 3200,
+          "lengthWarning": false,
+          "reachedActualTail": true,
+          "fileRPC": 1,
+          "saveRPC": 0
+        },
+        "trace-3200-lf.txt": {
+          "lastVisibleLine": 3200,
+          "lengthWarning": true,
+          "reachedActualTail": true,
+          "fileRPC": 1,
+          "saveRPC": 0
+        },
+        "trace-5000-eof.txt": {
+          "lastVisibleLine": 3200,
+          "lengthWarning": true,
+          "reachedActualTail": false,
+          "fileRPC": 1,
+          "saveRPC": 0
+        },
+        "trace-5000-lf.txt": {
+          "lastVisibleLine": 3200,
+          "lengthWarning": true,
+          "reachedActualTail": false,
+          "fileRPC": 1,
+          "saveRPC": 0
+        }
+      },
+      "viewport": [
+        320,
+        740
+      ],
+      "newDraftKeys": 0
+    },
+    "candidate": {
+      "appJS": "1e9194a15b85d19e",
+      "files": {
+        "trace-3200-eof.txt": {
+          "pages": 4,
+          "verifiedReadOnlyLines": 3200,
+          "lastVisibleLine": 3200,
+          "keyboardReachedTail": true,
+          "fileRPC": 1,
+          "saveRPC": 0
+        },
+        "trace-3200-lf.txt": {
+          "pages": 4,
+          "verifiedReadOnlyLines": 3200,
+          "lastVisibleLine": 3200,
+          "keyboardReachedTail": true,
+          "fileRPC": 1,
+          "saveRPC": 0
+        },
+        "trace-5000-eof.txt": {
+          "pages": 7,
+          "verifiedReadOnlyLines": 5000,
+          "lastVisibleLine": 5000,
+          "keyboardReachedTail": true,
+          "fileRPC": 1,
+          "saveRPC": 0
+        },
+        "trace-5000-lf.txt": {
+          "pages": 7,
+          "verifiedReadOnlyLines": 5000,
+          "lastVisibleLine": 5000,
+          "keyboardReachedTail": true,
+          "fileRPC": 1,
+          "saveRPC": 0
+        }
+      },
+      "viewport": [
+        320,
+        740
+      ],
+      "newDraftKeys": 0
+    }
+  },
+  "instaboxEditingAndRevalidation": {
+    "mode": "instabox",
+    "viewportCssPixels": 320,
+    "fileBytes": 131072,
+    "fixtureRemoved": true,
+    "pageOnRevalidation": 5,
+    "selectedLine": 3518,
+    "unchangedPreservedSelectionAndPosition": true,
+    "editedBytes": 1,
+    "initialSha256": "50291a586891a0df6875f94175d93acc2fd04bf06b669c8a5f180ba452dece62",
+    "savedSha256": "a750172e2aa6251c0ccd156cf1bb886ded893e64e2c2dbb03a300b97b11a9aac",
+    "changedOtherPagePreservedSelectionAndPosition": true,
+    "newLastLineVisible": true,
+    "oversizeBytes": 131073,
+    "oversizeShowsLimit": true,
+    "clipboardEmptyLinePreserved": true,
+    "clipboardExactCharacters": 28
+  },
+  "localPreviousVersionFileBoundary": {
+    "source": "d78dbc0",
+    "chromium": "156.0.8078.79",
+    "rows": [
+      {
+        "name": "lines-3199-eof.txt",
+        "sourceLines": 3199,
+        "finalLF": false,
+        "bodyBytes": 76775,
+        "sha256": "d635c407be61a26d5221278a939d51c21fbe6f8f08e90ff8f1ddf726aa44d7cc",
+        "workerTail": "lines-3199-eof row 3199",
+        "notice": "",
+        "rows": 3199,
+        "numberedContentRows": 3199,
+        "lastNumberedContent": "lines-3199-eof row 3199",
+        "lastRenderedRow": "3199",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-3199-lf.txt",
+        "sourceLines": 3199,
+        "finalLF": true,
+        "bodyBytes": 73577,
+        "sha256": "21a9fccdce331d111fcb7f69121b97175ef17c80f07cef6822d4caac94b54181",
+        "workerTail": "lines-3199-lf row 3199",
+        "notice": "",
+        "rows": 3200,
+        "numberedContentRows": 3199,
+        "lastNumberedContent": "lines-3199-lf row 3199",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": true,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-3200-eof.txt",
+        "sourceLines": 3200,
+        "finalLF": false,
+        "bodyBytes": 76799,
+        "sha256": "3c874ff0c136b3e64095ab0179d78f2e4c8d95aa37aa8db3943d579417f75e45",
+        "workerTail": "lines-3200-eof row 3200",
+        "notice": "",
+        "rows": 3200,
+        "numberedContentRows": 3200,
+        "lastNumberedContent": "lines-3200-eof row 3200",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-3200-lf.txt",
+        "sourceLines": 3200,
+        "finalLF": true,
+        "bodyBytes": 73600,
+        "sha256": "3c4056a29fa683594125a1184ef934eb97b18ebafbd9bc249af8c88d62835fef",
+        "workerTail": "lines-3200-lf row 3200",
+        "notice": "预览已限制显示长度。",
+        "rows": 3200,
+        "numberedContentRows": 3200,
+        "lastNumberedContent": "lines-3200-lf row 3200",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-3201-eof.txt",
+        "sourceLines": 3201,
+        "finalLF": false,
+        "bodyBytes": 76823,
+        "sha256": "b9b17a8229344c98656a818d7570adc8976e7c14958cb2e016e757f9bc263a4c",
+        "workerTail": "lines-3201-eof row 3201",
+        "notice": "预览已限制显示长度。",
+        "rows": 3200,
+        "numberedContentRows": 3200,
+        "lastNumberedContent": "lines-3201-eof row 3200",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-3201-lf.txt",
+        "sourceLines": 3201,
+        "finalLF": true,
+        "bodyBytes": 73623,
+        "sha256": "88b506e3572ea3ac47877f6b341afb74e444ea5c89b0ea10ed55b4041dbe26ad",
+        "workerTail": "lines-3201-lf row 3201",
+        "notice": "预览已限制显示长度。",
+        "rows": 3200,
+        "numberedContentRows": 3200,
+        "lastNumberedContent": "lines-3201-lf row 3200",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-5000-eof.txt",
+        "sourceLines": 5000,
+        "finalLF": false,
+        "bodyBytes": 119999,
+        "sha256": "2ef581f39fd5bb565dbe1630763eaa3bbc98615757bf1f94768b06e7ccfadf72",
+        "workerTail": "lines-5000-eof row 5000",
+        "notice": "预览已限制显示长度。",
+        "rows": 3200,
+        "numberedContentRows": 3200,
+        "lastNumberedContent": "lines-5000-eof row 3200",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      },
+      {
+        "name": "lines-5000-lf.txt",
+        "sourceLines": 5000,
+        "finalLF": true,
+        "bodyBytes": 115000,
+        "sha256": "c7f2a9b5318e834ab361cc9d8c73294e93fbf02a3005077157c07e3ba73ad026",
+        "workerTail": "lines-5000-lf row 5000",
+        "notice": "预览已限制显示长度。",
+        "rows": 3200,
+        "numberedContentRows": 3200,
+        "lastNumberedContent": "lines-5000-lf row 3200",
+        "lastRenderedRow": "3200",
+        "lastIsSyntheticBlank": false,
+        "lastRowMeasuredInViewport": true
+      }
+    ]
+  },
+  "localTextLimit": {
+    "chromium": "156.0.8078.79",
+    "viewportCssPixels": [
+      1440,
+      900
+    ],
+    "allLF": {
+      "bytes": 131072,
+      "physicalLines": 131072,
+      "pages": 164,
+      "maximumRowsInDOM": 800,
+      "maximumDescendantElementsInPreview": 3369,
+      "maximumDescendantNodesInPreview": 4335,
+      "lastPageRows": 672,
+      "allLineNumbersVerified": true
+    },
+    "singleLine": {
+      "bytes": 131072,
+      "rows": 1,
+      "horizontalScrollReachedTail": true
+    }
+  },
+  "nextOfflineDiffBaseline": {
+    "sourceCommit": "d78dbc06e1c86b1c02b333f95546f047207b03cb",
+    "before": {
+      "stagedRows": 7,
+      "unstagedRows": 7
+    },
+    "reopenWhileDisconnected": {
+      "stagedRows": 0,
+      "unstagedRows": 0,
+      "stagedStatus": "与工作区的连接中断。恢复网络后可重试。",
+      "unstagedStatus": "与工作区的连接中断。恢复网络后可重试。",
+      "failedRequests": [
+        "file",
+        "diff:staged",
+        "diff:unstaged"
+      ]
+    },
+    "reconnectRestoresBoth": true
+  }
+}

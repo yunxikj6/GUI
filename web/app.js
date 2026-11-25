@@ -202,6 +202,13 @@ function resetPreview() {
   state.file = null; fileSync();
 }
 function drawRows(preview, rows, diff, offset = 0) {
+  if (!diff) {
+    // Keep the actual text nodes when a remote edit only affects other pages.
+    const shown = preview.fileRows;
+    if (shown?.offset === offset && shown.rows.length === rows.length &&
+        shown.rows.every((line,i) => line === rows[i])) return;
+    preview.fileRows = {offset, rows};
+  }
   const fragment = document.createDocumentFragment();
   for (const [i, line] of rows.entries()) {
     const row = el('div', 'code-row');
@@ -214,15 +221,13 @@ function drawRows(preview, rows, diff, offset = 0) {
     }
     const number = el('span','line-no', String(offset + i + 1));
     number.setAttribute('aria-hidden','true');
-    row.append(number, el('span','line-text',line || ' '));
+    const text = el('span','line-text',line);
+    // A real break keeps an empty file line in a native text selection and clipboard.
+    if (!line) text.append(diff ? ' ' : el('br'));
+    row.append(number,text);
     fragment.append(row);
   }
   preview.replaceChildren(fragment);
-}
-function drawFileLines(value) {
-  const lines = value.slice(0,180000).split('\n'), shown = lines.slice(0,3200);
-  drawRows($('preview'),shown,false);
-  return shown.length < lines.length || value.length > 180000;
 }
 function textareaText(raw) { return raw.replace(/\r\n?/g,'\n'); }
 function editedFileText(edit, value, caret) {
@@ -297,22 +302,32 @@ function drawEdit() {
   }
 }
 function renderFile(f) {
+  const preview = $('preview');
+  const sameText = f.kind === 'text' && state.file?.kind === 'text' && state.file.path === f.path;
+  const page = sameText ? Number(preview.querySelector('.file-page')?.value || 1) : 1;
+  const top = sameText ? preview.scrollTop : 0, left = sameText ? preview.scrollLeft : 0;
+  const pagingFocus = state.file?.path === f.path && preview.querySelector('.file-pages :focus');
   state.file = f;
-  $('fileNotice').textContent = ''; $('preview').hidden = false;
+  $('fileNotice').textContent = ''; preview.hidden = false;
   fileHeading(f.kind === 'image' ? '图片预览' : '文件预览', f.path.split('/').pop(), f.path.includes('/') ? f.path : '', prettySize(f.size));
   if (f.kind === 'image') {
+    $('editBar').hidden = true; $('fileEditArea').hidden = true;
     if (!['image/png','image/jpeg','image/gif','image/webp','image/bmp','image/avif','image/x-icon'].includes(f.mime)) {
+      preview.replaceChildren();
       $('fileNotice').textContent = '此图片格式暂不支持预览。';
       return;
     }
     const image = el('img','preview-image');
     image.alt = displayPath(f.path); image.src = 'data:' + f.mime + ';base64,' + f.content;
     image.addEventListener('error', () => { $('fileNotice').textContent = '图片解码失败。'; }, {once:true});
-    $('preview').replaceChildren(image);
+    preview.replaceChildren(image);
   } else {
-    if (drawFileLines(textareaText(f.content))) $('fileNotice').textContent = '预览已限制显示长度。';
+    if (f.content) drawPagedLines(preview,textareaText(f.content),'file','文件预览',page);
+    else preview.replaceChildren(el('p','preview-note','空文件'));
+    preview.scrollTop = top; preview.scrollLeft = left;
     drawEdit();
   }
+  if (pagingFocus) (preview.querySelector('.file-page') || preview).focus({preventScroll:true});
 }
 function sameFile(a,b) {
   return a?.kind === b.kind && (a.revision && b.revision ? a.revision === b.revision : a.content === b.content);
@@ -423,25 +438,33 @@ function makeDiffLayer(scope, onRetry) {
   box.append(heading,notice,retry,lines);
   return {box,lines,notice,retry,empty:false};
 }
-const diffPageSize = 800;
-function drawDiffPages(layer, scope, text) {
+const linesPerPage = 800;
+function drawPagedLines(viewport, text, kind, label, initialPage = 1) {
   const rows = text.split('\n');
   if (rows.at(-1) === '') rows.pop();
-  if (rows.length <= diffPageSize) { drawRows(layer.lines,rows,true); return; }
-  const total = Math.ceil(rows.length / diffPageSize);
-  const nav = el('nav','diff-pages'), select = el('select','diff-page');
-  nav.setAttribute('aria-label',diffLabels[scope] + '差异分页');
-  select.setAttribute('aria-label',diffLabels[scope] + '差异页码');
-  const prev = el('button','diff-prev','上一页'), next = el('button','diff-next','下一页');
+  const diff = kind === 'diff';
+  const lines = diff ? viewport : viewport.querySelector('.file-lines') || el('div','file-lines');
+  if (!diff) {
+    viewport.querySelector('.file-pages')?.remove();
+    if (lines.parentElement !== viewport) viewport.replaceChildren(lines);
+  }
+  if (rows.length <= linesPerPage) { drawRows(lines,rows,diff); return; }
+  const total = Math.ceil(rows.length / linesPerPage);
+  const nav = el('nav','line-pages ' + kind + '-pages'), select = el('select',kind + '-page');
+  nav.setAttribute('aria-label',label + '分页');
+  select.setAttribute('aria-label',label + '页码');
+  const prev = el('button',kind + '-prev','上一页'), next = el('button',kind + '-next','下一页');
+  nav.append(prev,select,next);
+  lines.before(nav);
   for (let page = 1; page <= total; page++) {
-    const first = (page - 1) * diffPageSize + 1, last = Math.min(page * diffPageSize,rows.length);
+    const first = (page - 1) * linesPerPage + 1, last = Math.min(page * linesPerPage,rows.length);
     const option = el('option','','第 ' + page + ' 页 · ' + first + '–' + last + ' 行');
     option.value = String(page); select.append(option);
   }
   function show(page) {
-    const offset = (page - 1) * diffPageSize;
-    drawRows(layer.lines,rows.slice(offset,offset + diffPageSize),true,offset);
-    layer.lines.scrollTop = layer.lines.scrollLeft = 0;
+    const offset = (page - 1) * linesPerPage;
+    drawRows(lines,rows.slice(offset,offset + linesPerPage),diff,offset);
+    viewport.scrollTop = viewport.scrollLeft = 0;
     select.value = String(page);
     const from = document.activeElement;
     prev.disabled = page === 1; next.disabled = page === total;
@@ -450,10 +473,10 @@ function drawDiffPages(layer, scope, text) {
   select.addEventListener('change',() => show(Number(select.value)));
   prev.addEventListener('click',() => show(Number(select.value) - 1));
   next.addEventListener('click',() => show(Number(select.value) + 1));
-  nav.append(prev,select,next); layer.lines.before(nav); show(1);
+  show(Math.min(initialPage,total));
 }
 function renderDiffLayer(layer, scope, data) {
-  if (data.diff) { drawDiffPages(layer,scope,data.diff); layer.lines.tabIndex = 0; }
+  if (data.diff) { drawPagedLines(layer.lines,data.diff,'diff',diffLabels[scope] + '差异'); layer.lines.tabIndex = 0; }
   layer.empty = !data.diff && !data.truncated;
   const empty = {staged:'没有已暂存的改动。', unstaged:'没有未暂存或未跟踪的改动。'};
   layer.notice.textContent = data.truncated ? '服务端已截断此差异，当前仅显示开头部分。' :
