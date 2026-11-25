@@ -86,6 +86,15 @@ download_signed_claude() { cp "$FAKE/claude-desktop.deb" "$1/claude-desktop.deb"
                 self.assertEqual(result.returncode, code, result.stdout)
                 self.assertFalse(self.trace.exists())
 
+    def test_single_app_confirmation_names_the_selected_ubuntu_package(self):
+        for value, name in (("chatgpt", "ChatGPT"), ("claude", "Claude")):
+            with self.subTest(app=name):
+                result = self.invoke(("--app", value), "\n")
+                self.assertEqual(result.returncode, 130)
+                self.assertIn(f"将在本机 Ubuntu 中安装 {name}。", result.stdout)
+                self.assertNotIn("请选择", result.stdout)
+                self.assertFalse(self.trace.exists())
+
     def test_missing_download_or_signature_tool_stops_before_network(self):
         for tool, app in (("curl", "chatgpt"), ("gpg", "claude")):
             override = f'command() {{ if [[ "$*" == "-v {tool}" ]]; then return 1; fi; builtin command "$@"; }}'

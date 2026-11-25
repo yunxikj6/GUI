@@ -35,6 +35,9 @@ class DesktopShortcuts(unittest.TestCase):
         self.system = self.base / "system"
         self.trust = self.base / "trust"
         self.opened = self.base / "opened"
+        self.setup_icon = self.system / "icons/Yaru/256x256/apps/system-software-install.png"
+        self.setup_icon.parent.mkdir(parents=True)
+        self.setup_icon.write_bytes(self.png(b"\x45\x65\x45"))
         self.env = {
             "PATH": str(self.bin) + ":/usr/bin:/bin", "LC_ALL": "C.UTF-8",
             "HOME": str(self.home), "XDG_DATA_HOME": str(self.data),
@@ -44,6 +47,10 @@ class DesktopShortcuts(unittest.TestCase):
         }
         # Only metadata::trusted needs a real GVfs session. All launches below use /usr/bin/gio.
         self.executable(self.bin / "gio", 'test "$1:$2:$3:$4:$6:$7" = "set:-n:-t:string:metadata::trusted:true" || exit 2\nprintf "%s\\n" "$5" >> "$TEST_TRUST"')
+
+        # GIO must route Terminal=true to a terminal, even without a graphical session.
+        self.executable(self.bin / "xdg-terminal-exec",
+                        'case "$1" in --|-e|-x) shift ;; esac\nexec "$@"')
 
     @staticmethod
     def executable(path, body):
@@ -55,9 +62,9 @@ class DesktopShortcuts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, (command, result.stderr))
         return result
 
-    def release(self, version):
+    def release(self, version, *, windows=True):
         arch = {"x86_64": "x64", "amd64": "x64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine().lower())
-        if not arch:
+        if windows and not arch:
             self.skipTest("the Windows launcher supports x64 and arm64")
         bundle = self.base / ("version " + version + " %")
         (bundle / "linux").mkdir(parents=True)
@@ -66,6 +73,10 @@ class DesktopShortcuts(unittest.TestCase):
         shutil.copyfile(ROOT / "linux/install-app-launchers.py", script)
         self.shortcut_script = bundle / "linux/desktop-shortcuts.py"
         shutil.copyfile(SHORTCUTS, self.shortcut_script)
+        self.executable(bundle / "linux/setup-vendor-apps.sh",
+                        f'printf "%s|%s|%s\\n" "{version}" "$1" "$2" >> "$TEST_OPENED"\nexit 130')
+        if not windows:
+            return bundle
         self.executable(bundle / "windows" / f"CloudLinuxWorkspace-{arch}.exe",
                         f'printf "%s|%s|%s\\n" "{version}" "$1" "$2" >> "$TEST_OPENED"')
         self.run_ok(sys.executable, script)
@@ -79,6 +90,13 @@ class DesktopShortcuts(unittest.TestCase):
         entry.parent.mkdir(parents=True)
         entry.write_text("[Desktop Entry]\nType=Application\nName=Claude\nExec=claude-desktop %U\nIcon=claude-desktop\n")
         self.executable(self.bin / "claude-desktop", 'printf "linux-claude\\n" >> "$TEST_OPENED"')
+        return entry
+
+    def native_chatgpt(self):
+        entry = self.system / "applications/chatgpt.desktop"
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.write_text("[Desktop Entry]\nType=Application\nName=ChatGPT\nExec=chatgpt %U\nIcon=chatgpt\n")
+        self.executable(self.bin / "chatgpt", 'printf "linux-chatgpt\\n" >> "$TEST_OPENED"')
         return entry
 
     def launch(self, shortcut, expected):
@@ -101,15 +119,16 @@ class DesktopShortcuts(unittest.TestCase):
         for f in original:
             self.assertEqual(stat.S_IMODE(f.stat().st_mode), 0o700)
         self.assertCountEqual(self.trust.read_text().splitlines(), map(str, original))
-        self.launch(chat, "one|--open-app|ChatGPT")
+        self.launch(chat, "one|--app|chatgpt")
+        self.launch(self.data / "applications/cloudworkspace-windows-chatgpt.desktop", "one|--open-app|ChatGPT")
         shutil.rmtree(old)
         self.assertFalse(self.shortcut_script.exists())
         self.release("two")
         self.offer()
         self.assertEqual(original, {f: (f.stat().st_ino, f.read_bytes()) for f in original})
         self.assertCountEqual(self.trust.read_text().splitlines(), map(str, original))
-        self.launch(chat, "two|--open-app|ChatGPT")
-        self.launch(claude, "two|--open-app|Claude")
+        self.launch(chat, "two|--app|chatgpt")
+        self.launch(claude, "two|--app|claude")
 
     def test_configured_desktop_disabled_or_missing(self):
         self.release("one")
@@ -153,14 +172,14 @@ class DesktopShortcuts(unittest.TestCase):
         desktop.rmdir()
         self.offer()
         self.assertFalse(desktop.exists())
-        self.launch(moved, "one|--open-app|Claude")
+        self.launch(moved, "one|--app|claude")
 
     def test_existing_icon_opens_native_claude_after_installation(self):
         self.release("one")
         self.offer()
         icon = self.home / "Desktop/Claude.desktop"
         original = (icon.stat().st_ino, icon.read_bytes())
-        self.launch(icon, "one|--open-app|Claude")
+        self.launch(icon, "one|--app|claude")
         self.native_claude()
         self.offer()  # The old Windows registration still exists.
         self.launch(icon, "linux-claude")
@@ -170,17 +189,65 @@ class DesktopShortcuts(unittest.TestCase):
         self.assertFalse((self.data / "applications/cloudworkspace-windows-claude.desktop").exists())
         self.launch(icon, "linux-claude")
 
-    def test_only_registered_applications_receive_shortcuts(self):
-        desktop = self.home / "Desktop"
+    def test_old_windows_alias_migrates_without_changing_the_trusted_file(self):
+        self.release("one")
         self.offer()
-        self.assertFalse(desktop.exists())
-        self.assertEqual([p.name for p in (self.data / "applications").iterdir()], ["cloudworkspace-install-apps.desktop"])
+        app = self.home / "Desktop/ChatGPT.desktop"
+        alias = self.data / "cloudworkspace/desktop-shortcuts/ChatGPT.desktop"
+        # Layout created by releases where the desktop icon fell back to Windows.
+        alias.unlink()
+        alias.symlink_to(self.data / "applications/cloudworkspace-windows-chatgpt.desktop")
+        identity = app.stat().st_ino, app.read_bytes(), self.trust.read_bytes()
+        self.launch(app, "one|--open-app|ChatGPT")
+        self.offer()
+        self.assertEqual((app.stat().st_ino, app.read_bytes(), self.trust.read_bytes()), identity)
+        self.launch(app, "one|--app|chatgpt")
+
+    def test_custom_installer_id_preserved_without_falling_back_to_old_windows_alias(self):
+        self.release("one")
+        self.offer()
+        app = self.home / "Desktop/ChatGPT.desktop"
+        alias = self.data / "cloudworkspace/desktop-shortcuts/ChatGPT.desktop"
+        windows = self.data / "applications/cloudworkspace-windows-chatgpt.desktop"
+        installer = alias.readlink()
+        alias.unlink()
+        alias.symlink_to(windows)
+        installer.write_text("[Desktop Entry]\nType=Application\nName=Personal\nExec=/usr/bin/true\n")
+        original = installer.read_bytes(), app.read_bytes(), app.stat().st_ino, self.trust.read_bytes()
+        self.offer()
+        self.assertFalse(os.path.lexists(alias))
+        self.assertEqual((installer.read_bytes(), app.read_bytes(), app.stat().st_ino, self.trust.read_bytes()), original)
+        self.launch(windows, "one|--open-app|ChatGPT")
+        self.launch(self.home / "Desktop/Claude.desktop", "one|--app|claude")
+        installer.unlink()
+        self.offer()
+        self.launch(app, "one|--app|chatgpt")
+
+    def test_fresh_ubuntu_respects_a_hidden_native_registration(self):
+        self.release("linux", windows=False)
+        self.native_claude()
+        override = self.data / "applications/com.anthropic.Claude.desktop"
+        override.parent.mkdir(parents=True)
+        override.write_text("[Desktop Entry]\nHidden=true\n")
+        self.offer()
+        self.assertEqual([p.name for p in (self.home / "Desktop").iterdir()], ["ChatGPT.desktop"])
+        self.assertEqual(override.read_text(), "[Desktop Entry]\nHidden=true\n")
+
+    def test_fresh_ubuntu_offers_app_specific_installers_and_prefers_the_installed_client(self):
+        desktop = self.home / "Desktop"
+        self.release("linux", windows=False)
+        self.offer()
+        self.assertEqual({p.name for p in desktop.iterdir()}, {"ChatGPT.desktop", "Claude.desktop"})
+        self.assertFalse(list((self.data / "applications").glob("cloudworkspace-windows-*.desktop")))
         self.assertFalse(self.opened.exists())
-        self.assertFalse((self.home / "state").exists())
+        for app in ("ChatGPT", "Claude"):
+            shortcut = desktop / (app + ".desktop")
+            self.launch(shortcut, "linux|--app|" + app.lower())
+            self.assertEqual(Path(self.desktop_icon(shortcut)).read_bytes(), self.setup_icon.read_bytes())
         self.native_claude()
         self.offer()
-        self.assertEqual([p.name for p in desktop.iterdir()], ["Claude.desktop"])
         self.launch(desktop / "Claude.desktop", "linux-claude")
+        self.launch(desktop / "ChatGPT.desktop", "linux|--app|chatgpt")
 
     def test_both_native_packages_replace_windows_shortcuts_and_honor_hidden_user_entry(self):
         self.release("one")
@@ -189,9 +256,7 @@ class DesktopShortcuts(unittest.TestCase):
         icon = desktop / "ChatGPT.desktop"
         initial = icon.stat().st_ino, icon.read_bytes()
         self.native_claude()
-        native = self.system / "applications/chatgpt.desktop"
-        native.write_text("[Desktop Entry]\nType=Application\nName=ChatGPT\nExec=chatgpt %U\nIcon=chatgpt\n")
-        self.executable(self.bin / "chatgpt", 'printf "linux-chatgpt\\n" >> "$TEST_OPENED"')
+        self.native_chatgpt()
         self.release("two")
         self.offer()
         self.launch(icon, "linux-chatgpt")
@@ -202,7 +267,9 @@ class DesktopShortcuts(unittest.TestCase):
         override.write_text("[Desktop Entry]\nHidden=true\n")
         self.release("three")
         self.offer()
-        self.launch(icon, "three|--open-app|ChatGPT")
+        alias = self.data / "cloudworkspace/desktop-shortcuts/ChatGPT.desktop"
+        self.assertEqual(alias.readlink().name, "cloudworkspace-install-chatgpt.desktop")
+        self.assertIn("NoDisplay=true", alias.read_text())
         self.assertEqual(override.read_text(), "[Desktop Entry]\nHidden=true\n")
 
     @staticmethod
@@ -238,11 +305,12 @@ class DesktopShortcuts(unittest.TestCase):
         vendor.write_bytes(artwork)
         self.change_icon(self.data / "applications/cloudworkspace-windows-claude.desktop", vendor)
         self.offer()
-        self.assertEqual(cached.read_bytes(), artwork)
+        self.assertEqual(cached.read_bytes(), fallback)
+        self.assertEqual(fallback, self.setup_icon.read_bytes())
         same_image = cached.stat().st_ino
         self.offer()
         self.assertEqual(cached.stat().st_ino, same_image)
-        self.launch(file, "one|--open-app|Claude")
+        self.launch(file, "one|--app|claude")
         vendor_native = self.native_claude()
         native_image = self.base / "linux image.png"
         native_image.write_bytes(self.png(b"\x00\xff\x00"))
@@ -253,6 +321,10 @@ class DesktopShortcuts(unittest.TestCase):
         self.assertEqual((file.read_bytes(), file.stat().st_ino), original)
         self.assertEqual(self.trust.read_bytes(), trust)
         self.launch(file, "linux-claude")
+        vendor_native.unlink()
+        self.offer()
+        self.assertEqual(cached.read_bytes(), self.setup_icon.read_bytes())
+        self.launch(file, "one|--app|claude")
 
     def test_legacy_literal_icon_is_preserved_and_its_target_still_updates(self):
         self.release("one")
@@ -295,7 +367,9 @@ class DesktopShortcuts(unittest.TestCase):
         shutil.copy2(artwork, replacement)  # Copy mode and xattrs, but this is a new inode.
         original = replacement.read_bytes()
         replacement.replace(artwork)
-        self.change_icon(self.data / "applications/cloudworkspace-windows-chatgpt.desktop", picture)
+        native_art = self.base / "native app.png"
+        native_art.write_bytes(self.png(b"\xab\xcd\xef"))
+        self.change_icon(self.native_chatgpt(), native_art)
         self.offer()
         self.assertEqual(artwork.read_bytes(), original)
 

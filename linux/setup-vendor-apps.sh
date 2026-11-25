@@ -141,7 +141,7 @@ install_debs() (
 )
 
 setup_vendor_apps() {
-    local choice='' answer='' arch
+    local choice='' answer='' arch name
     if [[ $# == 2 && $1 == --app ]]; then shift; fi
     case "$#:${1:-}" in
         1:--help|1:-h) echo '用法：setup-vendor-apps.sh [--app chatgpt|claude|both|none]'; return ;;
@@ -161,7 +161,12 @@ setup_vendor_apps() {
             *) echo '未识别选项。'; return 64 ;;
         esac
     fi
-    printf '将下载 %s 的官方软件包，并使用 sudo 和 APT 安装。厂商软件包可注册系统更新源、签名密钥和自动更新配置。\n' "$choice"
+    case "$choice" in
+        chatgpt) name='ChatGPT' ;;
+        claude) name='Claude' ;;
+        both) name='ChatGPT 和 Claude' ;;
+    esac
+    printf '将在本机 Ubuntu 中安装 %s。安装程序将下载官方软件包，并使用 sudo 和 APT 安装。厂商软件包可注册系统更新源、签名密钥和自动更新配置。\n' "$name"
     if ! read -r -p '开始下载并安装？输入 y 继续，按 Enter 取消 [y/N] ' answer || [[ ! $answer =~ ^([yY]|[yY][eE][sS])$ ]]; then
         echo '已取消。'; return 130
     fi

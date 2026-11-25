@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Offer each installed application a desktop shortcut once, in the GNOME user's session."""
+"""Offer one GNOME shortcut per client, targeting the Ubuntu app or its installer."""
 import ctypes
 import fcntl
 import hashlib
@@ -30,7 +30,7 @@ def desktop_dir():
 
 
 def entry_for(app):
-    return launchers.native_entry(app) or launchers.application_entry(launchers.APP_IDS[app])
+    return launchers.native_entry(app) or launchers.installer_entry(app)
 
 
 def stable_entry(app, source, marker):
@@ -53,6 +53,17 @@ def stable_entry(app, source, marker):
             new.symlink_to(source)
             new.replace(alias)
     return alias
+
+
+def disconnect_unavailable(app):
+    # A registration collision can leave an issued shortcut pointing at Windows,
+    # a hidden system app, or the new occupant of a formerly managed installer ID.
+    alias = launchers.data_home() / "cloudworkspace/desktop-shortcuts" / (app + ".desktop")
+    if alias.is_symlink():
+        previous = alias.readlink()
+        ids = (launchers.APP_IDS[app], launchers.NATIVE_APPS[app][0], launchers.INSTALL_IDS[app])
+        if any(previous == base / "applications" / name for base in launchers.data_roots() for name in ids):
+            alias.unlink()
 
 
 ICON_LIMIT = 4 * 1024 * 1024
@@ -79,6 +90,12 @@ def icon_sources(icon):
             match = theme.lookup_icon(name, 512, 0)
             if match and match.get_filename():
                 yield Path(match.get_filename())
+        if name == "system-software-install":
+            for base in launchers.data_roots():
+                for size in ("256x256@2x", "256x256", "48x48"):
+                    yield base / "icons/Yaru" / size / "apps/system-software-install.png"
+            # With no installer artwork installed, let DING resolve the named theme icon.
+            return
         if name in ("claude-desktop", "chatgpt"):
             for base in launchers.data_roots():
                 yield base / "icons/hicolor/256x256/apps" / (name + ".png")
@@ -177,8 +194,8 @@ def ensure_shortcuts():
     except (OSError, RuntimeError) as error:
         print(f"安装官方客户端的菜单项未能更新：{error}", file=sys.stderr)
     state = xdg_home("XDG_STATE_HOME", ".local/state") / "cloudworkspace/desktop-shortcuts"
-    available = {app: info for app in APPS if (info := entry_for(app))}
-    if not available:
+    available = {app: entry_for(app) for app in APPS}
+    if not any(available.values()) and not state.is_dir():
         return
     desktop = writable_desktop(state)
     if desktop is None and not state.is_dir():
@@ -190,19 +207,26 @@ def ensure_shortcuts():
     lock = os.open(state, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        for app, (source, icon) in available.items():
+        for app, info in available.items():
             marker = state / app
             if marker.exists():
                 if marker.read_text(encoding="utf-8") == "installed\n":
+                    info = info or launchers.installer_entry(app, include_hidden=True)
+                    if not info:
+                        disconnect_unavailable(app)
+                        continue
+                    source, icon = info
                     alias = stable_entry(app, source, marker)
                     shortcut_icon(alias, icon)
                 continue
-            if desktop is None:
+            if desktop is None or not info:
                 continue
+            source, icon = info
             target = desktop / (app + ".desktop")
             # Preserve a vendor shortcut or any file, directory or symlink the user already placed here.
             installed = False
-            if not any(os.path.lexists(path) for path in (desktop / source.name, target)):
+            names = (target.name, source.name, launchers.NATIVE_APPS[app][0], launchers.APP_IDS[app])
+            if not any(os.path.lexists(desktop / name) for name in names):
                 alias = stable_entry(app, source, marker)
                 icon = shortcut_icon(alias, icon, create=True)
                 argument = launchers.exec_path_argument(alias)

@@ -1,0 +1,368 @@
+{
+  "environment": "Isolated Linux host. Ubuntu 24.04.5 amd64, GNOME Shell 46, DING, Wayland and GNOME Terminal. Windows WSLg and signed-in user sessions were not available.",
+  "baselineGit": "9ff8d6d60333fa4a03ebdd7241bd87aa8048ad2f",
+  "releaseSourceSha256": {
+    "linux/start-workspace.sh": "434c960b62640f3c7b379a05bb9ba0ad9e5995b66d44f293b9899965ca200c12",
+    "linux/desktop-shortcuts.py": "0e52f9d50ced4dace6f99530262d680f3a59166a9650d5b95c530829ba9ad830",
+    "linux/install-app-launchers.py": "772f0ac7620ce8b3db7ea7110395cb530aa8a4e960fad1ad3370dca2a221d1a9",
+    "linux/setup-vendor-apps.sh": "7a22a6e613e0411dd13e370b0e4ca5d1f0e688ac5fac5cdf208f6e60d466c1da"
+  },
+  "firstDesktop": {
+    "priorUbuntu": {
+      "receiptSha256": "391eb23ac006328f22f36cc755aaa5547cfa472c730319df850bee9937201191",
+      "icons": {},
+      "bothAppsMissingAtStart": true
+    },
+    "priorWslBranchOnLinux": {
+      "receiptSha256": "962bef5b6f53ce0f80d148f0f367858b84e075b1591fdf9619b57ac7dfdad80b",
+      "icons": {
+        "ChatGPT": {
+          "label": "ChatGPT",
+          "desktopId": "cloudworkspace-windows-chatgpt.desktop",
+          "trusted": true,
+          "opensTerminal": false
+        },
+        "Claude": {
+          "label": "Claude",
+          "desktopId": "cloudworkspace-windows-claude.desktop",
+          "trusted": true,
+          "opensTerminal": false
+        }
+      },
+      "bothAppsMissingAtStart": true
+    },
+    "releaseUbuntu": {
+      "receiptSha256": "4e3d71858741ae71bbce9634d1f83bb4aa26748869baef136d81efb88703eb10",
+      "icons": {
+        "ChatGPT": {
+          "label": "ChatGPT",
+          "desktopId": "cloudworkspace-install-chatgpt.desktop",
+          "trusted": true,
+          "opensTerminal": true
+        },
+        "Claude": {
+          "label": "Claude",
+          "desktopId": "cloudworkspace-install-claude.desktop",
+          "trusted": true,
+          "opensTerminal": true
+        }
+      },
+      "bothAppsMissingAtStart": true,
+      "bothLabelsVisible": true,
+      "cancelledByEnter": [
+        "ChatGPT",
+        "Claude"
+      ],
+      "cancelObservation": "Both selected installers exited 130. Package state and keyring files unchanged. No downloader, sudo, APT or vendor client execution was seen in the process trace."
+    },
+    "releaseWslBranchOnLinux": {
+      "receiptSha256": "d956d45480e65e710de1f4f05f42b9154938946ae09494b548f097f4f086fd78",
+      "icons": {
+        "ChatGPT": {
+          "label": "ChatGPT",
+          "desktopId": "cloudworkspace-install-chatgpt.desktop",
+          "trusted": true,
+          "opensTerminal": true
+        },
+        "Claude": {
+          "label": "Claude",
+          "desktopId": "cloudworkspace-install-claude.desktop",
+          "trusted": true,
+          "opensTerminal": true
+        }
+      },
+      "bothAppsMissingAtStart": true,
+      "bothLabelsVisible": true,
+      "cancelledByEnter": [
+        "ChatGPT",
+        "Claude"
+      ],
+      "cancelObservation": "Both selected installers exited 130. Package state and keyring files unchanged. No downloader, sudo, APT or vendor client execution was seen in the process trace."
+    }
+  },
+  "wslBranchScope": "A WSLg marker selected the Windows branch in an isolated Ubuntu namespace. The old shortcut attempted to launch the Windows PE. No real Windows interop or Windows GUI was used.",
+  "optionalWindowsMenu": {
+    "probe": "Linux namespace with the Ubuntu and WSLg marker files, actual workspace shell and optional menu installer. PowerShell icon lookup is a controlled blocking substitute. The GNOME entry records launch, no Windows system or graphical compositor was used in this probe.",
+    "desktopStartedBeforeWindowsLookupReleased": {
+      "before": false,
+      "after": true
+    }
+  },
+  "liveChatGPTDownloadAndInstallation": {
+    "environment": "Ubuntu 24.04.5 amd64, GNOME Shell 46 with Ubuntu mode, private Xvfb parent and native nested Wayland, Docker on Linux. No Windows/WSLg or vendor account used.",
+    "sourceSha256": {
+      "install-app-launchers.py": "395dedbde2870611b6912051c178bd8ff9d0aa3290333701dc5297d87d2535c1",
+      "desktop-shortcuts.py": "0e52f9d50ced4dace6f99530262d680f3a59166a9650d5b95c530829ba9ad830",
+      "setup-vendor-apps.sh": "7a22a6e613e0411dd13e370b0e4ca5d1f0e688ac5fac5cdf208f6e60d466c1da"
+    },
+    "selectedFromDesktop": "ChatGPT",
+    "download": {
+      "identity": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/dists/stable/InRelease",
+      "keyFingerprint": "3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4",
+      "debianArchiveSha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
+      "debianArchiveBytes": 501426562,
+      "assurance": "Product fetched the official HTTPS bootstrap link. Independently matched the SHA-256 of the live download to the archive in the vendor-signed APT index."
+    },
+    "confirmedByActualUbuntuSudoAndApt": true,
+    "aptChanges": {
+      "chatgpt": "installed 26.1120.50957 amd64",
+      "claude-desktop": "absent"
+    },
+    "dpkgAuditEmpty": true,
+    "vendorFiles": {
+      "/usr/bin/chatgpt": "8f983245c6c07070e2cdc480be50ec239e0f18ee36069126649d0692595c86ad",
+      "/usr/lib/chatgpt/ChatGPT": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+      "/usr/share/applications/chatgpt.desktop": "d65745ebbccb71dcdca03b15c7642d0ca1a07eb75f0b049271cd6dda8272cbc2"
+    },
+    "windowOutcome": "No window in this early Docker trial. The vendor executable also reported No usable sandbox when launched independently. The next trial used a sandbox-capable host."
+  },
+  "registeredChatGPTLaunchAfterTerminalCloses": {
+    "sourceSha256": "228c987cdf9943e3b42edac153b07bcbd0b8011955890b5b98ff75d20aa1b1ae",
+    "observedOn": "Ubuntu GNOME Terminal, original OpenAI package",
+    "terminalSession": 335,
+    "originalChatGPTProcess": {
+      "name": "ChatGPT",
+      "pid": 341,
+      "sid": 336,
+      "pgrp": 336,
+      "ttyNr": 0,
+      "fds": [
+        "/dev/null",
+        "/dev/null",
+        "/dev/null"
+      ],
+      "waylandIsInner": true,
+      "x11": "",
+      "sessionPathWrapper": true
+    },
+    "windowSeen": true,
+    "terminalExit": 0
+  },
+  "terminalRegression": {
+    "probe": "Real GNOME Terminal runs the product single-app --setup-app ChatGPT already-registered fast path against a test-only desktop entry whose executable records kernel signals, then the terminal command exits. A payload that survives writes a completion marker after the PTY closes. Two additional GIO controls isolate the effect of setsid and standard stream redirection.",
+    "oldSourceSha256": "395dedbde2870611b6912051c178bd8ff9d0aa3290333701dc5297d87d2535c1",
+    "newSourceSha256": "228c987cdf9943e3b42edac153b07bcbd0b8011955890b5b98ff75d20aa1b1ae",
+    "outcomes": {
+      "baseline": {
+        "kernelSighup": true,
+        "survivedTerminalClosure": false,
+        "writeToClosedPtyReturnedEio": false
+      },
+      "baseline-repeat": {
+        "kernelSighup": true,
+        "survivedTerminalClosure": false,
+        "writeToClosedPtyReturnedEio": false
+      },
+      "fixed": {
+        "kernelSighup": false,
+        "survivedTerminalClosure": true,
+        "writeToClosedPtyReturnedEio": false
+      },
+      "fixed-repeat": {
+        "kernelSighup": false,
+        "survivedTerminalClosure": true,
+        "writeToClosedPtyReturnedEio": false
+      },
+      "fd-null": {
+        "kernelSighup": true,
+        "survivedTerminalClosure": false,
+        "writeToClosedPtyReturnedEio": false
+      },
+      "setsid-only": {
+        "kernelSighup": false,
+        "survivedTerminalClosure": true,
+        "writeToClosedPtyReturnedEio": true
+      }
+    }
+  },
+  "freshChatGPTInstallAndWindow": {
+    "environment": "Ubuntu 24.04.5, GNOME 46 DING and Terminal; private writeable root, private network with loopback only.",
+    "events": [
+      "Double click the visible ChatGPT desktop launcher",
+      "Confirm y in the frozen original single-application installer",
+      "apt-get install",
+      "dpkg --unpack",
+      "gio launch vendor desktop",
+      "Mutter observed the original ChatGPT window without a second click"
+    ],
+    "sameGnomeSessionAndPackageTransaction": true,
+    "targetPackage": "install ok installed amd64 26.1120.50957",
+    "claudeInstalled": false,
+    "aptInstalledOnly": "chatgpt:amd64 (26.1120.50957)",
+    "actualDpkgAndApt": true,
+    "localArchiveTransfer": "Test-only curl adapter served the independently verified original OpenAI .deb for its single fixed download request. No external route.",
+    "privilegeHandoff": "Test-only sudo adapter ran the original constrained apt-get command as UID 0 in a nested user namespace; the offline APT fetch worker used the only mapped UID, with no host sudo or real PAM in this trial.",
+    "vendorDebSha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
+    "applicationElfSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+    "registeredEntrySha256": "d65745ebbccb71dcdca03b15c7642d0ca1a07eb75f0b049271cd6dda8272cbc2",
+    "window": {
+      "desktopId": "chatgpt.desktop",
+      "pid": 555,
+      "wayland": true,
+      "focused": false
+    },
+    "guestUid": 1000,
+    "accountUsed": false,
+    "additionalClickAfterConfirmation": false,
+    "terminalInitialTty": true,
+    "screenSha256": "a259abd1cfd004b96d5636216604b777a747b7e93a2dcfe5116e92f8eb56290c",
+    "frozenSources": {
+      "install-app-launchers.py": "772f0ac7620ce8b3db7ea7110395cb530aa8a4e960fad1ad3370dca2a221d1a9",
+      "desktop-shortcuts.py": "0e52f9d50ced4dace6f99530262d680f3a59166a9650d5b95c530829ba9ad830",
+      "setup-vendor-apps.sh": "7a22a6e613e0411dd13e370b0e4ca5d1f0e688ac5fac5cdf208f6e60d466c1da"
+    },
+    "sandboxedRenderer": {
+      "pid": 721,
+      "parent": 583,
+      "role": "--type=renderer",
+      "noNewPrivileges": 1,
+      "seccomp": 2,
+      "noSandboxFlag": false
+    },
+    "parentContainsNoIndependentChatGPTX11Window": true,
+    "subsequentFocusSample": {
+      "desktopId": "chatgpt.desktop",
+      "pid": 555,
+      "wayland": true,
+      "focused": true
+    },
+    "screenshot": "../native-first-installed-chatgpt.png"
+  },
+  "confirmationScreenshot": {
+    "path": "../native-first-install-confirmation.png",
+    "sha256": "6eb5ac47d6e7667037916bff2805427c740e5e35258cbdd189f8fd6c39d09c13"
+  },
+  "shortcutUpgrade": {
+    "scope": "Controlled Linux registrations in isolated user directories, with a local test executable.",
+    "migration": {
+      "retainedEditedChatGptName": true,
+      "retainedDesktopInode": true,
+      "preservedDeletedClaude": true,
+      "secondRunDidNotReapplyTrust": true
+    },
+    "oneApp": {
+      "before": {
+        "windowsMenu": true,
+        "otherWindowsMenu": true,
+        "stableTarget": "cloudworkspace-install-chatgpt.desktop",
+        "nativeStarted": false
+      },
+      "after": {
+        "windowsMenu": false,
+        "otherWindowsMenu": true,
+        "stableTarget": "chatgpt.desktop",
+        "nativeStarted": true
+      }
+    },
+    "overlappingSetupWindows": {
+      "fixture": "two separate unpack paths; one synthetic installer waits for explicit cancellation",
+      "overlapBlocked": true,
+      "secondInstallerNotExecutedWhileBusy": true,
+      "retryAfterCancellationEntered": true,
+      "noHomeVendorDataOrSystemInstallation": true
+    }
+  },
+  "iconVisibilityTiming": {
+    "scope": "Separate Linux cold-start trials. DING can take time to show all three labels (Claude, ChatGPT, Home).",
+    "tracedSecondsAfterShellReady": [
+      10.751,
+      10.965,
+      22.338
+    ],
+    "untracedSecondsAfterShellReady": 2.545,
+    "concurrentObservation": "One earlier baseline and one candidate run displayed no desktop icons within 30 seconds even though the files existed. DING repeatedly restarted. Cause unresolved.",
+    "originalObservationSha256": "38ceec0a1fe4b52e5319c10bede9b13427f9dad0ca4e9ec63fffd5ebcfc80f24"
+  },
+  "freshClaudeInstall": {
+    "system": "Ubuntu 24.04.5 LTS",
+    "aptVersion": "apt 2.8.3 (amd64)",
+    "package": "claude-desktop amd64 6.28899.6 install ok installed",
+    "signature": "[GNUPG:] VALIDSIG 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE 2026-11-24 1795544765 0 4 0 1 10 01 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+    "archiveSHA256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+    "installedBinary": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "installedDesktop": "83dd76c7ea73ed93b69ae12e0212c9ff527e22e5c4c247bb1003f048b3179c49",
+    "desktopExec": "Exec=claude-desktop %U",
+    "aptCheck": 0,
+    "dpkgAudit": "",
+    "nativeLaunchObservation": {
+      "nativeProcesses": [
+        {
+          "pid": 8365,
+          "elf": "/usr/lib/claude-desktop/claude-desktop",
+          "main": true,
+          "sandboxDisabled": false
+        },
+        {
+          "pid": 8370,
+          "elf": "/usr/lib/claude-desktop/claude-desktop",
+          "main": false,
+          "sandboxDisabled": false
+        }
+      ],
+      "mappedWindows": []
+    },
+    "boundaries": "Actual registered first-use desktop entry Exec was run in a private ordinary-user PTY and install confirmation, sudo and apt prompts were answered there. One private Xvfb without GNOME Shell, DING, Windows or WSLg. No account sign-in. Native process/window observation is reported independently; GIO acceptance alone does not establish a window.",
+    "secondDirectLaunchDiagnostic": {
+      "reason": "Operation not permitted creating the Electron zygote namespace under the default private Docker sandbox",
+      "exitCode": 133,
+      "evidence": "separate-launch.log",
+      "scope": "A separate diagnostic launch after capturing the first registered entry handoff. No sandbox or host controls changed."
+    },
+    "sourceSha256": "228c987cdf9943e3b42edac153b07bcbd0b8011955890b5b98ff75d20aa1b1ae",
+    "desktopShortcutBeforeAndAfter": {
+      "Claude": {
+        "inodePreserved": true,
+        "desktopFileUnchanged": true,
+        "before": "cloudworkspace-install-claude.desktop",
+        "after": "com.anthropic.Claude.desktop"
+      },
+      "ChatGPT": {
+        "inodePreserved": true,
+        "desktopFileUnchanged": true,
+        "before": "cloudworkspace-install-chatgpt.desktop",
+        "after": "cloudworkspace-install-chatgpt.desktop"
+      }
+    }
+  },
+  "externalClaudeRegistrationAndWindow": {
+    "scope": "Fresh offline real Ubuntu Noble GNOME 46 DING and bundled product fast path after simulated final step of an external package registration. The earlier real PAM/APT installation was a separate transaction. No Windows, WSLg or account sign-in.",
+    "sameArchiveSHA256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+    "sameELFSHA256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "sameDesktopSHA256": "83dd76c7ea73ed93b69ae12e0212c9ff527e22e5c4c247bb1003f048b3179c49",
+    "version": "6.28899.6",
+    "product": "772f0ac7620ce8b3db7ea7110395cb530aa8a4e960fad1ad3370dca2a221d1a9",
+    "privateNetwork": "loopback only",
+    "registeredDesktopId": "com.anthropic.Claude.desktop",
+    "externalRegistration": "Signed Ubuntu package contents mounted read-only. Revealed the unmodified system .desktop file after DING had registered its previously missing desktop action in the running session. No new install in this observation.",
+    "installerLockAbsentBeforeAndAfter": true,
+    "shellPid": 74,
+    "waylandWindowPid": 460,
+    "stableSequence": 3,
+    "mutterFocused": true,
+    "renderer": [
+      {
+        "pid": 641,
+        "parent": 491,
+        "type": "renderer",
+        "uid": 1000,
+        "noSandboxFlag": false,
+        "noNewPrivileges": 1,
+        "seccomp": 2,
+        "seccompFilters": 2
+      },
+      {
+        "pid": 661,
+        "parent": 491,
+        "type": "renderer",
+        "uid": 1000,
+        "noSandboxFlag": false,
+        "noNewPrivileges": 1,
+        "seccomp": 2,
+        "seccompFilters": 2
+      }
+    ],
+    "screenshotSHA256": "88ae067b2ef46419c58881e760eecc62c961f6cafe9121a1a26c5e0c834d728b",
+    "visibleResult": "Couldn't connect to Claude (ERR_INTERNET_DISCONNECTED).",
+    "receiptSha256": "0e77b63cd6b8e8faf69f396636c573d7d63eb5861129c5091a59f01d2efe8040"
+  }
+}

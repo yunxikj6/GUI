@@ -42,7 +42,8 @@
     "projectFilesRecord": "native-project-files.json",
     "desktopShortcutIconsRecord": "native-shortcut-icons.json",
     "officialLinuxClientsRecord": "native-linux-clients.json",
-    "browserHandoffRecord": "native-browser-handoff.json"
+    "browserHandoffRecord": "native-browser-handoff.json",
+    "firstLaunchRecord": "native-first-launch.json"
   },
   "claudeDesktop": {
     "debianPackage": "claude-desktop",
@@ -163,10 +164,10 @@
     "applicationWindowVerifierRecord": "native-app-window-verifier.json"
   },
   "pythonRegression": {
-    "archiveRevision": "31b2d609c222076efdf2cb55d5f81784af91007a",
-    "passed": 328,
+    "archiveRevision": "9ff8d6d60333fa4a03ebdd7241bd87aa8048ad2f",
+    "passed": 331,
     "skipped": 0,
-    "snapshotFiles": 229,
+    "snapshotFiles": 233,
     "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }

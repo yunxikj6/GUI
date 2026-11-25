@@ -55,3 +55,32 @@ class NativeEntry(unittest.TestCase):
             subprocess.run(['/bin/bash', str(script)], env=env, check=True)
             self.assertEqual((base / 'calls').read_text().splitlines()[-2:], ['--check', '--desktop-shortcuts'])
             self.assertEqual((base / 'project-args').read_text(), 'relink --offer-setup')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'exercise the Linux workspace entry')
+    def test_wsl_starts_gnome_while_optional_windows_menu_is_busy_or_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / 'linux'
+            base.mkdir()
+            (base / 'os-release').write_text('ID=ubuntu\n')
+            (base / 'wslg-versions').touch()
+            entry = base / 'start-workspace.sh'
+            source = (native_workspace.ROOT / 'linux' / entry.name).read_text()
+            entry.write_text(source.replace('/etc/os-release', './os-release')
+                             .replace('/mnt/wslg/versions.txt', './wslg-versions'))
+            (base.parent / 'native_files.py').write_text('')
+            (base / 'start-gnome.sh').write_text(
+                'if [[ $1 == --check ]]; then exit 0; fi\n'
+                '[[ $1 == --desktop-shortcuts ]] || exit 1\n'
+                'touch gnome-started\nexit 17\n')
+            (base / 'install-app-launchers.py').write_text(
+                "from pathlib import Path\nimport time\n"
+                "end = time.monotonic() + 4\n"
+                "while not Path('gnome-started').exists() and time.monotonic() < end:\n"
+                "    time.sleep(0.02)\n"
+                "if Path('gnome-started').exists():\n"
+                "    Path('gnome-started-before-menu-finished').touch()\n"
+                "raise SystemExit(1)\n")
+            run = subprocess.run(['/bin/bash', str(entry), '--wsl'], capture_output=True, text=True, timeout=12)
+            self.assertEqual(run.returncode, 17, run.stderr)
+            self.assertTrue((base / 'gnome-started-before-menu-finished').exists())
+            self.assertIn('Windows 版应用的菜单项未能更新', run.stderr)

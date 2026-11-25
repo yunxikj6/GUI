@@ -23,6 +23,7 @@ NATIVE_APPS = {
     "ChatGPT": ("chatgpt.desktop", "chatgpt"),
 }
 INSTALLER_MARKER = "X-CloudWorkspace-Installer=true"
+INSTALL_IDS = {app: f"cloudworkspace-install-{app.lower()}.desktop" for app in NATIVE_APPS}
 APP_IDS = {
     "ChatGPT": "cloudworkspace-windows-chatgpt.desktop",
     "Claude": "cloudworkspace-windows-claude.desktop",
@@ -55,7 +56,9 @@ def application_entry(app_id, *, command=None):
                 return None
             if command:
                 system_path = os.environ.get("CLOUDWORKSPACE_SYSTEM_PATH") if os.environ.get("CLOUDWORKSPACE_NESTED_GNOME") else None
-                if entry.get("Exec", "").split()[:1] != [command] or not shutil.which(command, path=system_path):
+                argv = entry.get("Exec", "").split()
+                if (argv[:1] != [command] or (base == data_home() and argv != [command, "%U"])
+                        or not shutil.which(command, path=system_path)):
                     return None
             elif not entry.getboolean("X-CloudWorkspace-WindowsLauncher", False):
                 return None
@@ -73,6 +76,11 @@ def application_entry(app_id, *, command=None):
 def native_entry(app):
     app_id, command = NATIVE_APPS[app]
     return application_entry(app_id, command=command)
+
+
+def has_native_registration(app):
+    app_id, _ = NATIVE_APPS[app]
+    return any(os.path.lexists(base / "applications" / app_id) for base in data_roots())
 
 
 def exec_path_argument(path):
@@ -123,9 +131,41 @@ def update_entry(path, new_text, *, marker=MANAGED):
             output.write(new_text)
             output.flush()
             os.chmod(tmp, 0o644)
-            tmp.replace(path)
+            if prior is None:
+                # A concurrently created custom entry must survive first registration.
+                try:
+                    os.link(tmp, path)
+                except FileExistsError:
+                    if path.is_symlink() or path.read_bytes() != new_text.encode("utf-8"):
+                        raise RuntimeError(f"桌面项同时发生了更改，请确认后重试：{path}") from None
+            else:
+                tmp.replace(path)
         finally:
             tmp.unlink(missing_ok=True)
+
+
+def app_setup_text(app, hidden):
+    return "\n".join((
+        "[Desktop Entry]", "Type=Application", f"Name=Install {app} for Ubuntu", f"Name[zh_CN]=安装 Ubuntu 版 {app}",
+        f"Comment=Install and open the official {app} app in Ubuntu",
+        f"Comment[zh_CN]=安装并打开 Ubuntu 版官方 {app} 客户端",
+        "Icon=system-software-install", "Categories=Settings;", "Terminal=true",
+        f"NoDisplay={'true' if hidden else 'false'}",
+        f"Exec=/usr/bin/python3 {exec_path_argument(SCRIPT)} --setup-app {app}", INSTALLER_MARKER, "",
+    ))
+
+
+def installer_entry(app, *, include_hidden=False):
+    path = data_home() / "applications" / INSTALL_IDS[app]
+    if path.is_symlink() or not path.is_file() or not SCRIPT.with_name("setup-vendor-apps.sh").is_file():
+        return None
+    try:
+        entry = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    if entry == app_setup_text(app, False) or (include_hidden and entry == app_setup_text(app, True)):
+        return path, "system-software-install"
+    return None
 
 
 def offer_app_setup():
@@ -143,13 +183,68 @@ def offer_app_setup():
         f"Exec=/usr/bin/python3 {exec_path_argument(SCRIPT)} --setup-apps",
         INSTALLER_MARKER, "",
     ))
-    update_entry(applications / "cloudworkspace-install-apps.desktop", entry, marker=INSTALLER_MARKER)
+    entries = {"cloudworkspace-install-apps.desktop": entry}
+    entries.update((filename, app_setup_text(app, has_native_registration(app))) for app, filename in INSTALL_IDS.items())
+    errors = []
+    for filename, text in entries.items():
+        try:
+            update_entry(applications / filename, text, marker=INSTALLER_MARKER)
+        except (OSError, RuntimeError, UnicodeError) as error:
+            errors.append(str(error))
+    if errors:
+        raise RuntimeError("\n".join(errors))
 
 
-def setup_apps():
+def open_registered_app(app, env):
+    native = native_entry(app)
+    if native:
+        # The setup terminal closes as soon as this command finishes. Give GIO
+        # and the client a session and standard streams independent of that PTY.
+        result = subprocess.run(["/usr/bin/gio", "launch", str(native[0])], env=env,
+                                start_new_session=True, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode:
+            raise RuntimeError(f"Ubuntu 未能通过 {native[0].name} 打开 {app}。请在“活动”中检查该应用后重试。")
+        return True
+    if has_native_registration(app):
+        raise RuntimeError(f"Ubuntu 已有 {NATIVE_APPS[app][0]}。请检查该桌面项是否被隐藏、改写，及其官方启动命令是否可用。")
+    return False
+
+
+def refresh_after_setup(app, env):
+    if os.environ.get("WSL_DISTRO_NAME"):
+        if app:
+            try:
+                update_entry(data_home() / "applications" / APP_IDS[app], None)
+            except (OSError, RuntimeError, UnicodeError) as error:
+                print(f"Windows 菜单项未更新：{error}", file=sys.stderr)
+        else:
+            install()
+    return subprocess.run([sys.executable, str(SCRIPT.with_name("desktop-shortcuts.py"))], env=env).returncode
+
+
+def setup_apps(app=None):
     env = os.environ.copy()
     env.pop("INSTABOX_API_KEY", None)
-    result = subprocess.run(["/bin/bash", str(SCRIPT.with_name("setup-vendor-apps.sh"))], env=env)
+    if app and open_registered_app(app, env):
+        return refresh_after_setup(app, env)
+    installer = SCRIPT.with_name("setup-vendor-apps.sh")
+    # Both old and new unpack locations use this user's same installation lock.
+    state = Path(os.environ.get("XDG_STATE_HOME", ""))
+    directory = (state if state.is_absolute() else Path.home() / ".local/state") / "cloudworkspace/vendor-install"
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    lock = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("另一个 Ubuntu 客户端安装窗口正在运行。请先完成或取消该安装，然后重试。") from None
+        if app and open_registered_app(app, env):
+            return refresh_after_setup(app, env)
+        options = ["--app", app.lower()] if app else []
+        result = subprocess.run(["/bin/bash", str(installer), *options], env=env)
+    finally:
+        os.close(lock)
     if result.returncode:
         if result.returncode != 130 and sys.stdin.isatty():
             try:
@@ -157,9 +252,9 @@ def setup_apps():
             except EOFError:
                 pass
         return result.returncode
-    if os.environ.get("WSL_DISTRO_NAME"):
-        install()
-    return subprocess.run([sys.executable, str(SCRIPT.with_name("desktop-shortcuts.py"))], env=env).returncode
+    if app and not open_registered_app(app, env):
+        raise RuntimeError(f"安装程序已退出，Ubuntu 尚未注册官方 {app} 桌面项。请检查安装结果后重试。")
+    return refresh_after_setup(app, env)
 
 
 def recent(path, seconds):
@@ -235,7 +330,7 @@ def install():
         with ThreadPoolExecutor(max_workers=len(apps)) as pool:
             icons = dict(zip(apps, pool.map(installed_icon, apps)))
     for app, filename in APP_IDS.items():
-        update_entry(directory / filename, entry_text(app, icons[app]) if app in icons else None)
+        update_entry(directory / filename, entry_text(app, icons[app]) if app in icons and not native_entry(app) else None)
 
 
 def windows_path(wslpath, linux_path):
@@ -317,12 +412,13 @@ def main():
     action = cli.add_mutually_exclusive_group()
     action.add_argument("--open", choices=APP_IDS, metavar="APP", help="Activate an official Windows app.")
     action.add_argument("--setup-apps", action="store_true", help="Install native Ubuntu clients in a terminal.")
+    action.add_argument("--setup-app", choices=NATIVE_APPS, metavar="APP", help="Install and open the selected Ubuntu app.")
     args = cli.parse_args()
     try:
         if args.open:
             return activate(args.open)
-        if args.setup_apps:
-            return setup_apps()
+        if args.setup_apps or args.setup_app:
+            return setup_apps(args.setup_app)
         else:
             install()
     except (OSError, RuntimeError, UnicodeError, ValueError) as err:
@@ -330,6 +426,11 @@ def main():
             show_error(args.open, str(err))
         else:
             print(err, file=sys.stderr)
+            if args.setup_app and sys.stdin.isatty():
+                try:
+                    input("按 Enter 关闭。")
+                except EOFError:
+                    pass
         return 1
     return 0
 

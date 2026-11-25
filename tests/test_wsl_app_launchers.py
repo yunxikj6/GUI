@@ -1,9 +1,11 @@
 """Exercise real GIO activation, native interop argv, and optional registered app icons."""
 import base64
+import fcntl
 import json
 import os
 from pathlib import Path
 import platform
+import pty
 import shutil
 import subprocess
 import sys
@@ -68,6 +70,12 @@ assert args[:5] == ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", os.envi
 assert len(args) == 9 and args[5] == "-App" and args[7] == "-IconPath" and args[8].startswith("Z:")
 with open(os.environ["ICON_ARGS_LOG"], "a") as out:
     out.write(json.dumps(args) + chr(10))
+if os.environ.get("ICON_RELEASE"):
+    release = Path(os.environ["ICON_RELEASE"])
+    (release.parent / args[6]).touch()
+    end = time.monotonic() + 4
+    while not release.exists() and time.monotonic() < end:
+        time.sleep(.02)
 if os.environ.get("ICON_GATE"):
     gate = Path(os.environ["ICON_GATE"])
     (gate / args[6]).touch()
@@ -90,6 +98,233 @@ Path(args[8][2:].replace(chr(92), "/")).write_bytes(base64.b64decode(os.environ[
 
     def desktop(self, app):
         return self.apps / f"cloudworkspace-windows-{app.lower()}.desktop"
+
+    def offer(self, *, check=True):
+        return subprocess.run([sys.executable, "-c", "import runpy,sys;runpy.run_path(sys.argv[1])['offer_app_setup']()",
+                               self.script], env=self.env, capture_output=True, text=True, check=check)
+
+    def setup_fixture(self):
+        self.env.update(INSTALL_LOG=str(self.bin.parent / "install.log"), XDG_STATE_HOME=str(self.bin.parent / "state"),
+                        OPENED=str(self.bin.parent / "ubuntu-opened"), WSL_DISTRO_NAME="Ubuntu",
+                        CLOUDWORKSPACE_NESTED_GNOME="1", CLOUDWORKSPACE_SYSTEM_PATH=str(self.bin))
+        self.installer = self.script.with_name("setup-vendor-apps.sh")
+        self.installer.write_text("""set -eu
+printf '%s\\n' "$*" >>"$INSTALL_LOG"
+test -z "${INSTABOX_API_KEY+x}"
+read -r consent
+[[ $consent == y ]] || exit 130
+case "$2" in
+  chatgpt) desktop=chatgpt; command=chatgpt ;;
+  claude) desktop=com.anthropic.Claude; command=claude-desktop ;;
+  *) exit 64 ;;
+esac
+mkdir -p "$XDG_DATA_DIRS/applications"
+printf '[Desktop Entry]\\nType=Application\\nName=%s\\nExec=%s %%U\\nIcon=%s\\n' "$desktop" "$command" "$command" >"$XDG_DATA_DIRS/applications/$desktop.desktop"
+""")
+        self.program(self.script.with_name("desktop-shortcuts.py"), "pass\n")
+        for app in ("chatgpt", "claude-desktop"):
+            self.program(self.bin / app, """import json, os, sys
+from pathlib import Path
+with Path(os.environ['OPENED']).open('a') as f:
+    print(json.dumps([Path(sys.argv[0]).name, os.environ.get('WAYLAND_DISPLAY'), 'INSTABOX_API_KEY' in os.environ]), file=f)
+""")
+
+    def invoke_setup(self, app, answer="", *, script=None):
+        return subprocess.run([sys.executable, script or self.script, "--setup-app", app], env=self.env,
+                              input=answer, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=8)
+
+    def test_installers_are_independent_relocatable_and_preserve_foreign_entries(self):
+        self.setup_fixture()
+        self.offer()
+        generic = self.apps / "cloudworkspace-install-apps.desktop"
+        chatgpt = self.apps / "cloudworkspace-install-chatgpt.desktop"
+        claude = self.apps / "cloudworkspace-install-claude.desktop"
+        self.assertIn("--setup-apps\n", generic.read_text())
+        for app, item in (("ChatGPT", chatgpt), ("Claude", claude)):
+            data = item.read_text()
+            self.assertIn(f"Name[zh_CN]=安装 Ubuntu 版 {app}\n", data)
+            self.assertIn(f" --setup-app {app}\n", data)
+            self.assertIn("Terminal=true\n", data)
+            self.assertIn("NoDisplay=false\n", data)
+            if shutil.which("desktop-file-validate"):
+                subprocess.run(["desktop-file-validate", item], check=True)
+        self.assertFalse(self.log.exists())
+        self.assertFalse(Path(self.env["INSTALL_LOG"]).exists())
+        old = self.script.parent
+        new = old.with_name("moved Linux 包")
+        old.rename(new)
+        self.script = new / self.script.name
+        self.offer()
+        self.assertIn("moved Linux 包", chatgpt.read_text())
+        custom = "[Desktop Entry]\nType=Application\nName=My own installer\n"
+        chatgpt.write_text(custom)
+        claude.unlink()
+        self.assertNotEqual(self.offer(check=False).returncode, 0)
+        self.assertEqual(chatgpt.read_text(), custom)
+        self.assertTrue(claude.is_file())
+
+    def test_one_app_cancel_retry_then_direct_native_launch(self):
+        self.setup_fixture()
+        self.env.update(INSTABOX_API_KEY="fixture-only", WAYLAND_DISPLAY="private-fixture-display")
+        self.install()
+        opened = Path(self.env["OPENED"])
+        calls = Path(self.env["INSTALL_LOG"])
+        self.assertEqual(self.invoke_setup("Claude", "\n").returncode, 130)
+        self.assertEqual(calls.read_text().splitlines(), ["--app claude"])
+        self.assertFalse(opened.exists())
+        self.assertFalse((self.system / "applications").exists())
+        for index in range(2):
+            result = self.invoke_setup("Claude", "y\n" if index == 0 else "")
+            self.assertEqual(result.returncode, 0, result.stdout)
+            deadline = time.monotonic() + 4
+            while time.monotonic() < deadline and (not opened.exists() or len(opened.read_text().splitlines()) < index + 1):
+                time.sleep(.02)
+            self.assertEqual([json.loads(row) for row in opened.read_text().splitlines()],
+                             [["claude-desktop", "private-fixture-display", False]] * (index + 1))
+        self.assertEqual(calls.read_text().splitlines(), ["--app claude", "--app claude"])
+        self.assertFalse(self.log.exists())
+        self.assertFalse(self.desktop("Claude").exists())
+        self.assertTrue(self.desktop("ChatGPT").is_file())
+        self.offer()
+        self.assertIn("NoDisplay=true\n", (self.apps / "cloudworkspace-install-claude.desktop").read_text())
+
+    def test_desktop_access_after_external_install_refreshes_only_that_app(self):
+        self.setup_fixture()
+        shortcuts = self.script.with_name("desktop-shortcuts.py")
+        shutil.copyfile(SOURCE.with_name(shortcuts.name), shortcuts)
+        self.install()
+        subprocess.run([sys.executable, shortcuts], env=self.env, check=True, capture_output=True)
+        aliases = self.apps.parent / "cloudworkspace/desktop-shortcuts"
+        chatgpt = aliases / "ChatGPT.desktop"
+        claude = aliases / "Claude.desktop"
+        self.assertEqual(chatgpt.readlink(), self.apps / "cloudworkspace-install-chatgpt.desktop")
+        self.assertEqual(claude.readlink(), self.apps / "cloudworkspace-install-claude.desktop")
+        self.assertTrue(self.desktop("ChatGPT").is_file())
+
+        # The user installs the package outside the running workspace, before clicking its existing icon.
+        native = self.system / "applications/chatgpt.desktop"
+        native.parent.mkdir(parents=True)
+        native.write_text("[Desktop Entry]\nType=Application\nName=ChatGPT\nExec=chatgpt %U\nIcon=chatgpt\n")
+        result = self.invoke_setup("ChatGPT")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(chatgpt.readlink(), native)
+        self.assertFalse(self.desktop("ChatGPT").exists())
+        self.assertEqual(claude.readlink(), self.apps / "cloudworkspace-install-claude.desktop")
+        self.assertTrue(self.desktop("Claude").is_file())
+        self.assertFalse(Path(self.env["INSTALL_LOG"]).exists())
+        icon = Path(self.env["HOME"]) / "Desktop/ChatGPT.desktop"
+        subprocess.run(["/usr/bin/gio", "launch", icon], env=self.env, check=True)
+        opened = Path(self.env["OPENED"])
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline and (not opened.exists() or len(opened.read_text().splitlines()) < 2):
+            time.sleep(.02)
+        self.assertEqual([json.loads(line)[0] for line in opened.read_text().splitlines()], ["chatgpt", "chatgpt"])
+
+    def test_install_terminal_closes_without_hanging_up_the_client(self):
+        self.setup_fixture()
+        self.program(self.bin / "chatgpt", """import json, os
+from pathlib import Path
+opened = Path(os.environ["OPENED"])
+pending = opened.with_suffix(".tmp")
+pending.write_text(json.dumps({
+    "session": os.getsid(0), "terminal": [os.isatty(fd) for fd in (0, 1, 2)]
+}))
+pending.replace(opened)
+""")
+        master, slave = pty.openpty()
+        try:
+            # Give the launcher a controlling terminal just as GNOME Terminal does.
+            enter_terminal = (
+                "import fcntl, os, sys, termios\n"
+                "fcntl.ioctl(0, termios.TIOCSCTTY, 0)\n"
+                "os.execv(sys.executable, [sys.executable, *sys.argv[1:]])"
+            )
+            with subprocess.Popen([sys.executable, "-c", enter_terminal, str(self.script), "--setup-app", "ChatGPT"],
+                                  stdin=slave, stdout=slave, stderr=slave, start_new_session=True, env=self.env) as proc:
+                try:
+                    os.write(master, b"y\n")
+                    self.assertEqual(proc.wait(timeout=8), 0)
+                finally:
+                    if proc.poll() is None:
+                        proc.kill()
+        finally:
+            os.close(slave)
+            os.close(master)
+        opened = Path(self.env["OPENED"])
+        deadline = time.monotonic() + 3
+        while not opened.exists() and time.monotonic() < deadline:
+            time.sleep(.02)
+        self.assertTrue(opened.exists(), "Closing the setup terminal prevented the app from starting")
+        child = json.loads(opened.read_text())
+        self.assertNotEqual(child["session"], proc.pid)
+        self.assertEqual(child["terminal"], [False, False, False])
+
+    def test_existing_hidden_or_modified_vendor_registration_is_not_reinstalled(self):
+        self.setup_fixture()
+        self.apps.mkdir(parents=True)
+        user = self.apps / "chatgpt.desktop"
+        for entry in ("Hidden=true\nExec=chatgpt %U", "NoDisplay=true\nExec=chatgpt %U",
+                      "Exec=unrelated-program", "Exec=chatgpt --custom-profile %U"):
+            with self.subTest(entry=entry):
+                original = f"[Desktop Entry]\nType=Application\nName=User config\n{entry}\n"
+                user.write_text(original)
+                self.offer()
+                self.assertIn("NoDisplay=true\n", (self.apps / "cloudworkspace-install-chatgpt.desktop").read_text())
+                result = self.invoke_setup("ChatGPT", "y\n")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("chatgpt.desktop", result.stdout)
+                self.assertEqual(user.read_text(), original)
+                self.assertFalse(Path(self.env["INSTALL_LOG"]).exists())
+                self.assertFalse(Path(self.env["OPENED"]).exists())
+
+    def test_installation_lock_is_shared_by_a_second_unpacked_copy(self):
+        self.setup_fixture()
+        moved = self.script.parent.with_name("second-release")
+        shutil.copytree(self.script.parent, moved)
+        directory = Path(self.env["XDG_STATE_HOME"]) / "cloudworkspace/vendor-install"
+        directory.mkdir(parents=True)
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            for script in (self.script, moved / self.script.name):
+                result = self.invoke_setup("ChatGPT", "y\n", script=script)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("另一个 Ubuntu", result.stdout)
+        finally:
+            os.close(fd)
+        self.assertFalse(Path(self.env["INSTALL_LOG"]).exists())
+        self.assertEqual(self.invoke_setup("ChatGPT", "\n", script=moved / self.script.name).returncode, 130)
+
+    def test_package_install_completing_during_windows_icon_lookup_wins(self):
+        self.setup_fixture()
+        hold = self.bin.parent / "hold"
+        hold.mkdir()
+        self.env["ICON_RELEASE"] = str(hold / "continue")
+        with subprocess.Popen([sys.executable, self.script], env=self.env) as background:
+            try:
+                deadline = time.monotonic() + 4
+                while not (hold / "Claude").exists() and time.monotonic() < deadline:
+                    time.sleep(.02)
+                self.assertTrue((hold / "Claude").exists())
+                installed = self.system / "applications/com.anthropic.Claude.desktop"
+                installed.parent.mkdir(parents=True)
+                installed.write_text("[Desktop Entry]\nType=Application\nName=Claude\nExec=claude-desktop %U\n")
+            finally:
+                (hold / "continue").touch()
+            self.assertEqual(background.wait(timeout=5), 0)
+        self.assertFalse(self.desktop("Claude").exists())
+        self.assertTrue(self.desktop("ChatGPT").is_file())
+
+    def test_installer_failure_or_unregistered_success_does_not_open_an_app(self):
+        self.setup_fixture()
+        self.installer.write_text("exit 72\n")
+        self.assertEqual(self.invoke_setup("ChatGPT", "y\n").returncode, 72)
+        self.installer.write_text("exit 0\n")
+        result = self.invoke_setup("ChatGPT", "y\n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("尚未注册官方 ChatGPT", result.stdout)
+        self.assertFalse(Path(self.env["OPENED"]).exists())
+        self.assertFalse(self.log.exists())
 
     def test_gio_activates_native_launcher_with_exact_argv(self):
         gio = shutil.which("gio")

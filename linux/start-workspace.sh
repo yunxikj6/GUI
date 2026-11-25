@@ -25,6 +25,8 @@ fi
 if "$check"; then exit 0; fi
 python3 ../native_files.py relink --offer-setup || echo 'InstaBox 项目入口未能更新。' >&2
 if "$wsl"; then
-    python3 ./install-app-launchers.py
+    # Looking up optional Store icons can wait on Windows interop. The Ubuntu
+    # desktop and its own application shortcuts can start independently.
+    (python3 ./install-app-launchers.py || echo 'Windows 版应用的菜单项未能更新。' >&2) </dev/null &
 fi
 exec /bin/bash ./start-gnome.sh --desktop-shortcuts
