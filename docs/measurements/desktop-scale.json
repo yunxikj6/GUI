@@ -1,0 +1,577 @@
+{
+  "localThunarBaseline": {
+    "previousCommit": "ac31f926ce1fd658734fd6eaad927d0dab2e422a",
+    "environment": "Local isolated TigerVNC display and stock Thunar; Chromium client",
+    "app": "/usr/bin/thunar",
+    "version": "4.20.2-1+deb13u1",
+    "desktopPixels": [
+      1920,
+      1080
+    ],
+    "sourceMenuGlyphPixels": 11,
+    "sourceFolderGlyphPixels": 10,
+    "observations": [
+      {
+        "condition": "laptop",
+        "clientCSSViewport": [
+          1272,
+          709
+        ],
+        "devicePixelRatio": 1,
+        "canvasCSSSize": [
+          1157.328,
+          651
+        ],
+        "desktopPixelToCSSPixel": 0.60278,
+        "projectedMenuGlyphCSSPixels": 6.63,
+        "nativeMenuOpened": true,
+        "nativeDirectoryWindowTitle": "Documents - Thunar"
+      },
+      {
+        "condition": "browser-zoom",
+        "clientCSSViewport": [
+          1018,
+          567
+        ],
+        "devicePixelRatio": 1.25,
+        "canvasCSSSize": [
+          905.237,
+          509.2
+        ],
+        "desktopPixelToCSSPixel": 0.47148,
+        "projectedMenuGlyphCSSPixels": 5.19,
+        "nativeMenuOpened": true,
+        "nativeDirectoryWindowTitle": "Documents - Thunar"
+      },
+      {
+        "condition": "browser-fullscreen",
+        "clientCSSViewport": [
+          1360,
+          768
+        ],
+        "devicePixelRatio": 1,
+        "canvasCSSSize": [
+          1262.219,
+          710
+        ],
+        "desktopPixelToCSSPixel": 0.65741,
+        "projectedMenuGlyphCSSPixels": 7.23,
+        "nativeMenuOpened": true,
+        "nativeDirectoryWindowTitle": "Documents - Thunar"
+      },
+      {
+        "condition": "fullscreen-exit",
+        "clientCSSViewport": [
+          1272,
+          709
+        ],
+        "devicePixelRatio": 1,
+        "canvasCSSSize": [
+          1157.328,
+          651
+        ],
+        "desktopPixelToCSSPixel": 0.60278,
+        "projectedMenuGlyphCSSPixels": 6.63
+      },
+      {
+        "condition": "narrow",
+        "clientCSSViewport": [
+          360,
+          720
+        ],
+        "devicePixelRatio": 1,
+        "canvasCSSSize": [
+          360,
+          202.5
+        ],
+        "desktopPixelToCSSPixel": 0.1875,
+        "projectedMenuGlyphCSSPixels": 2.06,
+        "nativeMenuOpened": true,
+        "nativeDirectoryWindowTitle": "Documents - Thunar"
+      },
+      {
+        "condition": "narrow320",
+        "clientCSSViewport": [
+          320,
+          640
+        ],
+        "devicePixelRatio": 1,
+        "canvasCSSSize": [
+          320,
+          180
+        ],
+        "desktopPixelToCSSPixel": 0.16667,
+        "projectedMenuGlyphCSSPixels": 1.83,
+        "nativeMenuOpened": true,
+        "nativeDirectoryWindowTitle": "Documents - Thunar"
+      }
+    ]
+  },
+  "isolatedInstaBoxThunar": {
+    "environment": "Isolated guest TigerVNC display on a private Unix socket, native Thunar, synthetic files. An isolated lease fixture gated viewer input. The real shared desktop was not used in this test.",
+    "previousViewer": {
+      "binary": "/usr/bin/thunar",
+      "version": "4.20.2-1+deb13u1",
+      "guestInitial": [
+        1920,
+        1080
+      ],
+      "window": [
+        640,
+        312,
+        640,
+        480
+      ],
+      "privateUnix": true,
+      "serverTCP": false,
+      "menuTarget": [
+        658,
+        326
+      ],
+      "folderTarget": [
+        1015,
+        463
+      ],
+      "fit": {
+        "viewport": [
+          320,
+          720
+        ],
+        "buffer": [
+          1920,
+          1080
+        ],
+        "canvas": [
+          0,
+          313,
+          320,
+          180
+        ],
+        "host": [
+          0,
+          86,
+          320,
+          634
+        ],
+        "scroll": [
+          0,
+          0
+        ]
+      },
+      "watchActions": [
+        "status"
+      ],
+      "menuClick": [
+        109.67,
+        388.33
+      ],
+      "nativeFileMenu": [
+        {
+          "kind": "_NET_WM_WINDOW_TYPE_POPUP_MENU",
+          "rect": [
+            640,
+            337,
+            292,
+            254
+          ]
+        }
+      ],
+      "guestMenuPointer": [
+        654,
+        324
+      ],
+      "folderClick": [
+        169.17,
+        411.17
+      ],
+      "nativeFolderWindow": [
+        "Documents - Thunar"
+      ],
+      "guestFolderPointer": [
+        1014,
+        462
+      ],
+      "guestFinal": [
+        1920,
+        1080
+      ],
+      "browser": "156.0.8078.79",
+      "leaseActions": [
+        "status",
+        "takeover",
+        "handback"
+      ],
+      "fixtureStopped": true,
+      "assetSha256": {
+        "index.html": "23c975f24815023ffe127e84d309ef613226d8cd4675d3d6d7053be4731f8f8c",
+        "viewer.js": "976a5c351d04c27d885f056ce8a59b2a5123326ba0490477c608921349c09c0d",
+        "style.css": "573a65c4a782587f93742fb96c3cf84bd79bacf1b4456e75023f7adb86dd149c"
+      }
+    },
+    "releaseViewer": {
+      "binary": "/usr/bin/thunar",
+      "version": "4.20.2-1+deb13u1",
+      "guestInitial": [
+        1920,
+        1080
+      ],
+      "window": [
+        640,
+        312,
+        640,
+        480
+      ],
+      "privateUnix": true,
+      "serverTCP": false,
+      "menuTarget": [
+        658,
+        326
+      ],
+      "folderTarget": [
+        1015,
+        421
+      ],
+      "fit": {
+        "viewport": [
+          320,
+          720
+        ],
+        "buffer": [
+          1920,
+          1080
+        ],
+        "canvas": [
+          0,
+          334,
+          320,
+          180
+        ],
+        "host": [
+          0,
+          128,
+          320,
+          592
+        ],
+        "scroll": [
+          0,
+          0
+        ]
+      },
+      "watchActions": [
+        "status"
+      ],
+      "fitImage": "../desktop-scale-fit.png",
+      "originalBeforePan": {
+        "viewport": [
+          320,
+          720
+        ],
+        "buffer": [
+          1920,
+          1080
+        ],
+        "canvas": [
+          0,
+          170,
+          1920,
+          1080
+        ],
+        "host": [
+          0,
+          170,
+          320,
+          506
+        ],
+        "scroll": [
+          0,
+          0
+        ]
+      },
+      "screenshotViewport": {
+        "viewport": [
+          320,
+          720
+        ],
+        "buffer": [
+          1920,
+          1080
+        ],
+        "canvas": [
+          -820,
+          -193,
+          1920,
+          1080
+        ],
+        "host": [
+          0,
+          170,
+          320,
+          506
+        ],
+        "scroll": [
+          820,
+          363
+        ]
+      },
+      "originalImage": "../desktop-scale-original.png",
+      "menuViewport": {
+        "viewport": [
+          320,
+          720
+        ],
+        "buffer": [
+          1920,
+          1080
+        ],
+        "canvas": [
+          -558,
+          -56,
+          1920,
+          1080
+        ],
+        "host": [
+          0,
+          170,
+          320,
+          506
+        ],
+        "scroll": [
+          558,
+          226
+        ]
+      },
+      "menuClick": [
+        100.0,
+        270.0
+      ],
+      "nativeFileMenu": [
+        {
+          "kind": "_NET_WM_WINDOW_TYPE_POPUP_MENU",
+          "rect": [
+            640,
+            337,
+            292,
+            254
+          ]
+        }
+      ],
+      "guestMenuPointer": [
+        658,
+        326
+      ],
+      "menuFrameChange": {
+        "open": 22.241,
+        "closed": 1.069
+      },
+      "folderViewport": {
+        "viewport": [
+          320,
+          720
+        ],
+        "buffer": [
+          1920,
+          1080
+        ],
+        "canvas": [
+          -820,
+          -193,
+          1920,
+          1080
+        ],
+        "host": [
+          0,
+          170,
+          320,
+          506
+        ],
+        "scroll": [
+          820,
+          363
+        ]
+      },
+      "folderClick": [
+        195.0,
+        228.0
+      ],
+      "folderIconPixels": {
+        "before": [
+          153,
+          193,
+          242
+        ],
+        "selected": [
+          37,
+          117,
+          228
+        ]
+      },
+      "folderOpenAction": "click the folder icon, await its painted selection, then press Enter",
+      "nativeFolderWindow": [
+        "Documents - Thunar"
+      ],
+      "guestFolderPointer": [
+        1015,
+        421
+      ],
+      "guestFinal": [
+        1920,
+        1080
+      ],
+      "browser": "156.0.8078.79",
+      "leaseActions": [
+        "status",
+        "takeover",
+        "handback"
+      ],
+      "fixtureStopped": true,
+      "assetSha256": {
+        "index.html": "4cd45c124bdeb82899b72bc7ff082675458498086d8242d401c03cfabb8f8078",
+        "viewer.js": "159e52155ec9ecea8b27c9b3e151caaa5d287bcfb56c67ee9a3106a9b4574a9d",
+        "style.css": "475000c432060397a82a160da99800c1e249250d5fe4e50683f15bf8d4d52c92"
+      }
+    }
+  },
+  "existingInstaBoxDesktop": {
+    "environment": "Normal local launcher built from the release viewer source, connected through the official API to the already running user desktop. Only the viewer scale was changed. The workbench used the previously staged checkout. No user desktop images were saved.",
+    "observation": {
+      "root": {
+        "status": 302,
+        "location": "/desktop/"
+      },
+      "takeoverRequests": 0,
+      "inputRequests": 0,
+      "handbackRequests": 0,
+      "screenCapture": false,
+      "screenshotFallbackUsed": false,
+      "chromium": "156.0.8078.79",
+      "providerBefore": {
+        "installed": true,
+        "running": true,
+        "controller": "agent",
+        "yours": null,
+        "agentPausable": true,
+        "kind": null
+      },
+      "scaleMeasurements": {
+        "fit": {
+          "viewport": [
+            390,
+            740
+          ],
+          "screen": [
+            390,
+            612
+          ],
+          "source": [
+            823,
+            512
+          ],
+          "canvas": [
+            823,
+            512
+          ],
+          "css": [
+            390,
+            242.609375
+          ],
+          "scrollRange": [
+            0,
+            0
+          ]
+        },
+        "original": {
+          "viewport": [
+            390,
+            740
+          ],
+          "screen": [
+            390,
+            586
+          ],
+          "source": [
+            823,
+            512
+          ],
+          "canvas": [
+            823,
+            512
+          ],
+          "css": [
+            823,
+            512
+          ],
+          "scrollRange": [
+            433,
+            0
+          ]
+        },
+        "restoredFit": {
+          "viewport": [
+            390,
+            740
+          ],
+          "screen": [
+            390,
+            612
+          ],
+          "source": [
+            823,
+            512
+          ],
+          "canvas": [
+            823,
+            512
+          ],
+          "css": [
+            390,
+            242.609375
+          ],
+          "scrollRange": [
+            0,
+            0
+          ]
+        }
+      },
+      "liveDesktop": {
+        "outcome": "passed",
+        "route": "/desktop/vnc",
+        "visibleViewingStatus": "正在观看",
+        "providerReply": {
+          "running": true,
+          "controller": "agent",
+          "yours": null,
+          "agentPausable": true,
+          "kind": null
+        },
+        "wsOpened": 1,
+        "incomingFrames": 7,
+        "incomingBytes": 34547,
+        "decodedPixelRects": 29,
+        "frontCanvasPaints": 3,
+        "clipboardCalls": 0,
+        "blockedRfbInput": 0,
+        "blockedRfbResize": 0,
+        "serverWidth": 823,
+        "serverHeight": 512,
+        "framebuffer": [
+          823,
+          512
+        ]
+      },
+      "providerAfter": {
+        "installed": true,
+        "running": true,
+        "controller": "agent",
+        "yours": null,
+        "agentPausable": true,
+        "kind": null
+      },
+      "workbench": {
+        "path": "/workbench/",
+        "branch": "reviewed-edits",
+        "realProjectTree": true
+      },
+      "printedDefaultPath": "/desktop/"
+    }
+  }
+}

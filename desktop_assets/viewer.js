@@ -5,6 +5,9 @@ const screen = byId('screen');
 const status = byId('status');
 const control = byId('control');
 const mode = byId('mode');
+const desktopScale = byId('desktopScale');
+const panView = byId('panView');
+const panHint = byId('panHint');
 const textForm = byId('textForm');
 const clipboardToggle = byId('clipboardToggle');
 const clipboardPanel = byId('clipboardPanel');
@@ -15,6 +18,50 @@ const clipboardCopy = byId('clipboardCopy');
 const clipboardStatus = byId('clipboardStatus');
 let session = 0, rfb, timer, frameUrl, desktop, controlled = false, stills = false;
 let liveConnected = false, clipboardVersion = 0, receivedText = '';
+
+let panRequested = false, panDrag = null;
+
+function syncPan() {
+  const original = desktopScale.value === 'original';
+  const local = original && (!controlled || panRequested);
+  screen.dataset.scale = desktopScale.value;
+  screen.dataset.localPan = String(local);
+  const display = screen.firstElementChild;
+  panView.hidden = !display || !original || !controlled;
+  panView.setAttribute('aria-pressed', String(original && panRequested));
+  panHint.hidden = !display || !original;
+  panHint.textContent = local ? '拖动或滑动画面可移动本地视窗，聚焦后也可用方向键。' : '点击或滚动画面可操作云端。要移动视窗，请开启本地平移。';
+  if (local && screen.contains(document.activeElement)) screen.focus({preventScroll:true});
+  if (display) display.inert = local;
+}
+
+desktopScale.onchange = () => {
+  syncPan();
+  if (rfb) rfb.scaleViewport = desktopScale.value === 'fit';
+  screen.scrollTo(0, 0);
+};
+panView.onclick = () => {
+  panRequested = !panRequested;
+  syncPan();
+  if (panRequested) screen.focus({preventScroll:true});
+};
+
+// Pan locally so a swipe at the edge does not trigger browser history navigation.
+screen.addEventListener('pointerdown', e => {
+  if (screen.dataset.localPan !== 'true' || !e.isPrimary || e.button !== 0 || e.target !== screen) return;
+  const rect = screen.getBoundingClientRect();
+  if (e.clientX >= rect.left + screen.clientWidth || e.clientY >= rect.top + screen.clientHeight) return;
+  panDrag = {id:e.pointerId, x:e.clientX, y:e.clientY, left:screen.scrollLeft, top:screen.scrollTop};
+  screen.focus({preventScroll:true});
+  screen.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+screen.addEventListener('pointermove', e => {
+  if (panDrag?.id === e.pointerId && screen.dataset.localPan === 'true') {
+    screen.scrollTo(panDrag.left + panDrag.x - e.clientX, panDrag.top + panDrag.y - e.clientY);
+  }
+});
+screen.addEventListener('lostpointercapture', () => { panDrag = null; });
 
 function canExchange() {
   return liveConnected && controlled && !stills && rfb && !rfb.viewOnly;
@@ -94,7 +141,7 @@ function cleanup() {
   clearTimeout(timer);
   if (rfb) { rfb.disconnect(); rfb = null; }
   if (frameUrl) { URL.revokeObjectURL(frameUrl); frameUrl = null; }
-  screen.replaceChildren();
+  screen.replaceChildren(); syncPan();
   mode.disabled = true; control.disabled = true; textForm.hidden = true;
   return session;
 }
@@ -105,6 +152,8 @@ function syncControl(state) {
   control.disabled = state.kind === 'x11' && state.agentPausable === false;
   control.textContent = controlled ? '交还输入' : '接管输入';
   if (rfb) rfb.viewOnly = !controlled;
+  if (!controlled) panRequested = false;
+  syncPan();
   textForm.hidden = !(controlled && stills);
   syncClipboard();
 }
@@ -120,10 +169,10 @@ function openLiveSocket(n) {
   const client = new RFB(screen, url.href);
   rfb = client;
   const current = () => n === session && client === rfb;
-  client.scaleViewport = true; client.resizeSession = false; client.viewOnly = !controlled;
+  client.scaleViewport = desktopScale.value === 'fit'; client.resizeSession = false; client.viewOnly = !controlled;
   client.addEventListener('connect', () => {
     if (!current()) return;
-    liveConnected = true; syncClipboard();
+    liveConnected = true; syncPan(); syncClipboard();
     status.textContent = controlled ? '已接管输入' : '正在观看';
   });
   client.addEventListener('clipboard', e => {
@@ -161,9 +210,9 @@ async function showFrames() {
   const n = cleanup();
   stills = true; mode.disabled = false; mode.textContent = '切回实时';
   syncControl(desktop); status.textContent = '连接逐帧模式…';
-  const img = new Image(); img.tabIndex = 0; img.alt = '云端 Linux 屏幕';
-  screen.replaceChildren(img);
-  let reading = false;
+  const img = new Image(); img.tabIndex = 0; img.draggable = false; img.alt = '云端 Linux 屏幕';
+  screen.replaceChildren(img); syncPan();
+  let reading = false, frameWidth = 0, frameHeight = 0;
   async function refresh() {
     clearTimeout(timer);
     if (reading || n !== session) return;
@@ -174,8 +223,19 @@ async function showFrames() {
         if (!r.ok) throw Error((await r.json()).error || '获取画面失败');
         const blob = await r.blob();
         if (n !== session) return;
-        const old = frameUrl; frameUrl = URL.createObjectURL(blob); img.src = frameUrl;
-        if (old) URL.revokeObjectURL(old);
+        const nextUrl = URL.createObjectURL(blob);
+        try {
+          // Keep the previous frame and its input coordinates available while decoding.
+          const next = new Image(); next.src = nextUrl;
+          await next.decode();
+          if (n !== session) return;
+          const old = frameUrl;
+          frameWidth = next.naturalWidth; frameHeight = next.naturalHeight;
+          frameUrl = nextUrl; img.src = nextUrl;
+          if (old) URL.revokeObjectURL(old);
+        } finally {
+          if (frameUrl !== nextUrl) URL.revokeObjectURL(nextUrl);
+        }
         status.textContent = controlled ? '逐帧控制' : '逐帧观看';
       }
     } catch(e) { if (n === session) status.textContent = e.message; }
@@ -196,20 +256,23 @@ async function showFrames() {
     });
     return chain;
   };
-  function point(e) {
+  function sendClick(e, button) {
     const r = img.getBoundingClientRect();
-    return {x:Math.floor((e.clientX-r.x)*img.naturalWidth/r.width),y:Math.floor((e.clientY-r.y)*img.naturalHeight/r.height)};
+    if (!r.width || !r.height || !frameWidth || !frameHeight) return;
+    const x = Math.floor((e.clientX-r.x)*frameWidth/r.width);
+    const y = Math.floor((e.clientY-r.y)*frameHeight/r.height);
+    if (x >= 0 && x < frameWidth && y >= 0 && y < frameHeight) sendInput({key:'click',button,x,y});
   }
-  img.onclick = e => { img.focus(); sendInput({key:'click',button:1,...point(e)}); };
-  img.oncontextmenu = e => { e.preventDefault(); sendInput({key:'click',button:3,...point(e)}); };
+  img.onclick = e => { img.focus({preventScroll:true}); sendClick(e, 1); };
+  img.oncontextmenu = e => { e.preventDefault(); sendClick(e, 3); };
   let wheelAt = 0;
   img.onwheel = e => {
-    if (!controlled || !e.deltaY) return;
-    e.preventDefault(); if (performance.now() - wheelAt < 150) return;
-    wheelAt = performance.now(); sendInput({key:'click',button:e.deltaY<0?4:5,...point(e)});
+    if (!controlled || screen.dataset.localPan === 'true') return;
+    e.preventDefault(); if (!e.deltaY || performance.now() - wheelAt < 150) return;
+    wheelAt = performance.now(); sendClick(e, e.deltaY<0?4:5);
   };
   img.onkeydown = e => {
-    if (!controlled || e.isComposing || e.repeat) return;
+    if (!controlled || screen.dataset.localPan === 'true' || e.isComposing || e.repeat) return;
     const names = {Enter:'Return',Backspace:'BackSpace',Escape:'Escape',Tab:'Tab',ArrowUp:'Up',ArrowDown:'Down',ArrowLeft:'Left',ArrowRight:'Right',Delete:'Delete',Home:'Home',End:'End',' ':'space'};
     const key = names[e.key] || (/^[A-Za-z0-9]$/.test(e.key) ? e.key : null);
     if (!key) return;

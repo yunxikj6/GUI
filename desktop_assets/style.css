@@ -1,9 +1,14 @@
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
+html,body{height:100%;margin:0}body{overflow:hidden}
 body{background:#182130;color:#f2f5fa;font:14px "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;display:flex;flex-direction:column}
 header{background:#fbfcff;color:#263345;display:flex;align-items:center;gap:16px;min-height:58px;padding:8px 20px;flex-wrap:wrap;border-bottom:1px solid #d6dce7}
 h1{font-size:17px;margin:0;letter-spacing:-.02em}.back{color:#40527b;text-decoration:none;font-weight:600}.separator{height:21px;border-left:1px solid #d9dfeb}#status{font-size:13px;color:#5c687c}
-.toolbar{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px}button{font:inherit;border:1px solid #ccd4e3;border-radius:6px;background:white;color:#23324b;padding:7px 11px;cursor:pointer}
+.toolbar{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.scale-choice{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+#desktopScale{font:inherit;padding:6px 3px;color:inherit;background:white;border:1px solid #ccd4e3;border-radius:6px}
+#panView[aria-pressed=true]{background:#dce6ff;border-color:#6782ba}
+#desktopScale:focus-visible,#screen:focus-visible{outline:3px solid #7a8df2;outline-offset:-3px}
+button{font:inherit;border:1px solid #ccd4e3;border-radius:6px;background:white;color:#23324b;padding:7px 11px;cursor:pointer}
 button:hover{background:#eef1fb}button:disabled{opacity:.5;cursor:default}
 button:focus-visible,a:focus-visible,input:focus-visible,#screen img:focus-visible{outline:3px solid #7a8df2;outline-offset:1px}
 #clipboardPanel{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;overflow:auto;max-height:48vh;padding:12px 20px;background:#f1f4fa;color:#344056;border-bottom:1px solid #cbd3e1}
@@ -14,8 +19,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,#screen img:focus-visib
 #clipboardStatus{grid-column:1/-1;margin:0;font-size:13px}
 #clipboardStatus:empty{display:none}
 @media(max-width:550px){#clipboardPanel{grid-template-columns:1fr;padding:10px}#clipboardPanel textarea{height:3.6em}}
-#screen{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden}
-#screen img{display:block;max-width:100%;max-height:100%;width:auto;height:auto}
+#screen{flex:1 1 0;min-width:0;min-height:0;width:100%;display:flex;overflow:hidden;overscroll-behavior:contain}
+#screen img{display:block;flex:none;margin:auto;max-width:100%;max-height:100%;width:auto;height:auto}
+#screen[data-scale=original]{overflow:auto}
+#screen[data-scale=original] img{max-width:none;max-height:none}
+#screen[data-scale=original] > div{min-width:100%;min-height:100%;flex:none;width:max-content!important;height:max-content!important;overflow:visible!important}
+#screen[data-scale=original] canvas{flex:none}
+#screen[data-local-pan=true]{cursor:grab;touch-action:none}
+#screen[data-local-pan=true]:active{cursor:grabbing}
+#screen[data-local-pan=true] > *{pointer-events:none}
+#screen[data-local-pan=false][data-scale=original] img{touch-action:none}
+#panHint{flex:none;margin:0;padding:4px 10px;font-size:12px;color:#cad6ea;background:#202c3e}
 #textForm{display:flex;align-items:center;gap:12px;background:#f1f4fa;color:#344056;padding:8px 16px}
 #textForm[hidden]{display:none}input{flex:1;min-width:80px;padding:8px;border:1px solid #ccd4e3;border-radius:4px}
 @media(max-width:720px){header{gap:8px;padding:8px 10px}.toolbar{width:100%;margin:0}.separator{display:none}#textForm label{display:none}}

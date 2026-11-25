@@ -3,7 +3,7 @@
 <title>Linux 桌面 · 云端工作区</title><link rel="stylesheet" href="/desktop/style.css"></head>
 <body><header><a class="back" href="/workbench/" aria-label="打开项目工作台">工作台</a><span class="separator"></span>
 <h1>Linux 桌面</h1><span id="status" role="status">正在连接</span>
-<div class="toolbar"><button id="control" disabled>接管输入</button><button id="clipboardToggle" hidden aria-controls="clipboardPanel" aria-expanded="false">剪贴板</button><button id="mode" disabled>逐帧查看</button><button id="retry">重新连接</button></div></header>
+<div class="toolbar"><label class="scale-choice">显示比例 <select id="desktopScale" aria-label="桌面显示比例"><option value="fit">适应窗口</option><option value="original">原始大小</option></select></label><button id="panView" hidden aria-pressed="false" aria-controls="screen">本地平移</button><button id="control" disabled>接管输入</button><button id="clipboardToggle" hidden aria-controls="clipboardPanel" aria-expanded="false">剪贴板</button><button id="mode" disabled>逐帧查看</button><button id="retry">重新连接</button></div></header>
 <section id="clipboardPanel" aria-label="实时桌面剪贴板" hidden>
   <div><label for="clipboardSendText">发送到云端的文本</label>
     <textarea id="clipboardSendText" rows="3" placeholder="在此粘贴或输入文本" spellcheck="false" autocomplete="off"></textarea>
@@ -13,6 +13,7 @@
     <button id="clipboardCopy" disabled>复制到本机</button></div>
   <p id="clipboardStatus" role="status"></p>
 </section>
-<main id="screen" aria-label="云端 Linux 桌面"></main>
+<main id="screen" tabindex="0" aria-label="云端 Linux 桌面" aria-describedby="panHint"></main>
+<p id="panHint" hidden></p>
 <form id="textForm" hidden><label for="typing">发送到云端输入框</label><input id="typing" autocomplete="off" maxlength="2048"><button type="submit">发送文字</button></form>
 <script type="module" src="/desktop/viewer.js"></script></body></html>
