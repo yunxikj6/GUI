@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("local_gnome", ROOT / "linux/gnome_session.py")
@@ -92,3 +92,38 @@ esac""",
             self.assertEqual(launched.returncode, 7, launched.stderr)
             self.assertEqual(Path(checkpoint.read_text()).name, "wayland-0")
             self.assertFalse(Path(checkpoint.read_text()).parent.exists())
+
+    def test_nested_initial_mode_uses_x11_workarea_in_current_coordinates(self):
+        for area, expected in [((1920, 1080), "1888x1016"), ((1280, 720), "1248x656"),
+                               ((3840, 2160), "3808x2096"), ((640, 480), "608x420"),
+                               (None, None)]:
+            with self.subTest(area=area), patch.dict(os.environ, {"GDK_SCALE":"2"}, clear=True), \
+                    patch.object(gnome, "parent_workarea", return_value=area):
+                self.assertEqual(gnome.nested_mode("GNOME Shell 46.0", "--nested"), expected)
+
+    def test_nested_mode_preserves_explicit_configuration_and_other_shells(self):
+        for version, backend, env in [
+            ("GNOME Shell 48.2", "--nested", {}), ("GNOME Shell 46.0", "--devkit", {}),
+            ("GNOME Shell 46", "--nested", {"MUTTER_DEBUG_DUMMY_MODE_SPECS": "1200x750"}),
+            ("GNOME Shell 46.9", "--nested", {"MUTTER_DEBUG_DUMMY_MONITOR_SCALES": "2"}),
+            ("GNOME Shell 46", "--nested", {"MUTTER_DEBUG_NUM_DUMMY_MONITORS": "2"}),
+        ]:
+            with self.subTest(version=version, env=env), patch.dict(os.environ, env, clear=True), \
+                    patch.object(gnome, "parent_workarea", side_effect=AssertionError("unexpected size probe")):
+                self.assertIsNone(gnome.nested_mode(version, backend))
+
+    def test_x11_size_probe_keeps_apps_backend_preference(self):
+        api = Mock()
+        def open_display(name):
+            self.assertEqual(name, b":9")
+            self.assertEqual(os.environ["GDK_BACKEND"], "x11")
+            return None
+        api.gdk_display_open.side_effect = open_display
+        for preference in ["wayland", None]:
+            env = {"DISPLAY": ":9"}
+            if preference:
+                env["GDK_BACKEND"] = preference
+            with self.subTest(preference=preference), patch.dict(os.environ, env, clear=True), \
+                    patch.object(gnome.ctypes, "CDLL", return_value=api):
+                self.assertIsNone(gnome.parent_workarea())
+                self.assertEqual(os.environ.get("GDK_BACKEND"), preference)

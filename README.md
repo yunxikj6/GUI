@@ -8,9 +8,13 @@ Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面�
 
 ![Ubuntu 桌面上双击 Claude 后打开的官方程序，左上角是实际展开的应用菜单](docs/native-ubuntu-claude-menu.png)
 
-在 Ubuntu 24.04.5 上，从 GNOME 的“活动”启动 Claude 后，已核对运行中的程序与厂商软件包的 SHA-256。上图是退出后双击桌面图标重新打开程序，展开官方菜单时的登录前画面。Windows 上的 WSLg、ChatGPT 实际窗口和已登录对话仍待实机验收。[Ubuntu 桌面原图](docs/native-ubuntu-desktop.png) · [验收记录](docs/measurements/native-workspace.json)
+在 Ubuntu 24.04.5 上，从 GNOME 的“活动”启动 Claude 后，已核对运行中的程序与厂商软件包的 SHA-256。上图是退出后双击桌面图标重新打开程序，展开官方菜单时的登录前画面。另一次在全新用户目录里断网后双击启动，Claude 显示了自己的连接错误页，同一窗口仍能展开 File 子菜单。[断网冷启动原图](docs/native-ubuntu-claude-offline-menu.png)
+
+Windows 上的 WSLg、ChatGPT 实际窗口和已登录对话仍待实机验收。[Ubuntu 桌面原图](docs/native-ubuntu-desktop.png) · [验收记录](docs/measurements/native-workspace.json)
 
 ## 工作区连接
+
+在“活动”里打开 **InstaBox 项目文件**，首次使用时选择云机和项目目录。选中的云端文本会出现在 Ubuntu 文件管理器里。双击即可用本机编辑器打开。Ctrl+S 保存到本机，在文件上右键选 **脚本 → 保存到 InstaBox** 才会更新云端。实际云机已独立核对编辑后的字节。[首次连接与使用方法](docs/native-project-files.md) · [编辑器实拍](docs/native-cloud-file-edit.png)
 
 通过官方客户端的本地 MCP 连接访问指定的 InstaBox 项目。默认可以查看目录、读取 UTF-8 文本和查询云端 Git 状态。显式启用保存后，修改已有文件时会核对读取版本。实测从云机读回了保存的字节，也验证了旧版本写入会收到冲突。ChatGPT 的本地连接适用于桌面端的 Codex 项目。[配置与账户范围](docs/official-client-workspace.md)
 

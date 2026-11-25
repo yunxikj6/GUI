@@ -59,6 +59,72 @@ def has_x_display():
     return False
 
 
+def parent_workarea():
+    """Return the primary X11 monitor's usable rectangle in the parent's coordinate space."""
+    class Rectangle(ctypes.Structure):
+        _fields_ = [(field, ctypes.c_int) for field in ("x", "y", "width", "height")]
+
+    pointer = ctypes.c_void_p
+    try:
+        gdk = ctypes.CDLL("libgdk-3.so.0")
+        for name, args, result in (
+            ("gdk_display_open", [ctypes.c_char_p], pointer),
+            ("gdk_x11_display_set_window_scale", [pointer, ctypes.c_int], None),
+            ("gdk_display_get_primary_monitor", [pointer], pointer),
+            ("gdk_display_get_monitor", [pointer, ctypes.c_int], pointer),
+            ("gdk_monitor_get_workarea", [pointer, ctypes.POINTER(Rectangle)], None),
+            ("gdk_display_close", [pointer], None),
+        ):
+            function = getattr(gdk, name)
+            function.argtypes, function.restype = args, result
+    except (OSError, AttributeError):
+        return None
+    name = os.environ.get("DISPLAY")
+    if not name:
+        return None
+    # This launcher is single-threaded. Query the parent X11 display even if the
+    # user's apps prefer Wayland, then restore their original backend preference.
+    previous_backend = os.environ.get("GDK_BACKEND")
+    try:
+        os.environ["GDK_BACKEND"] = "x11"
+        display = gdk.gdk_display_open(os.fsencode(name))
+    finally:
+        if previous_backend is None:
+            del os.environ["GDK_BACKEND"]
+        else:
+            os.environ["GDK_BACKEND"] = previous_backend
+    if not display:
+        return None
+    try:
+        # GDK's application-pixel scale applies only to this query connection. Mutter
+        # expects X11 window coordinates, which WSLg may already have scaled.
+        gdk.gdk_x11_display_set_window_scale(display, 1)
+        monitor = gdk.gdk_display_get_primary_monitor(display) or gdk.gdk_display_get_monitor(display, 0)
+        if monitor:
+            area = Rectangle()
+            gdk.gdk_monitor_get_workarea(monitor, ctypes.byref(area))
+            if area.width > 0 and area.height > 0:
+                return area.width, area.height
+    finally:
+        gdk.gdk_display_close(display)
+    return None
+
+
+def nested_mode(version, backend):
+    # GNOME 46's X11 nesting backend defaults to a fixed 800x600 fake monitor.
+    if backend != "--nested" or not re.match(r"^GNOME Shell 46(?:\.|$)", version):
+        return None
+    if any(key.startswith(("MUTTER_DEBUG_DUMMY_", "MUTTER_DEBUG_NUM_DUMMY_", "MUTTER_DEBUG_TILED_DUMMY_"))
+           for key in os.environ):
+        return None
+    area = parent_workarea()
+    if not area:
+        return None
+    width, height = area
+    # Leave space for the parent window's borders and title bar, including on small displays.
+    return f"{width - min(32, width // 12)}x{height - min(64, height // 8)}"
+
+
 def socket_path(value, directory):
     if not value:
         return None
@@ -129,6 +195,7 @@ def main():
         for name in ("DISPLAY", "WAYLAND_SOCKET", "SESSION_MANAGER", "DESKTOP_STARTUP_ID"):
             env.pop(name, None)
         env.update(WAYLAND_DISPLAY=child_display, XDG_RUNTIME_DIR=runtime or private_dir,
+                   CLOUDWORKSPACE_NESTED_GNOME="1",
                    XDG_SESSION_TYPE="wayland", GNOME_SHELL_SESSION_MODE=mode,
                    XDG_CURRENT_DESKTOP="ubuntu:GNOME" if mode == "ubuntu" else "GNOME")
         # D-Bus activated Wayland applications must inherit the child display. Only the compositor
@@ -136,6 +203,9 @@ def main():
         parent_env = ["WAYLAND_DISPLAY=" + str(wayland)] if wayland else ["-u", "WAYLAND_DISPLAY"]
         if os.environ.get("DISPLAY"):
             parent_env.append("DISPLAY=" + os.environ["DISPLAY"])
+        initial_mode = nested_mode(version, backend)
+        if initial_mode:
+            parent_env.append("MUTTER_DEBUG_DUMMY_MODE_SPECS=" + initial_mode)
         cmd = ["env", *parent_env, shell, backend, "--wayland", "--wayland-display=" + child_display]
         if backend == "--nested" and "--sm-disable" in flags:
             cmd.append("--sm-disable")

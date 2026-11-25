@@ -1,0 +1,76 @@
+{
+  "ubuntu": "24.04.5",
+  "editor": "/usr/bin/gnome-text-editor",
+  "sameChildWayland": true,
+  "seedBytes": 22,
+  "nativeSavedBytes": 40,
+  "cloudReadbackSha256": "e550f981acc5cdde0b9465fc3fdd431a002b542ba0e7d1be55cbe4b068ac3aa7",
+  "source": "private GNOME Secret Service session collection",
+  "publishedVia": "Nautilus Scripts menu",
+  "staleWriteRejected": true,
+  "originalDraftPreserved": true,
+  "refreshedCopyPublished": true,
+  "guest": "Ubuntu Base 24.04.5 amd64 on a private Linux display",
+  "editorPackage": "gnome-text-editor 46.3-0ubuntu2",
+  "fileManagerForEdit": "Ubuntu Nautilus 46.4",
+  "saveMenuEnvironment": "Ubuntu 24.04.5 Nautilus 46.4 on the same local GNOME display and in the same Files window used to open the document",
+  "remoteFileTransport": "InstaBox official HTTPS exec API",
+  "cloudBytesBeforeExplicitPublish": 22,
+  "remoteVerification": "Independent cloud Python process read the actual bytes on disk",
+  "screenshot": "../native-cloud-file-edit.png",
+  "windowsWslgTested": false,
+  "editorNetwork": "normal Linux test display",
+  "offlineEdit": {
+    "interfaceNames": [
+      "lo"
+    ],
+    "ipv4Routes": 0,
+    "openedBy": "Ubuntu Nautilus double click",
+    "savedBy": "GNOME Text Editor Ctrl+S",
+    "editedBytes": 40,
+    "cloudBytesBeforeExplicitPublish": 22,
+    "independentCloudDigestMatched": true
+  },
+  "firstConnectionUi": {
+    "nativeDialog": "Ubuntu Noble Zenity 4.0.1",
+    "outcomes": {
+      "cancel-0": false,
+      "cancel-1": false,
+      "cancel-2": false,
+      "cancel-3": false,
+      "cancel-4": false,
+      "default-cancel": false,
+      "accept": true,
+      "markup-cancel": false
+    },
+    "syntheticCallbacks": true
+  },
+  "secretService": {
+    "provider": "Ubuntu GNOME Keyring 46.1-2ubuntu0.2",
+    "privateBusAndUserBusSeparate": true,
+    "concurrentReadsWithSameUnlockedUserCollection": true,
+    "graphicalShellBusRetained": true,
+    "terminalStoreKeyExit": 0,
+    "cancelledNewKeyringPrompt": {
+      "realPromptObserved": true,
+      "action": "Escape",
+      "storeKeyExit": 1,
+      "defaultAbsentAfterCancel": true,
+      "syntheticValueEchoed": false
+    }
+  },
+  "coldFilesOpen": {
+    "test": "Noble nested desktop with an existing outer GNOME Keyring, unmodified distribution portals",
+    "showItems": {
+      "return_code": 0,
+      "elapsed": 28.16
+    },
+    "timeoutSeconds": 45,
+    "liveCloudTestSeconds": 27.61
+  },
+  "firstRunUsedNativeDialogsAndExistingSecret": true,
+  "sameNautilusWindowForEditAndPublish": true,
+  "gnomeNotificationReceived": true,
+  "saveMenuScreenshot": "../native-cloud-file-menu.png",
+  "gnomeActivitiesAndNativeCloudPicker": true
+}

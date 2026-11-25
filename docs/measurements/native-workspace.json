@@ -18,11 +18,17 @@
       "type": "apt-get --simulate",
       "ubuntuBase": "24.04.5 amd64",
       "aptVersion": "2.8.3",
-      "requestedPackages": 17,
-      "installedPlan": 493,
-      "upgradedPlan": 2,
+      "requestedPackages": 24,
+      "installedPlan": 521,
+      "upgradedPlan": 3,
       "removedPlan": 0,
-      "exitCode": 0
+      "exitCode": 0,
+      "certificateStore": {
+        "caFile": "/usr/lib/ssl/cert.pem",
+        "systemBundle": "/etc/ssl/certs/ca-certificates.crt",
+        "trustedAuthorities": 120,
+        "pythonDefaultCheckHostname": true
+      }
     },
     "firstRun": {
       "previousDesktopPresent": false,
@@ -31,7 +37,9 @@
       "gioTrusted": true,
       "registeredApplication": "com.anthropic.Claude.desktop",
       "windowsAppsInstalledInFixture": false
-    }
+    },
+    "initialWindowSizeRecord": "native-gnome-window-size.json",
+    "projectFilesRecord": "native-project-files.json"
   },
   "claudeDesktop": {
     "debianPackage": "claude-desktop",
@@ -68,6 +76,27 @@
       "observedSecondsAfterWelcome": 40,
       "configuredStdioProcessStarts": 0,
       "postLoginTested": false
+    },
+    "offlineColdStart": {
+      "profile": "new local Ubuntu user profile",
+      "networkInterfaces": [
+        "lo"
+      ],
+      "ipv4AndIpv6DefaultRoute": false,
+      "ui": "Desktop double click opened the official error page. The File menu and submenu opened in the same window.",
+      "mainMessage": "Couldn't connect to Claude",
+      "error": "ERR_INTERNET_DISCONNECTED",
+      "loginAndChatTested": false,
+      "screenshot": "../native-ubuntu-claude-offline-menu.png",
+      "screenshotSha256": "872ce370b1ba161598335c2f151a76d7b0cba47e3c7a3181b65c106589791e4e",
+      "mainPidInTestNamespace": 281,
+      "runningExecutableSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+      "matchesSignedPackage": true,
+      "rendererSeccomp": [
+        2,
+        2
+      ],
+      "noNewPrivilegesOnRenderers": true
     }
   },
   "workspaceMcp": {
@@ -117,8 +146,11 @@
     }
   },
   "pythonRegression": {
-    "passed": 198,
+    "passed": 241,
     "skipped": 0,
-    "testedSourceArchive": "8867dc8fea856b819509ff28c46b8904e1166f32"
+    "snapshotFiles": 183,
+    "affectedModuleRerunPassed": 57,
+    "affectedModuleRerunSkipped": 0,
+    "verification": "Linux regression followed by targeted checks of working-tree updates. Windows interactive coverage is recorded separately."
   }
 }

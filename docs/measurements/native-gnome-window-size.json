@@ -1,0 +1,66 @@
+{
+  "parent": "Private Linux Xvfb + Xfwm4 with an isolated X11 session",
+  "guest": "Ubuntu 24.04.5 amd64, GNOME Shell 46.0, Mutter 46.2, --nested",
+  "baselineCommit": "4e646fa",
+  "windowsWSLgTested": false,
+  "startupComparisons": [
+    {
+      "parentPixels": "1920x1080",
+      "beforeClientPixels": [
+        800,
+        600
+      ],
+      "afterClientPixels": [
+        1888,
+        1016
+      ]
+    },
+    {
+      "parentPixels": "1280x720",
+      "beforeClientPixels": [
+        800,
+        600
+      ],
+      "afterClientPixels": [
+        1248,
+        656
+      ]
+    }
+  ],
+  "additionalCases": [
+    {
+      "parentPixels": "3840x2160",
+      "clientPixels": [
+        3808,
+        2096
+      ],
+      "GDK_SCALE": "2",
+      "GDK_BACKEND": "wayland"
+    },
+    {
+      "parentPixels": "1600x900",
+      "clientPixels": [
+        1024,
+        700
+      ],
+      "explicitMutterMode": "1024x700"
+    },
+    {
+      "parentPixels": "1920x1080",
+      "clientPixels": [
+        1888,
+        936
+      ],
+      "parentWorkareaPixels": [
+        1920,
+        1000
+      ]
+    }
+  ],
+  "allRuns": {
+    "count": 7,
+    "clientMinimumAndMaximumEqualInitialSize": true,
+    "resizeAndMaximizeChangedClientSize": false,
+    "windowManagerCloseExitCode": 0
+  }
+}

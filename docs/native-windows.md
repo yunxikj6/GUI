@@ -15,7 +15,8 @@ sudo apt update
 sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-settings gnome-shell-extension-ubuntu-dock \
   gnome-shell-extension-appindicator gnome-shell-extension-desktop-icons-ng \
   yaru-theme-gtk yaru-theme-icon ubuntu-wallpapers-noble fonts-ubuntu nautilus gvfs \
-  xdg-user-dirs dbus-daemon x11-utils xwayland libgl1-mesa-dri
+  xdg-user-dirs dbus-daemon x11-utils xwayland libgl1-mesa-dri \
+  gnome-text-editor zenity gnome-keyring python3-keyring libnotify-bin fonts-noto-cjk ca-certificates
 ```
 
 ## 打开原版应用
@@ -23,8 +24,11 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
 - **Claude**。在 Ubuntu 安装 Anthropic 官方 `claude-desktop` 软件包。在 GNOME 的“活动”内搜索 Claude，然后按 Enter。Linux 客户端使用自己的窗口和账户。若 Ubuntu 没有安装它，桌面提供 Microsoft Store 版 Claude 的启动入口。独立安装的 Windows 版也可从 Windows 开始菜单打开。[Anthropic 官方安装说明](https://support.claude.com/en/articles/10065433-install-claude-desktop)
 - **ChatGPT**。通过 OpenAI 的下载入口在 Microsoft Store 安装官方桌面应用。在 GNOME 的“活动”内搜索 ChatGPT 并打开 Windows 版。窗口交由 Windows 管理，可以用 Windows 任务栏或 Alt+Tab 切换；它不会出现在 Ubuntu 的窗口概览里。[OpenAI 官方下载](https://chatgpt.com/download/)
 - **项目数据**。需要使用 InstaBox 时，为对应的官方客户端配置工作区连接。云端文件路径、Git 状态和保存结果来自所选云机。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
+- **在 Ubuntu 直接编辑项目文件**。完成绑定后，在“活动”打开 InstaBox 项目文件，从云端选一个文件，双击本地工作副本即可用系统编辑器修改。客户端会话和文件管理器可以独立使用。[原生文件操作](native-project-files.md)
 
 在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py` 启动本地会话。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。
+
+Ubuntu 24.04 的 GNOME Shell 46 启动时读取父显示的可用区域，给桌面边框和任务栏留出空间。Linux 嵌套窗口实测在 1920×1080 显示上得到 1888×1016 的桌面，在 1280×720 上得到 1248×656。这个版本的 Mutter 在运行中固定嵌套窗口大小，更换显示后可关闭再打开。Windows 的显示缩放仍需实机验证。[逐项测量](measurements/native-gnome-window-size.json)
 
 当 WSLg 把父 X11 套接字目录挂为只读时，工作区使用 Wayland 运行 Ubuntu 内的应用。已在该条件下打开 Nautilus 和官方 Claude。仅支持 X11 的 Linux 程序需要可用的嵌套 Xwayland。
 
@@ -32,6 +36,7 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
 
 - 在 Ubuntu 24.04.5 的 GNOME Shell 46.0 上，使用 Dock 中的原版文件管理器新建了目录并核对了磁盘结果。随后通过“活动”启动了 Anthropic 官方签名的 Claude Desktop 6.28899.6。程序映像与签名软件包中的文件摘要相同。[Ubuntu 桌面截图](native-ubuntu-desktop.png) · [Claude 窗口截图](native-ubuntu-claude.png)
 - 退出 Claude 后，双击桌面图标会重新打开客户端。登录前就可以展开原厂菜单，实测包含 File、Edit、View、Go、Help。[桌面图标打开的 Claude 菜单](native-ubuntu-claude-menu.png)
+- 在只有回环接口、没有对外 IP 路由的 Ubuntu 环境中，用全新用户配置双击启动官方 Claude。窗口显示 `ERR_INTERNET_DISCONNECTED`，本机仍可展开 File 菜单和子菜单。[离线原始截图](native-ubuntu-claude-offline-menu.png)
 - 客户端保持沙盒与 TLS 校验，验收到公开欢迎页。登录后的侧栏、聊天记录及 Artifacts 仍需获授权账户验收。
 - Windows 启动程序已按 x64、ARM64 构建并检查 PE 的 GUI 子系统。当前测试机是 Linux。Windows 11 上的实际 WSLg 窗口、真实 ChatGPT 窗口及端到端焦点切换尚待真机验证。
 

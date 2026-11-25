@@ -24,6 +24,11 @@ fi
 /bin/bash ./start-gnome.sh --check
 if "$check"; then exit 0; fi
 if "$wsl"; then
+    python3 ../native_files.py relink --offer-setup || echo '云项目文件入口未能更新。' >&2
+elif [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/cloudworkspace/native-files.json" ]]; then
+    python3 ../native_files.py relink || echo '云项目文件入口未能更新。' >&2
+fi
+if "$wsl"; then
     python3 ./install-app-launchers.py
     exec /bin/bash ./start-gnome.sh --desktop-shortcuts
 fi

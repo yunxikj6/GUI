@@ -4,20 +4,19 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections import OrderedDict
-from functools import cached_property
 import getpass
 import json
 import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import subprocess
 import sys
 from urllib.parse import quote_from_bytes
 import warnings
 
 from instabox import BridgeError, InstaBox, json_bytes
 
-APP = Path(__file__).resolve().parent
 VAULT_SERVICE = "InstaBox Workspace MCP"
 LIST = "list_workspace_directory"
 READ = "read_workspace_text"
@@ -25,19 +24,72 @@ GIT_STATUS = "get_workspace_git_status"
 SAVE = "save_workspace_text"
 
 
+def private_user_bus():
+    uid = os.getuid()
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{uid}")
+    # WSLg may export its shared display runtime while systemd's per-user bus lives separately.
+    if os.environ.get("CLOUDWORKSPACE_NESTED_GNOME") == "1" and runtime == Path("/mnt/wslg/runtime-dir"):
+        runtime = Path(f"/run/user/{uid}")
+    if not runtime.is_absolute():
+        raise ValueError("私有会话总线不可用。")
+    info = runtime.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid or info.st_mode & 0o077:
+        raise ValueError("私有会话总线不可用。")
+    bus = runtime / "bus"
+    socket_info = bus.lstat()
+    if not stat.S_ISSOCK(socket_info.st_mode) or socket_info.st_uid != uid:
+        raise ValueError("私有会话总线不可用。")
+    return "unix:path=" + quote_from_bytes(os.fsencode(bus), safe="/")
+
+
+class UserBusVault:
+    """Run only the upstream keyring operation on the user's stable bus, leaving GUI IPC intact."""
+    _worker = """import json, sys
+from keyring.backends.SecretService import Keyring
+method, arguments = json.load(sys.stdin)
+result = getattr(Keyring(), method)(*arguments)
+json.dump(result, sys.stdout, ensure_ascii=True)
+"""
+
+    def __init__(self, address):
+        self.address = address
+
+    def _request(self, method, *arguments):
+        # A key travels on anonymous pipes. Neither Python argv nor the environment carries it.
+        env = {**os.environ, "DBUS_SESSION_BUS_ADDRESS": self.address}
+        env.pop("INSTABOX_API_KEY", None)
+        reply = subprocess.run([sys.executable, "-B", "-c", self._worker], cwd="/", env=env,
+                               input=json.dumps([method, arguments]).encode("ascii"),
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        if reply.returncode:
+            raise RuntimeError("无法访问用户密钥环，或解锁已取消。")
+        return json.loads(reply.stdout)
+
+    def get_password(self, service, username):
+        return self._request("get_password", service, username)
+
+    def set_password(self, service, username, password):
+        self._request("set_password", service, username, password)
+
+    def delete_password(self, service, username):
+        self._request("delete_password", service, username)
+
+
 def system_vault():
     if sys.platform.startswith("linux"):
-        # Some desktop MCP hosts filter the session environment. Ubuntu's user
-        # bus has a stable socket inside the user-owned, private runtime directory.
-        if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
-            uid = os.getuid()
-            runtime = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{uid}")
-            bus = runtime / "bus"
-            info, socket_info = runtime.lstat(), bus.lstat()
-            if (not runtime.is_absolute() or not stat.S_ISDIR(info.st_mode) or info.st_uid != uid
-                    or info.st_mode & 0o077 or not stat.S_ISSOCK(socket_info.st_mode) or socket_info.st_uid != uid):
-                raise ValueError("私有会话总线不可用。")
-            os.environ["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=" + quote_from_bytes(os.fsencode(bus), safe="/")
+        current = os.environ.get("DBUS_SESSION_BUS_ADDRESS")
+        if os.environ.get("CLOUDWORKSPACE_NESTED_GNOME") == "1":
+            try:
+                address = private_user_bus()
+            except (OSError, ValueError):
+                if not current:
+                    raise
+            else:
+                if not current or current.split(",", 1)[0] != address:
+                    return UserBusVault(address)
+        if not current:
+            # A desktop MCP host may filter its bus variable. Recover the ordinary user socket.
+            os.environ["DBUS_SESSION_BUS_ADDRESS"] = private_user_bus()
         from keyring.backends.SecretService import Keyring
         return Keyring()
     if sys.platform == "win32":
@@ -78,10 +130,6 @@ class CloudFiles:
         self.transport = None
         self.lock = asyncio.Lock()
 
-    @cached_property
-    def worker_source(self):
-        return (APP / "cloud" / "workspace.py").read_text(encoding="utf-8")
-
     async def call(self, name, arguments):
         if name == LIST:
             request = {"op": "tree", "path": arguments.get("path", "")}
@@ -104,29 +152,18 @@ class CloudFiles:
             if self.transport is None:
                 key = await asyncio.to_thread(read_secret, self.machine, self.source)
                 self.transport = await asyncio.to_thread(InstaBox, key, self.machine, self.project)
-        # Execute the same worker in memory without initializing the selected project.
-        raw = await asyncio.to_thread(self.transport.exec,
-                                     ["python3", "-I", "-B", "-c", self.worker_source, "--stdin"],
-                                     json_bytes(request).decode("utf-8"),
-                                     envs={"CLOUD_WORKSPACE_ROOT": self.project})
-        try:
-            result = json.loads(raw)
-            if result["ok"] is False:
-                error = result["error"]
-                raise BridgeError(error["code"], error["message"])
-            data = result["data"]
-            if result["ok"] is not True or not isinstance(data, dict):
-                raise ValueError()
-            if name == READ and data.get("kind") != "text":
-                raise BridgeError("unsupported_file", "此工具仅读取 UTF-8 文本。")
-            if name == READ and self.allow_save:
+        data = await asyncio.to_thread(self.transport.file_request, request)
+        if name == READ and data.get("kind") != "text":
+            raise BridgeError("unsupported_file", "此工具仅读取 UTF-8 文本。")
+        if name == READ and self.allow_save:
+            try:
                 self.read_revisions[data["path"]] = data["revision"]
                 self.read_revisions.move_to_end(data["path"])
-                if len(self.read_revisions) > 1024:
-                    self.read_revisions.popitem(last=False)
-            return data
-        except (ValueError, TypeError, KeyError):
-            raise BridgeError("invalid_response", "未取得有效的工作区响应。") from None
+            except (KeyError, TypeError):
+                raise BridgeError("invalid_response", "未取得有效的工作区响应。") from None
+            if len(self.read_revisions) > 1024:
+                self.read_revisions.popitem(last=False)
+        return data
 
 
 async def serve(files):
@@ -218,7 +255,7 @@ def main():
             if args.credential_source == "environment":
                 print('env_vars = ["INSTABOX_API_KEY"]')
             elif sys.platform.startswith("linux"):
-                print('env_vars = ["DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR"]')
+                print('env_vars = ["DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "CLOUDWORKSPACE_NESTED_GNOME"]')
         else:
             print(json.dumps({"mcpServers": {"instabox-workspace": config}}, ensure_ascii=True, indent=2))
         return 0

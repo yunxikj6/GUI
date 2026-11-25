@@ -8,7 +8,8 @@ Windows 正常入口启动本机 Ubuntu GNOME，并从系统启动厂商提供�
 
 | 需要继续的工作 | 从哪里进入 | 已有证据 |
 | --- | --- | --- |
-| 本机界面、文件编辑和 Git 差异 | [前端](web/app.js)通过 [本机桥接](launcher.py) 的同源 `POST /api/rpc` 调用[文件服务](cloud/workspace.py) | 真机读写和冲突已测试；[浏览器回归](tests/test_browser.py)覆盖中文草稿、图片、窄屏和断线。 |
+| GNOME 原生项目文件 | [本机文件工作副本](native_files.py) 将指定云项目的文本交给 Nautilus 与本机编辑器 | [云机字节回读与并发修改验收](docs/native-project-files.md) |
+| 可选网页工作台的文件编辑和 Git 差异 | [前端](web/app.js)通过 [本机桥接](launcher.py) 的同源 `POST /api/rpc` 调用[文件服务](cloud/workspace.py) | 真机读写和冲突已测试；[浏览器回归](tests/test_browser.py)覆盖中文草稿、图片、窄屏和断线。 |
 | 编程助手和任务恢复 | [任务执行器](cloud/tasks.py)启动独立子进程，把请求、状态和输出写入 SQLite。客户端从事件游标补读 | [任务测试](tests/test_tasks.py)覆盖真实 Git 检查、并发去重、分页、进程终止和模型 CLI 替身；真实 CLI 的会话协议可用回环模型服务验证。在线账号的历史结果见[认证记录](docs/validation-reviewed-edits.md)。 |
 | 云机生命周期及适配其他主机 | [InstaBox 接入](instabox.py)负责选择、唤醒、按内容摘要安装工作进程，并用官方 HTTPS exec API 传输请求 | 真机挂起再恢复后，测试进程仍在，同一请求找回同一任务及全部 9 条事件。[实机记录](docs/validation.md) |
 | 原有 Linux 图形软件 | [桌面代理](desktop.py)和[查看器](desktop_assets/viewer.js)提供 noVNC 实时连接、逐帧备用模式和输入交接 | 两种模式都操作过真实 Xfce；[桌面模块测试](tests/test_desktop.py)覆盖资源、连接和输入处理。 |

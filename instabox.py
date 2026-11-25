@@ -1,6 +1,7 @@
 """InstaBox control-plane transport for a single private workspace."""
 from __future__ import annotations
 
+from functools import cached_property
 import gzip
 import hashlib
 import json
@@ -9,6 +10,7 @@ import socket
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path, PurePosixPath
@@ -57,30 +59,19 @@ print('ready')
 """
 
 
-class InstaBox:
+class InstaBoxAccount:
     base = 'https://api.instabox.sh'
 
-    def __init__(self, key: str, machine_id: str | None = None, project: str | None = None,
-                 *, source: Path | None = None):
+    def __init__(self, key: str):
         if not key.strip():
             raise BridgeError('missing_key', '需要 InstaBox API 密钥。')
-        self.project = project or '/data/cloud-workspace/project'
-        dest = PurePosixPath(self.project)
-        if not dest.is_absolute() or dest.parent == dest or '..' in dest.parts or chr(0) in self.project:
-            raise BridgeError('invalid_project', '请提供云机上项目的绝对目录。')
-        self.project = str(dest)
-        self.custom_project = project is not None
         self.key = key.strip()
-        machines = self.api('GET', '/v1/machines').get('machines', [])
-        if not machine_id and len(machines) != 1:
-            raise BridgeError('select_machine', '请用 --machine 指定已有 Linux 实例。')
-        self.machine_id = machine_id or machines[0]['id']
-        if not self.machine_id.startswith('m_') or not self.machine_id.replace('_', '').isalnum():
-            raise BridgeError('invalid_machine', '实例标识格式无效。')
-        self.path = '/v1/machines/' + self.machine_id
-        self.worker = None
-        self._source = source if source is not None else Path(__file__).resolve().parent / 'cloud'
-        self._setup_lock = threading.Lock()
+
+    def machine_page(self, cursor=None):
+        query = {'limit': 30}
+        if cursor is not None:
+            query['cursor'] = cursor
+        return self.api('GET', '/v1/machines?' + urllib.parse.urlencode(query))
 
     def api(self, method, path, body=None, timeout=45, headers=None):
         if not path.startswith('/v1/') or '#' in path:
@@ -106,6 +97,28 @@ class InstaBox:
         except (OSError, socket.timeout, ValueError, urllib.error.URLError) as exc:
             raise BridgeError('network', '无法取得 InstaBox 响应，请检查网络后重试。') from exc
 
+
+class InstaBox(InstaBoxAccount):
+    def __init__(self, key: str, machine_id: str | None = None, project: str | None = None,
+                 *, source: Path | None = None):
+        super().__init__(key)
+        self.project = project or '/data/cloud-workspace/project'
+        dest = PurePosixPath(self.project)
+        if not dest.is_absolute() or dest.parent == dest or '..' in dest.parts or chr(0) in self.project:
+            raise BridgeError('invalid_project', '请提供云机上项目的绝对目录。')
+        self.project = str(dest)
+        self.custom_project = project is not None
+        machines = self.api('GET', '/v1/machines').get('machines', [])
+        if not machine_id and len(machines) != 1:
+            raise BridgeError('select_machine', '请用 --machine 指定已有 Linux 实例。')
+        self.machine_id = machine_id or machines[0]['id']
+        if not self.machine_id.startswith('m_') or not self.machine_id.replace('_', '').isalnum():
+            raise BridgeError('invalid_machine', '实例标识格式无效。')
+        self.path = '/v1/machines/' + self.machine_id
+        self.worker = None
+        self._source = source if source is not None else Path(__file__).resolve().parent / 'cloud'
+        self._setup_lock = threading.Lock()
+
     def ensure_running(self):
         deadline = time.monotonic() + 150
         issued = False
@@ -129,6 +142,26 @@ class InstaBox:
         if result.get('timedOut') or result.get('truncated') or result.get('exitCode') != 0:
             raise BridgeError('worker_error', '云端工作进程未能返回完整结果。')
         return result.get('stdout', '')
+
+    @cached_property
+    def _file_worker(self):
+        return (self._source / 'workspace.py').read_text(encoding='utf-8')
+
+    def file_request(self, request):
+        """Run a scoped request against the existing project without initializing it."""
+        raw = self.exec(['python3', '-I', '-B', '-c', self._file_worker, '--stdin'],
+                        json_bytes(request).decode('utf-8'), envs={'CLOUD_WORKSPACE_ROOT': self.project})
+        try:
+            result = json.loads(raw)
+            if result['ok'] is False:
+                error = result['error']
+                if isinstance(error['code'], str) and isinstance(error['message'], str):
+                    raise BridgeError(error['code'], error['message'])
+            if result['ok'] is True and isinstance(result['data'], dict):
+                return result['data']
+        except (ValueError, TypeError, KeyError):
+            pass
+        raise BridgeError('invalid_response', '未取得有效的工作区响应。')
 
     def setup(self, source: Path):
         """Explicitly install and validate the selected version of the workspace tools."""

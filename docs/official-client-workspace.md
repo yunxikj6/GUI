@@ -13,7 +13,7 @@ python3 -m venv .venv-mcp
 .venv-mcp/bin/python workspace_mcp.py --machine m_example --project "/data/my-project" --print-config
 ```
 
-将示例机器标识和目录换成自己的现有项目。默认凭据源在 Linux 只使用当前用户 D-Bus 会话的 Secret Service。按提示解锁登录密钥环。若终端或 Claude Desktop 无法访问密钥环，请从同一个已登录的桌面用户会话启动，确认密钥环服务可用并解锁。适配器会在凭据库不可用时报错。宿主过滤会话环境变量时，适配器会检查当前用户的私有运行目录中的标准总线套接字。Ubuntu 的“密码和密钥”可管理该机器对应的 “InstaBox Workspace MCP” 条目。
+将示例机器标识和目录换成自己的现有项目。默认凭据源在 Linux 只使用当前用户 D-Bus 会话的 Secret Service。按提示解锁登录密钥环。若终端或 Claude Desktop 无法访问密钥环，请从同一个已登录的桌面用户会话启动，确认密钥环服务可用并解锁。适配器会在凭据库不可用时报错。宿主过滤会话环境变量时，适配器会检查当前用户私有运行目录中的标准总线套接字。由本工作区启动的嵌套 GNOME 会话也可通过此套接字访问同一个用户密钥环。文件管理器和通知使用嵌套桌面自己的会话总线。Ubuntu 的“密码和密钥”可管理该机器对应的 “InstaBox Workspace MCP” 条目。
 
 ## Windows 配置
 
