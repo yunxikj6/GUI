@@ -1,6 +1,6 @@
 # 云端工作台开发交接
 
-从这里接手工程，可以先运行本机模式完成一次“编辑 → 保存 → 查看差异 → 运行项目检查”，再用同一套界面连接 InstaBox。产品需求和完整场景见[需求与验收](docs/requirements.md)，用户启动说明见[README](README.md)。
+运行启动器可直接进入 InstaBox 的完整桌面。开发网页项目工作台时，可以用本机模式完成一次“编辑 → 保存 → 查看差异 → 运行项目检查”。产品需求和完整场景见[需求与验收](docs/requirements.md)，用户启动说明见[README](README.md)。
 
 ## 当前基线
 
@@ -28,10 +28,10 @@ python3 -m unittest discover -s tests -v
 python3 launcher.py --local --project "$(mktemp -d)/project" --no-browser
 ```
 
-真机验证使用带桌面的 Linux `agent-browser` 实例。在本机启动器的隐藏提示中输入 InstaBox 密钥，或通过环境变量 `INSTABOX_API_KEY` 提供。模型认证属于云机上的 Codex 或 Claude CLI。在账号只有一台实例时运行：
+真机验证使用带桌面的 Linux `agent-browser` 实例。在本机启动器的隐藏提示中输入 InstaBox 密钥，或通过环境变量 `INSTABOX_API_KEY` 提供。模型认证属于云机上的 Codex 或 Claude CLI。只有一台实例时，运行 `python3 launcher.py` 查看完整云桌面。要在项目工作台打开首轮交付的源码，可运行下列命令。
 
 ```sh
-python3 launcher.py --remote-project /data/cloud-workspace/source
+python3 launcher.py --workbench --remote-project /data/cloud-workspace/source
 ```
 
 这会打开首轮交付的 Git 源码工作副本。其中 `work` 分支固定在已部署的基线，后续从 GitHub 获取的新提交需单独同步。省略 `--remote-project` 会使用独立的示例仓库 `/data/cloud-workspace/project`；从多个实例中选择时加上 `--machine`。工作进程的版本目录在 `/data/cloud-workspace/runtime/`，原交付包在 `/data/cloud-workspace/releases/cloud-workbench.zip`。公开仓库只存放源码和可公开的结果；云机及模型访问使用各自的私有凭据。
@@ -70,6 +70,8 @@ Git 差异可按 `staged` 和 `unstaged` 分开读取。状态中的 `diffScopes
 
 ## 下一轮从哪里开始
 
-1. **闭合两种模型的成功路径。** 在各自已登录的测试环境里，分别从图形界面发送一条只读请求。以“真实回复可见、最终状态正确、刷新后输出完整、相同请求只执行一次”作为验收。保留 CLI 版本、事件种类和观察结果，账号凭据通过运行环境提供。
-2. **返回刚才读到的文件位置。** 在 4,800 行文件的第 6 页读到第 4,321 行，点开 README 或 Git 差异，再从文件树返回。即使工作进程确认文件未变，阅读器也会退回第 1 页并滚到开头。下一轮应能在同一标签页返回不变文件时继续读原位置，在文件缩短时落到有效行，并核对窄屏、项目切换和编辑草稿。
-3. **用对照实验证明下一类应用的收益。** 已有 GTK 实验显示，能显示原生控件和能获得本地文本选区是不同能力。以同一 Linux 应用比较工作区本地控件、完整 VNC 桌面、逐窗或工具包转发，再决定第二类应用和第二种主机后端。Windows、macOS 启动流程、真实中文输入法和公网弱网表现仍需实机覆盖。[实验条件与判据](docs/technology-review.md)
+用户选择先直接进入完整云桌面。默认启动地址为 `/desktop/`，已有会话先复用。原版 Thunar 的新建文件夹操作已在独立 InstaBox 显示上核对到磁盘。项目工作台从 `/workbench/` 进入。[桌面入口与原软件实测](docs/validation-desktop-entry.md)
+
+1. **核对完整桌面的日常操作。** 使用云机原软件复测键盘快捷键、中文输入法候选与提交、双向剪贴板、缩放和断线恢复。用户可见的延迟按首窗、菜单响应与保存确认分别测量，保留客户端系统和网络条件。
+2. **对照独立窗口。** 在同一测试文件上比较完整桌面和独立窗口。记录窗口所属进程、主窗口与对话框的关系、焦点切换和磁盘结果。分别注明本机实验或实际 InstaBox 云机。[实验条件与判据](docs/technology-review.md)
+3. **保留现有入口的回归。** 网页工作台已有独立的文件、差异和编程助手流程。真实模型账号成功路径、其他客户端系统及公网弱网体验仍需各自的验收环境。

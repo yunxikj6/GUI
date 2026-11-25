@@ -1,10 +1,16 @@
 # 云端工作台
 
-一个在本机浏览器中使用云端 Linux 项目的图形客户端。文件预览、编辑器、差异和编程助手输出由本机渲染。Linux 图形桌面可以在单独的窗口中打开，和这些工具访问同一台机器。
+连接 InstaBox 后，浏览器直接打开云机的完整 Linux 桌面。点击“接管输入”，就可以从 Xfce 的应用程序菜单打开原版软件。窗口、菜单和对话框由云机上的程序绘制，通过 noVNC 显示在本机。
+
+桌面顶栏的“工作台”可打开本项目提供的文件树、编辑器、Git 差异和助手记录。也可以用 `python3 launcher.py --workbench` 直接进入这个界面。
+
+目前转发的是整个桌面，各应用窗口由云端 Xfce 管理。Codex 和 Claude Code 的工作台入口调用各自的 CLI 并展示任务记录。如需它们自己的终端界面，可在云机的终端中运行对应命令；这与厂商的桌面应用是不同的产品形态。
 
 本分支支持 Codex 与 Claude Code 原生续聊、单文件修改审批、运行中任务取消和标签页草稿恢复。此前发布的独立下载包见 [0.1 发布页](https://github.com/yunxikj6/GUI/releases/tag/v0.1.0)。
 
-![在本机工作台查看 InstaBox 上的 Python 文件和项目检查记录](docs/workbench.png)
+![在 InstaBox 的原版 Thunar 中通过新建文件夹对话框创建目录后，目录已被选中](docs/thunar-cloud.png)
+
+图中是专用测试桌面上的 Thunar。通过它的“新建文件夹”对话框创建目录后，云机文件系统也读到了该目录。[实机验收](docs/validation-desktop-entry.md)
 
 ## 连接云机
 
@@ -16,10 +22,10 @@ python3 launcher.py
 
 Windows 可双击 `Start.cmd`，macOS 可双击 `Start.command` 或从终端运行上面的命令。输入 InstaBox 密钥时终端不会回显，已配置的 `INSTABOX_API_KEY` 也可使用。程序会打开本机浏览器。若有多台实例，用 `--machine m_…` 选择。可用 `--no-browser` 仅打印本机地址。请保持启动器运行，关闭它会断开本机连接；已接受的任务由云机持有。
 
-首次连接会启动或恢复所选实例，并在 `/data/cloud-workspace/project` 中准备一个独立的示例 Git 项目。有现成项目可指定其在云机上的绝对路径。下面的命令读取已有目录：
+首次连接会启动或恢复所选实例。只查看 Linux 桌面时，无需准备 Git 项目。首次使用可选工作台时，启动器才安装对应版本的工作进程，默认在 `/data/cloud-workspace/project` 准备示例项目。要在工作台打开已有项目，可传入云机上的绝对路径。
 
 ```sh
-python3 launcher.py --remote-project /data/workspace/my-project
+python3 launcher.py --workbench --remote-project /data/workspace/my-project
 ```
 
 用 `git worktree add` 创建的关联工作树也可直接作为项目打开。请把 `--remote-project` 指向该工作树的根目录。分支、Git 差异和项目检查都读取这份工作树自己的索引。分离 HEAD 时，侧栏显示当前提交的短标识。打开普通目录仍可浏览和编辑文件。
@@ -28,7 +34,9 @@ python3 launcher.py --remote-project /data/workspace/my-project
 
 密钥只交给本机启动器。云机工作进程、网页、交付包均不需要保留账户密钥。客户端监听 `127.0.0.1`，校验 HTTP Host 和网页 Origin。实例通信通过 InstaBox 官方 HTTPS API 完成。云机不用额外开放端口。选择项目意味着允许本机查看及编辑该目录中支持的文件。
 
-## 首次使用
+## 使用工作台
+
+在桌面顶栏点“工作台”后，可以用以下工具处理项目。[工作台截图](docs/workbench.png)
 
 1. 在左侧打开 `README.md`。只读预览中的长文本可按行号范围翻页，翻页使用已收到的正文。选择“编辑文件”，输入一行文字并保存。切换到“Git 差异”，在“已暂存”核对准备提交的内容，在“未暂存（含未跟踪）”查看之后仍留在工作区的改动。每层可单独折叠、重试和翻页。已读补丁保留在当前标签页内存中。断线后切回差异，仍能查看上次收到的正文，界面会标注“缓存未校验”。恢复连接后，可按层重试。未保存的文件草稿按标签页、工作区和文件保存。保持启动器运行，在同一标签页刷新后可以继续编辑。若云端文件已有新版本，界面会保留草稿并提示冲突。浏览器存储不可用时，界面会提示先保存。
 2. 在“云端任务”点击“项目检查”。检查会读取 Git 索引，并分别检查工作区与暂存区。要停止某项排队中或运行中的任务，在它的记录中点击“取消任务”。云机收回该任务的子进程后会显示“已取消”。此前收到的输出可以继续阅读，刷新后也能找回。先一步完成的任务会显示实际结果。
@@ -71,6 +79,7 @@ python3 launcher.py --local --project "$(mktemp -d)/project"
 
 - [架构调研与选型依据](docs/technology-review.md)
 - [GTK 图形工具包实验](docs/toolkit-experiment.md)
+- [默认进入完整 Linux 桌面与原版 Thunar 实机记录](docs/validation-desktop-entry.md)
 - [实时桌面双向文本剪贴板验收](docs/validation-desktop-clipboard.md)
 - [首版实机验收和性能记录](docs/validation.md)
 - [续聊、草稿与修改审批验收](docs/validation-reviewed-edits.md)

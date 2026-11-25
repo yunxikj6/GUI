@@ -1,0 +1,32 @@
+{
+  "realApplication": "/usr/bin/thunar",
+  "version": "4.20.2-1+deb13u1",
+  "initial": [
+    "Design",
+    "Documents",
+    "Release notes.txt",
+    "Screenshots"
+  ],
+  "privateUnix": true,
+  "serverTCP": false,
+  "nativeDialog": [
+    "Project Atlas - Thunar",
+    "Create New Folder"
+  ],
+  "final": [
+    "Design",
+    "Documents",
+    "Release notes.txt",
+    "Review complete",
+    "Screenshots"
+  ],
+  "realDirectoryCreated": true,
+  "screenshot": {
+    "name": "thunar-cloud.png",
+    "size": [
+      800,
+      519
+    ]
+  },
+  "fixtureStopped": true
+}

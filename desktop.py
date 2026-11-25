@@ -10,6 +10,7 @@ import select
 import re
 import ssl
 import tarfile
+import threading
 from urllib.parse import quote, unquote, urlsplit
 from urllib.request import getproxies, proxy_bypass
 
@@ -17,6 +18,7 @@ from urllib.request import getproxies, proxy_bypass
 ASSETS = Path(__file__).resolve().parent / "desktop_assets"
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 API_HOST = "api.instabox.sh"
+_START_LOCK = threading.Lock()
 
 
 class DesktopError(Exception):
@@ -226,6 +228,26 @@ def desktop_input(handler, instance):
     send_json(handler, 200, {"ok": True})
 
 
+def desktop_action(instance, action):
+    path = "/v1/machines/" + quote(instance.machine_id, safe="") + "/desktop"
+    requests = ({"action": action},)
+    if action == "start":
+        requests = ({"action": "status"}, {"action": "start", "width": 1280, "height": 800})
+    for body in requests:
+        state = instance.api("POST", path, body, timeout=45)
+        if state.get("running") is True:
+            return {k: state.get(k) for k in ("installed", "running", "controller", "yours", "agentPausable", "kind")}
+        if state.get("installing"):
+            raise DesktopError(409, "这台云机正在安装图形桌面。请等安装完成后重新连接。")
+        if state.get("failed"):
+            raise DesktopError(409, "这台云机的图形桌面安装失败。请在 InstaBox 查看安装日志，修复后重新连接。")
+        if state.get("installed") is False:
+            raise DesktopError(409, "这台云机尚未安装图形桌面。请在 InstaBox 安装桌面，或改用带桌面的 agent-browser 模板实例。")
+        if state.get("running") is not False:
+            raise DesktopError(502, "无法确认云机的图形桌面状态，请重新连接。")
+    raise DesktopError(409, "云机的图形桌面尚未就绪，请稍后重新连接。")
+
+
 def handle_desktop(handler, instance):
     path = urlsplit(handler.path).path
     try:
@@ -252,13 +274,13 @@ def handle_desktop(handler, instance):
             if handler.headers.get("Content-Length", "0") != "0" or handler.headers.get("Transfer-Encoding"):
                 raise DesktopError(400, "此操作无需请求内容。")
             action = actions[path]
-            body = {"action": action}
             if action == "start":
-                body.update(width=1280, height=800)
-            state = instance.api("POST", "/v1/machines/" + quote(instance.machine_id, safe="") + "/desktop", body, timeout=45)
-            result = {k: state.get(k) for k in ("installed", "running", "controller", "yours", "agentPausable", "kind")}
-            if not result["running"]:
-                raise DesktopError(409, "云机的图形桌面尚未就绪。请确认实例使用图形模板后重试。")
+                # Tabs share the launcher's cloud machine. A second tab must
+                # observe the first start before choosing its display size.
+                with _START_LOCK:
+                    result = desktop_action(instance, action)
+            else:
+                result = desktop_action(instance, action)
             return send_json(handler, 200, result)
         raise DesktopError(404, "找不到该桌面资源。")
     except DesktopError as e:

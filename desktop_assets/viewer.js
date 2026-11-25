@@ -100,7 +100,8 @@ function cleanup() {
 }
 
 function syncControl(state) {
-  controlled = Boolean(state.yours && state.controller === 'human');
+  // Other tabs and sessions can hold this account's lease. Only a takeover here enables input.
+  controlled = controlled && Boolean(state.yours && state.controller === 'human');
   control.disabled = state.kind === 'x11' && state.agentPausable === false;
   control.textContent = controlled ? '交还输入' : '接管输入';
   if (rfb) rfb.viewOnly = !controlled;
@@ -142,7 +143,7 @@ function openLiveSocket(n) {
 
 async function connect() {
   const n = cleanup();
-  stills = false; controlled = false; desktop = null;
+  stills = false; desktop = null;
   status.textContent = '启动桌面中…';
   mode.textContent = '逐帧查看';
   try {
@@ -225,22 +226,23 @@ async function showFrames() {
 control.onclick = async () => {
   const n = session;
   const releasing = controlled;
+  if (releasing) { controlled = false; syncControl(desktop); }
   control.disabled = true;
-  if (releasing && rfb) { rfb.viewOnly = true; syncClipboard(); }
   try {
     const state = await call(releasing ? 'handback' : 'takeover');
     if (n !== session) return;
+    controlled = !releasing;
     desktop = state; syncControl(state);
     status.textContent = controlled ? '已接管输入' : '正在观看';
     if (releasing && rfb) openLiveSocket(n);
   } catch(e) {
     if (n !== session) return;
-    if (releasing && rfb) { connect(); return; }
+    if (releasing) { connect(); return; }
     control.disabled = false; status.textContent = e.message;
   }
 };
 mode.onclick = () => { if (stills) connect(); else showFrames(); };
 byId('retry').onclick = connect;
-window.addEventListener('pagehide', () => { cleanup(); });
+window.addEventListener('pagehide', () => { controlled = false; cleanup(); });
 window.addEventListener('pageshow', e => { if (e.persisted) connect(); });
 connect();

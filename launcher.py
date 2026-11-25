@@ -20,6 +20,7 @@ APP = Path(__file__).resolve().parent
 PUBLIC_OPS = {'status', 'tree', 'file', 'diff', 'tasks', 'start', 'cancel', 'events', 'save',
               'proposal', 'decideProposal'}
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'),
+          '/workbench/': ('index.html', 'text/html; charset=utf-8'),
           '/index.html': ('index.html', 'text/html; charset=utf-8'),
           '/app.js': ('app.js', 'text/javascript; charset=utf-8'),
           '/proposals.js': ('proposals.js', 'text/javascript; charset=utf-8'),
@@ -112,7 +113,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return
         path = urllib.parse.urlsplit(self.path).path
-        if path.startswith('/desktop/'):
+        if path == '/' and not isinstance(self.server.workspace, LocalWorkspace):
+            self.send_response(302)
+            self.send_header('Location', '/desktop/')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+        elif path.startswith('/desktop/'):
             self.desktop()
         elif path == '/api/workspace':
             self.send_json(200, {'ok': True, 'data': workspace_identity(self.server.workspace)})
@@ -170,6 +177,7 @@ def main():
     args.add_argument('--remote-project', help='云机已有项目的绝对目录，默认使用独立示例仓库')
     args.add_argument('--machine', help='InstaBox 实例 ID，只有一台时自动选择')
     args.add_argument('--port', type=int, default=8765)
+    args.add_argument('--workbench', action='store_true', help='直接打开项目工作台')
     args.add_argument('--no-browser', action='store_true')
     opt = args.parse_args()
     if opt.local and not opt.project:
@@ -184,12 +192,14 @@ def main():
         else:
             key = os.environ.get('INSTABOX_API_KEY') or getpass.getpass('InstaBox API key（不回显）: ')
             workspace = InstaBox(key, opt.machine, opt.remote_project)
-            print('正在连接云机并检查工作区…', flush=True)
-            workspace.setup(APP / 'cloud')
+            print('正在连接云机…', flush=True)
+            workspace.ensure_running()
         with LocalServer(('127.0.0.1', opt.port), Handler) as server:
             server.workspace = workspace
-            addr = f'http://127.0.0.1:{server.server_port}/'
-            print(f'云端工作台 {addr}', flush=True)
+            path = '/workbench/' if opt.workbench else '/' if opt.local else '/desktop/'
+            addr = f'http://127.0.0.1:{server.server_port}{path}'
+            label = 'Linux 桌面' if path == '/desktop/' else '云端工作台'
+            print(f'{label} {addr}', flush=True)
             if not opt.no_browser:
                 threading.Timer(.2, webbrowser.open, args=(addr,)).start()
             server.serve_forever()

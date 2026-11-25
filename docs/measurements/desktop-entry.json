@@ -1,0 +1,56 @@
+{
+  "root": {
+    "status": 302,
+    "location": "/desktop/"
+  },
+  "takeoverRequests": 0,
+  "inputRequests": 0,
+  "handbackRequests": 0,
+  "screenCapture": false,
+  "screenshotFallbackUsed": false,
+  "chromium": "156.0.8078.79",
+  "providerBefore": {
+    "installed": true,
+    "running": true,
+    "controller": "agent",
+    "yours": null,
+    "agentPausable": true,
+    "kind": null
+  },
+  "liveDesktop": {
+    "outcome": "passed",
+    "route": "/desktop/vnc",
+    "visibleViewingStatus": "正在观看",
+    "providerReply": {
+      "running": true,
+      "controller": "agent",
+      "yours": null,
+      "agentPausable": true,
+      "kind": null
+    },
+    "wsOpened": 1,
+    "incomingFrames": 7,
+    "incomingBytes": 34499,
+    "decodedPixelRects": 28,
+    "frontCanvasPaints": 2,
+    "clipboardCalls": 0,
+    "framebuffer": [
+      823,
+      512
+    ]
+  },
+  "providerAfter": {
+    "installed": true,
+    "running": true,
+    "controller": "agent",
+    "yours": null,
+    "agentPausable": true,
+    "kind": null
+  },
+  "workbench": {
+    "path": "/workbench/",
+    "branch": "reviewed-edits",
+    "realProjectTree": true
+  },
+  "printedDefaultPath": "/desktop/"
+}

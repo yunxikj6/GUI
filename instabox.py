@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -59,7 +60,8 @@ print('ready')
 class InstaBox:
     base = 'https://api.instabox.sh'
 
-    def __init__(self, key: str, machine_id: str | None = None, project: str | None = None):
+    def __init__(self, key: str, machine_id: str | None = None, project: str | None = None,
+                 *, source: Path | None = None):
         if not key.strip():
             raise BridgeError('missing_key', '需要 InstaBox API 密钥。')
         self.project = project or '/data/cloud-workspace/project'
@@ -77,6 +79,8 @@ class InstaBox:
             raise BridgeError('invalid_machine', '实例标识格式无效。')
         self.path = '/v1/machines/' + self.machine_id
         self.worker = None
+        self._source = source if source is not None else Path(__file__).resolve().parent / 'cloud'
+        self._setup_lock = threading.Lock()
 
     def api(self, method, path, body=None, timeout=45, headers=None):
         if not path.startswith('/v1/') or '#' in path:
@@ -127,22 +131,42 @@ class InstaBox:
         return result.get('stdout', '')
 
     def setup(self, source: Path):
+        """Explicitly install and validate the selected version of the workspace tools."""
+        with self._setup_lock:
+            self._install_worker(source)
+
+    def _install_worker(self, source: Path):
         self.ensure_running()
-        bundle = {n: (source / n).read_text(encoding='utf-8') for n in WORKER_FILES}
+        try:
+            bundle = {n: (source / n).read_text(encoding='utf-8') for n in WORKER_FILES}
+        except (OSError, UnicodeError) as exc:
+            raise BridgeError('worker_source', '无法读取本机工作区组件，请检查程序文件后重试。') from exc
         raw = json.dumps(bundle, ensure_ascii=False, sort_keys=True).encode()
         release = hashlib.sha256(raw).hexdigest()[:20]
         directory = '/data/cloud-workspace/runtime/' + release
         self.exec(['python3', '-c', _INSTALL, directory], gzip.compress(raw).hex())
-        self.worker = directory + '/workspace.py'
-        result = self.rpc({'op': 'status' if self.custom_project else 'init'})
+        worker = directory + '/workspace.py'
+        initial = {'op': 'status' if self.custom_project else 'init'}
+        result = self._worker_rpc(worker, initial)
         if not result.get('ok'):
             error = result.get('error', {})
             raise BridgeError(error.get('code', 'init_error'), error.get('message', '项目初始化失败。'))
+        self.worker = worker
+        return initial, result
 
     def rpc(self, request):
+        with self._setup_lock:
+            if self.worker is None:
+                initial, result = self._install_worker(self._source)
+                if request == initial:
+                    return result
+            worker = self.worker
+        return self._worker_rpc(worker, request)
+
+    def _worker_rpc(self, worker, request):
         # Send arguments as stdin so project text and prompts are never shell
         # fragments and larger saves do not hit the guest's argv length limit.
-        argv = ['python3', self.worker, '--stdin']
+        argv = ['python3', worker, '--stdin']
         stdin = json_bytes(request).decode('utf-8')
         env = {'CLOUD_WORKSPACE_ROOT': self.project}
         if 'CLOUD_WORKSPACE_GIT' in os.environ:

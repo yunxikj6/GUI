@@ -3,7 +3,7 @@ import hashlib
 from io import BytesIO
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import desktop
 
@@ -41,14 +41,80 @@ class ViewerTest(unittest.TestCase):
         self.assertEqual(r.status, 404)
         self.instance.api.assert_not_called()
 
-    def test_start_uses_provider_control_only(self):
-        self.instance.api.return_value = {"installed": True, "running": True, "secret": "never echoed"}
-        r = Request("/desktop/start", "POST")
+    def post_action(self, action="start"):
+        r = Request("/desktop/" + action, "POST")
         desktop.handle_desktop(r, self.instance)
-        self.assertEqual(r.status, 200)
-        self.assertNotIn(b"secret", r.wfile.getvalue())
-        self.instance.api.assert_called_once_with("POST", "/v1/machines/m_demo/desktop",
-                                                 {"action": "start", "width": 1280, "height": 800}, timeout=45)
+        return r.status, json.loads(r.wfile.getvalue())
+
+    def test_running_desktop_keeps_existing_session_and_control(self):
+        for kind in ("wayland", None):
+            with self.subTest(kind=kind):
+                state = {"running": True, "controller": "human", "yours": False,
+                         "width": 1920, "height": 1080, "secret": "never echoed"}
+                if kind:
+                    state["kind"] = kind
+                self.instance.api.reset_mock()
+                self.instance.api.return_value = state
+                status, result = self.post_action()
+                self.assertEqual(status, 200)
+                self.assertEqual(result, {"running": True, "controller": "human", "yours": False,
+                                          "installed": None, "agentPausable": None, "kind": kind})
+                self.instance.api.assert_called_once_with("POST", "/v1/machines/m_demo/desktop",
+                                                          {"action": "status"}, timeout=45)
+
+    def test_stopped_desktop_starts_once_at_initial_size(self):
+        stopped = {"installed": True, "running": False}
+        started = {"installed": True, "running": True, "controller": "agent"}
+        self.instance.api.side_effect = [stopped, started, started]
+        for _ in range(2):
+            status, result = self.post_action()
+            self.assertEqual(status, 200)
+            self.assertEqual(result["controller"], "agent")
+        path = "/v1/machines/m_demo/desktop"
+        self.assertEqual(self.instance.api.call_args_list, [
+            call("POST", path, {"action": "status"}, timeout=45),
+            call("POST", path, {"action": "start", "width": 1280, "height": 800}, timeout=45),
+            call("POST", path, {"action": "status"}, timeout=45),
+        ])
+
+    def test_missing_install_pending_and_failed_are_distinct(self):
+        for extra, expected in (
+            ({}, "agent-browser"),
+            ({"installing": True}, "正在安装"),
+            ({"failed": True, "log": "private"}, "安装失败"),
+        ):
+            with self.subTest(extra=extra):
+                self.instance.api.reset_mock()
+                self.instance.api.return_value = {"installed": False, "running": False, **extra}
+                status, result = self.post_action()
+                self.assertEqual(status, 409)
+                self.assertIn(expected, result["error"])
+                self.assertNotIn("private", result["error"])
+                self.assertEqual(self.instance.api.call_count, 1)
+
+    def test_unready_start_and_unknown_status_do_not_trigger_other_actions(self):
+        self.instance.api.side_effect = [{"installed": True, "running": False}] * 2
+        status, result = self.post_action()
+        self.assertEqual(status, 409)
+        self.assertIn("尚未就绪", result["error"])
+        self.assertEqual(self.instance.api.call_count, 2)
+        for response in ({"installed": True}, OSError("private")):
+            with self.subTest(response=response):
+                self.instance.api.reset_mock()
+                self.instance.api.side_effect = [response]
+                status, result = self.post_action()
+                self.assertEqual(status, 502)
+                self.assertNotIn("private", result["error"])
+                self.assertEqual(self.instance.api.call_count, 1)
+
+    def test_explicit_control_actions_do_not_query_or_start(self):
+        self.instance.api.return_value = {"running": True}
+        for action in ("takeover", "handback"):
+            with self.subTest(action=action):
+                self.instance.api.reset_mock()
+                self.assertEqual(self.post_action(action)[0], 200)
+                self.instance.api.assert_called_once_with("POST", "/v1/machines/m_demo/desktop",
+                                                          {"action": action}, timeout=45)
 
     def test_upgrade_preserves_first_vnc_bytes(self):
         api = Mock()

@@ -21,7 +21,15 @@ class ClipboardPeer:
         self.send, self.extended = send, extended
         self.step, self.offered, self.received = 0, "", []
         self.echo, self.delivery = True, threading.Event()
+        self.input_messages, self.clipboard_requests = [], 0
+        self.frame_requested = threading.Event()
         send(b"RFB 003.008\n")
+
+    def wait_for_update_request(self):
+        # The next framebuffer request acknowledges that the browser processed earlier messages.
+        self.frame_requested.clear()
+        self.send(bytes(4))  # FramebufferUpdate with no rectangles.
+        return self.frame_requested.wait(3)
 
     def extension(self, action, body=b""):
         payload = struct.pack(">I", action | 1) + body  # Format 1 is plain text.
@@ -48,6 +56,10 @@ class ClipboardPeer:
                 if self.extended:
                     self.extension(CAPS | NOTIFY | PROVIDE | REQUEST, bytes(4))
             return
+        if data[0] == 3:  # FramebufferUpdateRequest
+            self.frame_requested.set()
+        if data[0] in (4, 5):  # KeyEvent and PointerEvent
+            self.input_messages.append(data[0])
         if data[0] != 6:  # ClientCutText
             return
         size = struct.unpack_from(">i", data, 4)[0]
@@ -59,6 +71,7 @@ class ClipboardPeer:
                 self.extension(REQUEST)
                 return
             if action == REQUEST:
+                self.clipboard_requests += 1
                 text = self.offered.replace("\n", "\r\n").encode("utf-8") + b"\0"
                 self.extension(PROVIDE, zlib.compress(struct.pack(">I", len(text)) + text))
                 return
@@ -117,7 +130,7 @@ class ViewerHandler(launcher.Handler):
 
 
 class DesktopClipboardAcceptance(BrowserFixture):
-    def viewer(self, extended=True, width=1100):
+    def viewer(self, extended=True, width=1100, owned=False):
         page = self.page
         server = launcher.LocalServer(("127.0.0.1", 0), ViewerHandler)
         self.addCleanup(server.server_close)
@@ -126,11 +139,12 @@ class DesktopClipboardAcceptance(BrowserFixture):
         self.peers = server.peers
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
-        owned = False
+        self.actions = []
 
         def control(route):
             nonlocal owned
             action = route.request.url.rsplit("/", 1)[1]
+            self.actions.append(action)
             if action in ("takeover", "handback"):
                 owned = action == "takeover"
             route.fulfill(json={"kind": "x11", "running": True, "agentPausable": True,
@@ -260,3 +274,47 @@ class DesktopClipboardAcceptance(BrowserFixture):
         self.page.locator("#clipboardSend").click()
         expect(self.incoming).to_have_value("café\nsecond")
         self.assertEqual(self.peers[-1].received, ["café\nsecond"])
+
+    def test_preexisting_human_lease_opens_view_only_until_this_page_takes_control(self):
+        self.viewer(owned=True)
+        page = self.page
+        canvas, status = page.locator("#screen canvas"), page.locator("#status")
+        expect(page.locator("#control")).to_have_text("接管输入")
+        expect(self.toggle).to_be_hidden()
+        prior = self.peers[-1]
+        prior.offer("云机已有剪贴板")
+        canvas.click()
+        canvas.press("k")
+        self.assertTrue(prior.wait_for_update_request())
+        self.assertEqual(prior.input_messages, [])
+        self.assertEqual(prior.clipboard_requests, 0)
+        frames = []
+        def frame_input(route):
+            frames.append(route.request.post_data_json)
+            route.fulfill(json={})
+
+        page.route("**/desktop/input", frame_input)
+        page.locator("#mode").click()
+        expect(status).to_have_text("逐帧观看")
+        img = page.locator("#screen img")
+        img.click()
+        img.press("k")
+        expect(page.locator("#textForm")).to_be_hidden()
+        page.locator("#mode").click()
+        expect(status).to_have_text("正在观看")
+        self.assertEqual((self.actions, frames), (["start", "start"], []))
+        self.take_control()
+        expect(self.incoming).to_have_value("")
+        self.peers[-1].offer("本页已接管")
+        expect(self.incoming).to_have_value("本页已接管")
+        canvas.click()
+        canvas.press("k")
+        self.assertTrue(self.peers[-1].wait_for_update_request())
+        self.assertIn(4, self.peers[-1].input_messages)
+        self.assertIn(5, self.peers[-1].input_messages)
+        # A newly loaded document must choose again, even as the server retains the lease.
+        page.reload()
+        expect(status).to_have_text("正在观看")
+        expect(self.toggle).to_be_hidden()
+        self.assertEqual(self.actions, ["start", "start", "takeover", "start"])
+        self.assertEqual(page.evaluate("[board.reads, board.writes]"), [0, []])
