@@ -1,0 +1,112 @@
+{
+  "linuxDesktop": {
+    "environment": "Ubuntu Base 24.04.5 LTS amd64 on a private Linux display; nested Wayland compositor, software rendering",
+    "gnomeShell": "46.0-0ubuntu6~24.04.17",
+    "sessionMode": "ubuntu",
+    "gtkTheme": "Yaru",
+    "enabledExtensions": [
+      "ubuntu-dock@ubuntu.com",
+      "ubuntu-appindicators@ubuntu.com",
+      "ding@rastersoft.com"
+    ],
+    "nautilus": {
+      "packageVersion": "1:46.4-0ubuntu0.2",
+      "action": "Created a folder in Documents from GNOME Files",
+      "verifiedOnDisk": true
+    },
+    "setupValidation": {
+      "type": "apt-get --simulate",
+      "ubuntuBase": "24.04.5 amd64",
+      "aptVersion": "2.8.3",
+      "requestedPackages": 17,
+      "installedPlan": 493,
+      "upgradedPlan": 2,
+      "removedPlan": 0,
+      "exitCode": 0
+    },
+    "firstRun": {
+      "previousDesktopPresent": false,
+      "checkCreatedDesktop": false,
+      "createdShortcut": "Claude.desktop",
+      "gioTrusted": true,
+      "registeredApplication": "com.anthropic.Claude.desktop",
+      "windowsAppsInstalledInFixture": false
+    }
+  },
+  "claudeDesktop": {
+    "debianPackage": "claude-desktop",
+    "version": "6.28899.6",
+    "architecture": "amd64",
+    "signedRepository": "https://downloads.claude.ai/claude-desktop/apt/stable/",
+    "packageSha256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+    "runningImage": "/usr/lib/claude-desktop/claude-desktop",
+    "runningImageSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "launch": "GNOME Activities opened com.anthropic.Claude.desktop. The public welcome window appeared.",
+    "screenshots": [
+      "../native-ubuntu-desktop.png",
+      "../native-ubuntu-claude.png",
+      "../native-ubuntu-claude-menu.png"
+    ],
+    "accountSignInTested": false,
+    "repositorySigningKey": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+    "rendererProcessSecurity": {
+      "sampled": 3,
+      "seccomp": 2,
+      "noNewPrivs": true
+    },
+    "desktopShortcut": "Double-clicked in Ubuntu Desktop Icons NG after exiting Claude. A new official process opened its public welcome window.",
+    "observedMenu": [
+      "File",
+      "Edit",
+      "View",
+      "Go",
+      "Help"
+    ]
+  },
+  "workspaceMcp": {
+    "transport": "stdio",
+    "protocolVersion": "2025-11-25",
+    "liveInstaBox": {
+      "listedDirectory": true,
+      "readBytes": 1653,
+      "readHashMatchedRevision": true,
+      "temporaryGitRepositoryStatus": "ready",
+      "savedBytes": 32,
+      "staleRevisionRejected": true,
+      "verifiedDiskSha256": "3723006b81287b2fae823912e773c03798f2591538dd213cffaef72c37bf2bb4"
+    },
+    "codexCli": {
+      "version": "codex-cli 0.172.0-alpha.2",
+      "registryCommands": [
+        "mcp list",
+        "mcp get"
+      ],
+      "appServerDiscovery": "mcpServerStatus/list",
+      "defaultTools": [
+        "get_workspace_git_status",
+        "list_workspace_directory",
+        "read_workspace_text"
+      ],
+      "additionalToolWithAllowSave": "save_workspace_text",
+      "modelRequestTested": false
+    }
+  },
+  "windows": {
+    "launcherPeArchitectures": [
+      "x64",
+      "arm64"
+    ],
+    "storeMainAumids": [
+      "OpenAI.Codex_2p2nqsd0c76g0!App",
+      "OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0!ChatGPT",
+      "AnthropicPBC.Claude_fnn82j28hfe8t!Claude"
+    ],
+    "interactiveWindowsAndWslgTested": false,
+    "windowsChatGptWindowObserved": false,
+    "windowsClaudeWindowObserved": false,
+    "launcherSha256": {
+      "x64": "28d9883eab1f3afda554966470e7d6e6b6a60dd423552e1044d18650c07ce581",
+      "arm64": "e3d4f2b9e60cc7b0de81f0553282fc698eb311978b75d92ac2edcf5a06c9adbc"
+    }
+  }
+}

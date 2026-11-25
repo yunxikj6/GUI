@@ -1,6 +1,6 @@
 # 云端工作台开发交接
 
-运行启动器可直接进入 InstaBox 的完整桌面。开发网页项目工作台时，可以用本机模式完成一次“编辑 → 保存 → 查看差异 → 运行项目检查”。产品需求和完整场景见[需求与验收](docs/requirements.md)，用户启动说明见[README](README.md)。
+Windows 正常入口启动本机 Ubuntu GNOME，并从系统启动厂商提供的应用。验收要区分本机 UI 的真实进程、云端文件与计算、厂商账户会话三者。参考图用于核对交互布局，产品界面及验收截图必须来自实际运行。[Windows 本机入口](docs/native-windows.md) · [云工作区连接](docs/official-client-workspace.md)
 
 ## 当前基线
 
@@ -28,7 +28,7 @@ python3 -m unittest discover -s tests -v
 python3 launcher.py --local --project "$(mktemp -d)/project" --no-browser
 ```
 
-真机验证使用带桌面的 Linux `agent-browser` 实例。在本机启动器的隐藏提示中输入 InstaBox 密钥，或通过环境变量 `INSTABOX_API_KEY` 提供。模型认证属于云机上的 Codex 或 Claude CLI。只有一台实例时，运行 `python3 launcher.py` 查看完整云桌面。要在项目工作台打开首轮交付的源码，可运行下列命令。
+真机验证使用带桌面的 Linux `agent-browser` 实例。在本机启动器的隐藏提示中输入 InstaBox 密钥，或通过环境变量 `INSTABOX_API_KEY` 提供。模型认证属于云机上的 Codex 或 Claude CLI。运行 `python3 launcher.py --cloud-desktop` 可以查看兼容模式下的完整云桌面。要在项目工作台打开首轮交付的源码，可运行下列命令。
 
 ```sh
 python3 launcher.py --workbench --remote-project /data/cloud-workspace/source
@@ -68,12 +68,8 @@ Git 差异可按 `staged` 和 `unstaged` 分开读取。状态中的 `diffScopes
 
 实时桌面接管输入后提供双向文本剪贴板。查看器按 noVNC 协商结果选择发送方式，保留经典 RFB 无法表示的 Unicode 草稿。发送文字后，用户还需在目标应用里粘贴。云端发来的文本仅在用户主动复制时写入本机系统剪贴板。[实机往返与兼容性记录](docs/validation-desktop-clipboard.md)
 
-## 下一轮从哪里开始
+## 接下来的验收
 
-用户选择先直接进入完整云桌面。默认启动地址为 `/desktop/`，已有会话先复用。原版 Thunar 的新建文件夹操作已在独立 InstaBox 显示上核对到磁盘。项目工作台从 `/workbench/` 进入。[桌面入口与原软件实测](docs/validation-desktop-entry.md)
-
-完整桌面现在支持适应窗口与原始大小。实时连接和逐帧查看使用同一比例选择。在观看或本地平移时，键鼠、触屏用来移动本机视窗。退出平移后，接管状态下的操作继续发送到云机。重连和切换图像来源后恢复同一页面内的原图视野。[断线恢复和首帧记录](docs/validation-desktop-view-recovery.md)[原程序显示与点击验收](docs/validation-desktop-scale.md)
-
-1. **核对完整桌面的日常操作。** 逐帧输入已限制在能复核的单行可打印 ASCII 范围，云端原程序对照覆盖真实按键及保存文件。[输入与保存验收](docs/validation-desktop-text.md) 已在独立 InstaBox 的原版 Mousepad 中核对 Fcitx5 拼音候选、选区替换与 UTF-8 落盘。下一步复核整屏查看、原程序菜单响应、刷新页面和云机挂起后的恢复。输入法以真实应用保存的 UTF-8 字节为准，延迟注明客户端与网络条件。
-2. **对照独立窗口。** 在同一测试文件上比较完整桌面和独立窗口。记录窗口所属进程、主窗口与对话框的关系、焦点切换和磁盘结果。分别注明本机实验或实际 InstaBox 云机。[实验条件与判据](docs/technology-review.md)
-3. **保留现有入口的回归。** 网页工作台已有独立的文件、差异和编程助手流程。真实模型账号成功路径、其他客户端系统及公网弱网体验仍需各自的验收环境。
+1. 在真实 Windows 11、Ubuntu WSL 2 和 WSLg 组合上双击原生入口，用 GNOME 活动概览启动程序。记录真实窗口所属进程、Ubuntu 会话模式、Ubuntu Dock 及 Windows 图形后端；保留未验证平台的标记。
+2. 在已授权的厂商账户中核对 Claude 的会话与 Artifacts、ChatGPT 的侧栏与输入框。验证官方应用通过已配置连接访问指定 InstaBox 项目，独立在云端复核数据。分别记录官方客户端自身的会话归属及工作区文件版本。
+3. 保持 `--cloud-desktop` 和 `--workbench` 的既有回归。远端帧只用于用户明确选择的兼容模式。[远端整屏验收](docs/validation-desktop-entry.md)

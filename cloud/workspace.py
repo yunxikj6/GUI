@@ -398,14 +398,9 @@ def repository_dir(root):
     return git_dir
 
 
-def status(root):
-    if __package__:
-        from . import tasks
-    else:
-        import tasks
-
-    providers = tasks.capabilities(root)
+def status(root, *, git_only=False):
     branch = ""
+    changes = {}
     state, message = "none", "当前项目根目录没有 Git 仓库。"
     try:
         git_dir = repository_dir(root)
@@ -414,15 +409,30 @@ def status(root):
             if code:
                 raw, _, _ = git(root, "rev-parse", "--short", "HEAD", git_dir=git_dir)
             branch = raw.decode("utf-8", "replace").removesuffix("\n")
+            if git_only:
+                records, clipped, _ = git(root, "status", "--porcelain=v1", "-z", "--no-renames",
+                                           "--untracked-files=normal", "--ignore-submodules=all", "--", *VISIBLE_PATHS,
+                                           git_dir=git_dir, overrides=disabled_filters(root, git_dir=git_dir))
+                # A truncated final record can end partway through a path.
+                items = records.split(b"\x00")[:-1]
+                changes = {"entries": [{"status": item[:2].decode("ascii"), "path": os.fsdecode(item[3:])}
+                                       for item in items[:MAX_ENTRIES]], "truncated": clipped or len(items) > MAX_ENTRIES}
             state, message = "ready", ""
     except WorkspaceError as exc:
         state, message = "error", str(exc)
     except (OSError, subprocess.TimeoutExpired):
         state, message = "error", "无法读取工作区 Git 信息，请检查服务器的 Git 和文件权限。"
+    result = {"project": root.name, "branch": branch, "gitState": state, "gitMessage": message}
+    if git_only:
+        return {**result, **changes}
+    if __package__:
+        from . import tasks
+    else:
+        import tasks
+    providers = tasks.capabilities(root)
     if state != "ready":
         providers["check"] = {"available": False, "detail": message}
-    return {"project": root.name, "branch": branch, "providers": providers,
-            "gitState": state, "gitMessage": message, "diffScopes": list(_DIFF_SCOPES)}
+    return {**result, "providers": providers, "diffScopes": list(_DIFF_SCOPES)}
 
 
 def disabled_filters(root, *, git_dir=None):
@@ -607,7 +617,7 @@ def dispatch(request, root):
     with open_path(root, [], directory=True):
         pass
     if op == "status":
-        return status(root)
+        return status(root, git_only=request.get("scope") == "git")
     if op == "tree":
         return tree(root, request.get("path", ""), request.get("cursor", _NO_TREE_CURSOR))
     if op == "file":

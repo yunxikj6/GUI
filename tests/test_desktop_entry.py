@@ -97,7 +97,7 @@ class DesktopEntry(unittest.TestCase):
 
     def test_printed_entry_and_system_browser_match_each_launch_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for options, path in [([], '/desktop/'), (['--workbench'], '/workbench/'),
+            for options, path in [(['--cloud-desktop'], '/desktop/'), (['--workbench'], '/workbench/'),
                                   (['--local', '--project', tmp], '/')]:
                 for headless in (True, False):
                     with self.subTest(options=options, headless=headless):
@@ -125,7 +125,7 @@ class DesktopEntry(unittest.TestCase):
                         box.return_value.setup.assert_not_called()
 
     @unittest.skipUnless(sync_playwright and BROWSER, 'browser acceptance requires Playwright and Chromium')
-    def test_remote_default_opens_viewing_session_without_taking_input(self):
+    def test_remote_web_service_opens_viewing_session_without_taking_input(self):
         remote = Mock(spec=launcher.InstaBox)
         remote.machine_id, remote.project = 'm_entryfixture', '/data/example'
         remote.rpc.return_value = {'ok': False, 'error': {'code': 'offline', 'message': 'offline'}}

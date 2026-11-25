@@ -1,0 +1,5 @@
+Start.cmd text eol=crlf
+Setup.cmd text eol=crlf
+linux/*.sh text eol=lf
+windows/launcher/*.sh text eol=lf
+windows/*.exe binary

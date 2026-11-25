@@ -171,15 +171,33 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    args = argparse.ArgumentParser(description='云端工作台 · 本机图形客户端')
+    args = argparse.ArgumentParser(description='本机 Linux 桌面与 InstaBox 工作区')
+    args.add_argument('--setup-native', action='store_true', help='交互安装 Ubuntu 24.04 WSLg 的桌面依赖')
+    args.add_argument('--native', action='store_true', help='启动本机 Linux 图形桌面（默认）')
+    args.add_argument('--distro', help='Windows 上已安装的 Ubuntu WSL 2 发行版名称')
+    args.add_argument('--check-native', action='store_true', help='检查本机图形运行条件')
+    args.add_argument('--cloud-desktop', action='store_true', help='使用浏览器查看或操作远端整屏桌面')
     args.add_argument('--local', action='store_true', help='开发模式，使用本机 Linux 工作进程')
     args.add_argument('--project', type=Path, help='本机开发模式使用的项目目录')
     args.add_argument('--remote-project', help='云机已有项目的绝对目录，默认使用独立示例仓库')
     args.add_argument('--machine', help='InstaBox 实例 ID，只有一台时自动选择')
-    args.add_argument('--port', type=int, default=8765)
+    args.add_argument('--port', type=int, help='兼容网页服务的本机端口，默认 8765')
     args.add_argument('--workbench', action='store_true', help='直接打开项目工作台')
     args.add_argument('--no-browser', action='store_true')
     opt = args.parse_args()
+    web_options = any((opt.workbench, opt.local, opt.project, opt.cloud_desktop,
+                       opt.remote_project, opt.machine, opt.no_browser, opt.port is not None))
+    if opt.setup_native and opt.check_native:
+        args.error('请分别运行 --setup-native 和 --check-native')
+    if (opt.native or opt.distro or opt.check_native or opt.setup_native) and web_options:
+        args.error('本机 GNOME 桌面与网页服务参数不能同时使用')
+    if not web_options:
+        from native_workspace import start
+        return start(check=opt.check_native, distro=opt.distro, setup=opt.setup_native)
+    if opt.cloud_desktop and (opt.workbench or opt.local):
+        args.error('--cloud-desktop 与 --local 或 --workbench 不能同时使用')
+    if opt.port is None:
+        opt.port = 8765
     if opt.local and not opt.project:
         args.error('--local 需要 --project 指定开发用项目目录')
     if not opt.local and opt.project:
