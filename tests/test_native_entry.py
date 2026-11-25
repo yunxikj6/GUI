@@ -38,7 +38,10 @@ class NativeEntry(unittest.TestCase):
         if sys.platform != 'linux':
             self.skipTest('exercise the Linux desktop entry')
         with tempfile.TemporaryDirectory() as tmp:
-            base = Path(tmp)
+            base = Path(tmp) / 'linux'
+            base.mkdir()
+            (base.parent / 'native_files.py').write_text(
+                "import sys\nfrom pathlib import Path\nPath('project-args').write_text(' '.join(sys.argv[1:]))\n")
             script = base / 'start-workspace.sh'
             script.write_bytes((native_workspace.ROOT / 'linux' / script.name).read_bytes())
             (base / 'start-gnome.sh').write_text('printf "%s\\n" "$*" >> calls\nexit "${TEST_CHECK_RESULT:-0}"\n')
@@ -47,6 +50,8 @@ class NativeEntry(unittest.TestCase):
                 result = subprocess.run(['/bin/bash', str(script), *args], env=dict(os.environ, TEST_CHECK_RESULT='0' if success else '3'))
                 self.assertEqual(result.returncode, 0 if success else 3)
             self.assertEqual((base / 'calls').read_text().splitlines(), ['--check', '--check'])
+            self.assertFalse((base / 'project-args').exists())
             env = dict(os.environ, TEST_CHECK_RESULT='0', XDG_CONFIG_HOME=str(base / 'config'))
             subprocess.run(['/bin/bash', str(script)], env=env, check=True)
             self.assertEqual((base / 'calls').read_text().splitlines()[-2:], ['--check', '--desktop-shortcuts'])
+            self.assertEqual((base / 'project-args').read_text(), 'relink --offer-setup')

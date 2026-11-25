@@ -26,7 +26,7 @@ setup() {
         gnome-shell-extension-appindicator gnome-shell-extension-desktop-icons-ng
         yaru-theme-gtk yaru-theme-icon ubuntu-wallpapers-noble fonts-ubuntu nautilus gvfs
         xdg-user-dirs dbus-daemon x11-utils xwayland libgl1-mesa-dri
-        gnome-text-editor gnome-terminal zenity gnome-keyring python3-keyring libnotify-bin fonts-noto-cjk ca-certificates curl gpg
+        gnome-text-editor gnome-terminal zenity gnome-keyring python3-venv python3-keyring libnotify-bin fonts-noto-cjk ca-certificates curl gpg
     )
     local missing=() package status answer
     for package in "${packages[@]}"; do

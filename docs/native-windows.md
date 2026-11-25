@@ -16,7 +16,7 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
   gnome-shell-extension-appindicator gnome-shell-extension-desktop-icons-ng \
   yaru-theme-gtk yaru-theme-icon ubuntu-wallpapers-noble fonts-ubuntu nautilus gvfs \
   xdg-user-dirs dbus-daemon x11-utils xwayland libgl1-mesa-dri \
-  gnome-text-editor gnome-terminal zenity gnome-keyring python3-keyring libnotify-bin fonts-noto-cjk ca-certificates curl gpg
+  gnome-text-editor gnome-terminal zenity gnome-keyring python3-venv python3-keyring libnotify-bin fonts-noto-cjk ca-certificates curl gpg
 ```
 
 ## 打开原版应用
@@ -27,7 +27,7 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
 - **Claude**。Anthropic 的 Linux 客户端在应用菜单注册为 `com.anthropic.Claude.desktop`。桌面图标会打开它自己的窗口。Claude 对话与 Artifacts 的可用性取决于登录账户。[Anthropic 官方安装说明](https://support.claude.com/en/articles/10065433-install-claude-desktop)
 - **Windows 版本**。在 WSL 中，缺少相应 Linux 客户端时仍提供对应的 Windows 应用入口。用户选择该入口时，启动器调起已安装的官方 Microsoft Store 版本。如果尚未安装商店版，会询问是否打开官方商品页。Windows 应用在独立的 Windows 窗口中运行。[ChatGPT 商店页](https://apps.microsoft.com/detail/9plm9xgg6vks) · [Claude 商店页](https://apps.microsoft.com/detail/9p6k58ths811)
 
-- **项目数据**。需要使用 InstaBox 时，为对应的官方客户端配置工作区连接。云端文件路径、Git 状态和保存结果来自所选云机。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
+- **项目数据**。需要在应用内读取云项目时，从 GNOME “活动”打开 **连接 InstaBox 到官方客户端**，选择应用并核对项目。此连接可列目录、读文本及查询 Git 状态。要保存文件，可用下述文件管理器操作。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
 - **在 Ubuntu 直接编辑项目文件**。完成绑定后，在“活动”打开 InstaBox 项目文件，从云端选一个文件，双击本地工作副本即可用系统编辑器修改。客户端会话和文件管理器可以独立使用。[原生文件操作](native-project-files.md)
 
 在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py` 启动本地会话。Ubuntu 桌面会为已安装的官方 ChatGPT 和 Claude 提供快捷方式。Windows 应用入口在 WSL 中注册。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。

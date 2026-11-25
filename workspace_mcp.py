@@ -222,6 +222,41 @@ async def serve(files):
         await server.run(reader, writer, server.create_initialization_options())
 
 
+def client_server_config(python, machine, project, *, host, credential_source="system", allow_save=False):
+    args = [str(Path(__file__).resolve()), "--machine", machine, "--project", str(project),
+            "--credential-source", credential_source]
+    if allow_save:
+        args.append("--allow-save")
+    server = {"command": str(python), "args": args}
+    if host == "codex":
+        # Codex filters its stdio environment. Inherit names so private proxy settings
+        # and credential values stay out of the vendor configuration on disk.
+        inherit = ["HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR"]
+        if credential_source == "environment":
+            inherit.append("INSTABOX_API_KEY")
+        elif sys.platform.startswith("linux"):
+            inherit.extend(("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "CLOUDWORKSPACE_NESTED_GNOME"))
+        server["env_vars"] = inherit
+        if allow_save:
+            server["tools"] = {"save_workspace_text": {"approval_mode": "prompt"}}
+    return server
+
+
+def is_previous_readonly_server(current, server, *, host):
+    """Recognize the exact manual configuration for this adapter when rebinding a project."""
+    if not isinstance(current, dict) or current.get("command") != server["command"]:
+        return False
+    args = current.get("args")
+    if not isinstance(args, list) or len(args) != 7 or not all(isinstance(value, str) for value in args):
+        return False
+    machine, project = args[2], args[4]
+    path = PurePosixPath(project)
+    if (not re.fullmatch(r"m_[A-Za-z0-9_]+", machine) or path.anchor != "/"
+            or path.parent == path or ".." in path.parts or "\x00" in project):
+        return False
+    return current == client_server_config(server["command"], machine, path, host=host)
+
+
 def main():
     parser = argparse.ArgumentParser(description="InstaBox 项目 MCP 接口（默认只读）")
     parser.add_argument("--machine", required=True, help="已有 Linux 云机的标识")
@@ -239,27 +274,15 @@ def main():
     if not project.is_absolute() or project.parent == project or ".." in project.parts or "\x00" in args.project:
         parser.error("请指定已有项目的绝对目录。")
     if args.print_config:
-        child_args = [str(Path(__file__).resolve()), "--machine", args.machine, "--project", str(project),
-                      "--credential-source", args.credential_source]
-        if args.allow_save:
-            child_args.append("--allow-save")
-        config = {"command": sys.executable, "args": child_args}
+        config = client_server_config(sys.executable, args.machine, project, host=args.host,
+                                      credential_source=args.credential_source, allow_save=args.allow_save)
         if args.host == "codex":
-            # JSON strings and arrays of strings share TOML's basic string syntax.
-            # Preserve non-BMP characters as UTF-8, not escaped surrogate pairs.
             print("[mcp_servers.instabox-workspace]")
-            for name, value in config.items():
-                print(name + " = " + json.dumps(value, ensure_ascii=False).replace(chr(127), r"\u007f"))
-            if args.allow_save:
+            for name in ("command", "args", "env_vars"):
+                # Literal UTF-8 also preserves non-BMP paths in TOML strings.
+                print(name + " = " + json.dumps(config[name], ensure_ascii=False).replace(chr(127), r"\u007f"))
+            if "tools" in config:
                 print('tools.save_workspace_text.approval_mode = "prompt"')
-            # Codex filters the environment of stdio servers. urllib/OpenSSL need
-            # the host's HTTPS proxy and CA settings on managed networks.
-            inherit = ["HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR"]
-            if args.credential_source == "environment":
-                inherit.append("INSTABOX_API_KEY")
-            elif sys.platform.startswith("linux"):
-                inherit.extend(("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "CLOUDWORKSPACE_NESTED_GNOME"))
-            print("env_vars = " + json.dumps(inherit))
         else:
             print(json.dumps({"mcpServers": {"instabox-workspace": config}}, ensure_ascii=True, indent=2))
         return 0

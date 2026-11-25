@@ -16,10 +16,10 @@ Ubuntu 24.04 上的桌面窗口现在显示为 **Cloud Linux Workspace**。在 W
 
 在“活动”里打开 **InstaBox 项目文件**，首次使用时选择云机和项目目录。选中的云端文本会出现在 Ubuntu 文件管理器里。双击即可用本机编辑器打开。Ctrl+S 保存到本机，在文件上右键选 **脚本 → 保存到 InstaBox** 才会更新云端。实际云机已独立核对编辑后的字节。[首次连接与使用方法](docs/native-project-files.md) · [编辑器实拍](docs/native-cloud-file-edit.png)
 
-通过官方客户端的本地 MCP 连接访问指定的 InstaBox 项目。默认可以查看目录、读取 UTF-8 文本和查询云端 Git 状态。显式启用保存后，修改已有文件时会核对读取版本。实测从云机读回了保存的字节，也验证了旧版本写入会收到冲突。ChatGPT 的本地连接适用于桌面端的 Codex 项目。[配置与账户范围](docs/official-client-workspace.md)
+在 GNOME 的“活动”里搜索 **连接 InstaBox 到官方客户端**，选择 Claude 或 ChatGPT 的本地 Codex 项目，再确认云机与项目目录。首次使用会引导你选择项目，并按需准备连接组件。重新打开所选客户端后，请从其 MCP 设置查看 `instabox-workspace`。该入口授予列目录、读文本和查询 Git 状态的权限。账户、聊天记录和工具授权仍由厂商管理。[连接步骤与权限](docs/official-client-workspace.md)
 
 ## 开发与验收
 
-Windows 启动器按当前用户注册的应用身份唤起厂商程序。本机 Ubuntu 使用发行版的 GNOME Shell、Ubuntu Dock、Nautilus 和 Wayland。官方 ChatGPT 和 Claude 的登录前窗口与 Ubuntu 文件管理器已在 Linux 测试环境运行。Windows 11 实机窗口可用随包的验收脚本核对所有者。[Windows 启动器源码](windows/launcher/) · [Linux 会话源码](linux/) · [实测数据](docs/measurements/native-workspace.json)
+显式选用 Windows Store 客户端时，启动器按当前用户注册的应用身份唤起厂商程序。默认的本机 Ubuntu 工作区使用发行版的 GNOME Shell、Ubuntu Dock、Nautilus 和 Wayland。官方 ChatGPT 和 Claude 的登录前窗口与 Ubuntu 文件管理器已在 Linux 测试环境运行。Windows 11 实机窗口可用随包的验收脚本核对所有者。[Windows 启动器源码](windows/launcher/) · [Linux 会话源码](linux/) · [实测数据](docs/measurements/native-workspace.json)
 
 如需使用已有的云端 Xfce，运行 `python3 launcher.py --cloud-desktop`；项目工作台使用 `python3 launcher.py --workbench`。这两个可选入口及历史版本的使用方法仍有完整记录。[远端桌面与工作台](docs/remote-workbench.md) · [开发交接](AGENTS.md)

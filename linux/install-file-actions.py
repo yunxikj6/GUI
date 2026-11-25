@@ -11,6 +11,7 @@ import tempfile
 
 ACTIONS = {"保存到 InstaBox": "publish", "取回 InstaBox 最新版本": "refresh"}
 ENTRY_ID = "cloudworkspace-instabox-project-files.desktop"
+CLIENT_ENTRY_ID = "cloudworkspace-instabox-clients.desktop"
 SCRIPT_HEADER = b"#!/usr/bin/python3\n# CloudLinuxWorkspace Nautilus action v1 sha256="
 ENTRY_HEADER = b"[Desktop Entry]\n# CloudLinuxWorkspace local project launcher v1 sha256="
 BODY = '''
@@ -100,8 +101,22 @@ def entry_bytes(python, client):
         "Type=Application\nName=InstaBox Project Files\nName[zh_CN]=InstaBox 项目文件\n"
         f"Exec={command} browse --notify\n"
         "Icon=folder-remote\nTerminal=false\nStartupNotify=false\nCategories=Utility;FileTools;\n"
-        "Actions=Configure;\n\n[Desktop Action Configure]\nName=Connect to an InstaBox project\n"
+        "Actions=Configure;ConnectClients;\n\n[Desktop Action Configure]\nName=Connect to an InstaBox project\n"
         f"Name[zh_CN]=连接 InstaBox 项目\nExec={command} configure --notify\n"
+        "\n[Desktop Action ConnectClients]\nName=Connect InstaBox to desktop apps\n"
+        f"Name[zh_CN]=连接 InstaBox 到官方客户端\nExec={command} connect-clients --notify\n"
+    ))
+
+
+def client_entry_bytes(python, client):
+    command = f"{exec_argument(python)} {exec_argument(client)}"
+    return managed_bytes(ENTRY_HEADER, (
+        "Type=Application\nName=Connect InstaBox to desktop apps\nName[zh_CN]=连接 InstaBox 到官方客户端\n"
+        "Comment=Use an InstaBox project with Claude or a local ChatGPT Codex project\n"
+        "Comment[zh_CN]=在 Claude 或 ChatGPT 的本地 Codex 项目中使用 InstaBox 文件\n"
+        "Keywords=ChatGPT;Codex;Claude;InstaBox;MCP;\n"
+        f"Exec={command} connect-clients --notify\n"
+        "Icon=network-server\nTerminal=false\nStartupNotify=false\nCategories=Utility;\n"
     ))
 
 
@@ -170,11 +185,17 @@ def install(python, client, *, entry_only=False):
         for title, verb in ACTIONS.items()
     ]
     entries.append((base / "applications" / ENTRY_ID, entry_bytes(python, client), ENTRY_HEADER, 0o644))
-    # Detect existing customizations before updating any of the three related entries.
+    # Detect existing customizations before updating related entries.
     for entry in entries:
         inspect(*entry)
     for entry in entries:
         write_entry(*entry)
+    # The same action remains reachable from Project Files if this optional search
+    # entry collides with a desktop file previously registered by the user.
+    try:
+        write_entry(base / "applications" / CLIENT_ENTRY_ID, client_entry_bytes(python, client), ENTRY_HEADER, 0o644)
+    except (OSError, ValueError) as exc:
+        print(f"客户端的独立搜索入口未能更新。可从“InstaBox 项目文件”的菜单打开。{exc}", file=sys.stderr)
 
 
 def main():

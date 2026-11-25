@@ -2,7 +2,19 @@
 
 在 Claude Desktop 对话或 ChatGPT Desktop 的本地 Codex 项目中，可以列出云目录、读取文本并查看 Git 状态。文件和用来读取它的 Python 进程都在选定的 InstaBox Linux 实例上。你选择调用的工具结果会进入官方客户端的对话上下文。账户、订阅、对话记录和工具授权由各自的官方客户端及组织管理。
 
-## Ubuntu 配置
+## 在 Ubuntu 桌面连接
+
+1. 从 GNOME 顶栏进入“活动”，搜索 **连接 InstaBox 到官方客户端**（英文 **Connect InstaBox to desktop apps**）。选择 **Claude** 或 **ChatGPT**。ChatGPT 使用已安装的 Ubuntu 官方桌面程序中的本地 Codex 项目。
+2. 已在“InstaBox 项目文件”中选过云机和目录时，这里会沿用该项目。首次绑定会引导你选择云机和目录，并把凭据存入 Ubuntu 用户密钥环。核对确认页上的客户端、机器和绝对路径，再点 **连接此项目**。已有合适的 Python 环境会直接复用，首次需要下载连接组件时，确认页会说明。若从旧版升级并提示缺少 `python3-venv`，在 Windows 中再运行一次新版 `Setup.cmd` 即可补装。
+3. 完全退出并重新打开所选客户端。在 Claude 的 **Settings → Developer → Local MCP servers** 或 ChatGPT 本地 Codex 项目的 **MCP** 设置中查看 `instabox-workspace`。可在已登录的项目会话中要求“读取这个云项目的 README.md”，并在客户端核对工具授权。实际返回的项目内容可进入这次厂商会话。
+
+每次只配置所选客户端。要让另一个客户端访问该项目，重新打开同一入口并选择它。要切换云项目，先在“InstaBox 项目文件”的“连接 InstaBox 项目”中更改项目，再为需要切换的客户端运行上述步骤。迁移解压目录后也可重新运行以更新启动路径。桌面入口使用系统密钥环和只读工具。需要开启保存时可使用下面的手工配置。
+
+首次连接的确认框来自 GNOME。确认后，ChatGPT 通过软件包自带的 Codex 设置接口登记连接，Claude 使用当前用户的 `claude_desktop_config.json`。如果已存在用户自行配置的同名服务，工作区会提示检查该项。[项目授权框实拍](native-client-connection.png) · [配置和读回记录](measurements/native-client-connections.json)
+
+切换项目时，ChatGPT 的设置接口可能重新排布该服务启动参数数组里的注释。如果另一个程序同时编辑设置并出现冲突，请先核对客户端的当前设置再重试。Claude 的配置目录如果位于不支持原子交换的文件系统上，可以在下面的手工配置步骤中合并已有文件。
+
+## Ubuntu 手工配置
 
 使用已登录的 Ubuntu 桌面用户，在解压的项目目录中运行以下命令。需要 Python 3.10 或更新版本、对应的 venv 组件和提供 Secret Service 的系统密钥环（例如 GNOME Keyring）。云机需已运行，并装有 Python 3。InstaBox 密钥需要能读取机器列表并调用该实例的 exec 接口。
 

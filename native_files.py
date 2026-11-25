@@ -85,24 +85,24 @@ def show_file(path):
         raise ValueError(f"工作副本已就绪。请在 Ubuntu 文件管理器中打开 {path}")
 
 
-def message(body, *, error=False):
+def message(body, *, error=False, title="InstaBox 项目文件"):
     try:
         if error and shutil.which("zenity"):
-            dialog = subprocess.run(["zenity", "--error", "--no-markup", "--title=InstaBox 项目文件",
+            dialog = subprocess.run(["zenity", "--error", "--no-markup", "--title=" + title,
                                      "--text=" + body], check=False)
             if dialog.returncode == 0:
                 return
         escaped = html.escape(body)
         if shutil.which("notify-send"):
-            result = subprocess.run(["notify-send", "--app-name=InstaBox 项目文件", "--",
-                                     "InstaBox 项目文件", escaped], timeout=5, check=False)
+            result = subprocess.run(["notify-send", "--app-name=" + title, "--",
+                                     title, escaped], timeout=5, check=False)
             if result.returncode == 0:
                 return
         if shutil.which("gdbus"):
             subprocess.run(["gdbus", "call", "--session", "--timeout", "4", "--dest",
                             "org.freedesktop.Notifications", "--object-path", "/org/freedesktop/Notifications",
                             "--method", "org.freedesktop.Notifications.Notify", "--", "InstaBox", "0", "",
-                            "InstaBox 项目文件", escaped, "[]", "{}", "8000"], capture_output=True)
+                            title, escaped, "[]", "{}", "8000"], capture_output=True)
     except (OSError, subprocess.SubprocessError):
         # A notification service can disappear after the file operation already succeeded.
         pass
@@ -126,6 +126,12 @@ def configure():
     return configure_project(validate, integrate, current=current)
 
 
+def project_for_client():
+    if not settings_path().exists() and not configure():
+        return None
+    return load_settings()
+
+
 def run(args):
     if args.action == "integrate":
         integrate(args.machine, args.project)
@@ -141,6 +147,10 @@ def run(args):
         return
     if args.action == "configure":
         configure()
+        return
+    if args.action == "connect-clients":
+        from linux.native_client_setup import connect_project_client
+        connect_project_client(load_project=project_for_client, state=xdg_path("XDG_STATE_HOME", ".local/state"))
         return
     if args.action == "browse" and not settings_path().exists() and not configure():
         return
@@ -190,10 +200,10 @@ def main(argv=None):
     config.add_argument("--project", required=True)
     relink = sub.add_parser("relink", help="更新桌面入口路径")
     relink.add_argument("--offer-setup", action="store_true", help="未连接项目时在活动菜单中提供首次设置入口")
-    for name in ("configure", "browse", "checkout", "publish", "refresh", "inspect"):
+    for name in ("configure", "connect-clients", "browse", "checkout", "publish", "refresh", "inspect"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--notify", action="store_true", help="在当前 GNOME 会话显示结果")
-        if name not in ("configure", "browse"):
+        if name not in ("configure", "connect-clients", "browse"):
             cmd.add_argument("path", help="云端相对路径" if name == "checkout" else "登记的本地工作副本路径")
         if name == "checkout":
             cmd.add_argument("--show", action="store_true", help="在本机文件管理器中选中副本")
@@ -206,7 +216,8 @@ def main(argv=None):
             note += " 请选中原稿，使用“取回 InstaBox 最新版本”，在新副本中合并修改后再保存到云机。"
         print(note, file=sys.stderr)
         if getattr(args, "notify", False):
-            message(note, error=True)
+            title = "连接 InstaBox 到官方客户端" if args.action == "connect-clients" else "InstaBox 项目文件"
+            message(note, error=True, title=title)
         return 1
     return 0
 

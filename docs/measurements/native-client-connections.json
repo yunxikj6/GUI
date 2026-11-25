@@ -1,0 +1,217 @@
+{
+  "linuxDesktop": {
+    "system": "Ubuntu 24.04.5 GNOME 46 in private Xvfb and Xfwm4",
+    "projectBinding": "Synthetic m_fixture /data/workspace-sample registered by native_files.py integrate. No live InstaBox machine, API key, client account, or model interaction was used.",
+    "vendorPackages": {
+      "ChatGPT": "26.1120.50957",
+      "Claude": "6.28899.6"
+    },
+    "networkInterfaces": [
+      "lo"
+    ],
+    "v4DefaultRoutes": [],
+    "v6DefaultRoutes": [],
+    "entry": "GNOME Activities -> Connect InstaBox to desktop apps",
+    "firstConfirmationCancelled": {
+      "baseline": {
+        "claude": "d457a813bc028f67aa6be16ac588683cf0c34b6945af73abce581c68d9859bdb",
+        "codex": "d648b7cf89b4047941ddd2c109e1dee543e17371b2e4c97a5ad93575f27608d7"
+      },
+      "after": {
+        "claude": "d457a813bc028f67aa6be16ac588683cf0c34b6945af73abce581c68d9859bdb",
+        "codex": "d648b7cf89b4047941ddd2c109e1dee543e17371b2e4c97a5ad93575f27608d7"
+      }
+    },
+    "confirmedClaudeOnly": {
+      "claude": "5461c7148bf6b142aaa74b8eee7b5f53f10004c32f5ebed82b0f99017f549d56",
+      "codex": "d648b7cf89b4047941ddd2c109e1dee543e17371b2e4c97a5ad93575f27608d7"
+    },
+    "confirmedChatGPT": {
+      "claude": "5461c7148bf6b142aaa74b8eee7b5f53f10004c32f5ebed82b0f99017f549d56",
+      "codex": "a5735cda7c8028ecc7252bce3a73cdae0f394304b6a42c285d0b48075ef992a4"
+    },
+    "afterRepeatedRegistrationOfBoth": {
+      "claude": "5461c7148bf6b142aaa74b8eee7b5f53f10004c32f5ebed82b0f99017f549d56",
+      "codex": "a5735cda7c8028ecc7252bce3a73cdae0f394304b6a42c285d0b48075ef992a4"
+    },
+    "screenshot": {
+      "path": "../native-client-connection.png",
+      "sha256": "2b36ee5be6858cd865bbf658b725bddca4a9ca562ca6e617c0177aa8a40e0d23"
+    }
+  },
+  "privatePythonRuntime": {
+    "cold": {
+      "phase": "cold",
+      "platform": "Ubuntu 24.04.5 LTS",
+      "python": "3.12.3",
+      "dependencies": [
+        "1.30.0",
+        "25.7.0"
+      ],
+      "wheelhouseAccessible": true,
+      "networkInterfaces": [
+        "lo"
+      ],
+      "externalVenvBytesUnchanged": true,
+      "runtimeIsPrivate": true,
+      "pipConfigRedirectsBlocked": true,
+      "durationSeconds": 11.47,
+      "progress": [
+        "正在创建用户专用 Python 环境…",
+        "正在安装 MCP 与系统密钥环依赖，首次安装可能需要几分钟…"
+      ]
+    },
+    "warm": {
+      "phase": "warm",
+      "packageSourceAvailable": false,
+      "externalRoutes": 0,
+      "progress": [],
+      "registeredVendorAccounts": 0,
+      "repoMoved": true,
+      "reusedSelectedPython": true,
+      "requiresPip": null,
+      "durationSeconds": 4.55,
+      "server": "instabox-workspace",
+      "protocol": "2025-11-25",
+      "tools": [
+        "list_workspace_directory",
+        "read_workspace_text",
+        "get_workspace_git_status"
+      ]
+    },
+    "minimal": {
+      "phase": "minimal",
+      "packageSourceAvailable": false,
+      "externalRoutes": 0,
+      "progress": [],
+      "registeredVendorAccounts": 0,
+      "repoMoved": true,
+      "reusedSelectedPython": true,
+      "requiresPip": false,
+      "durationSeconds": 4.26,
+      "server": "instabox-workspace",
+      "protocol": "2025-11-25",
+      "tools": [
+        "list_workspace_directory",
+        "read_workspace_text",
+        "get_workspace_git_status"
+      ]
+    },
+    "enterprise": {
+      "ubuntu": "24.04.5 amd64",
+      "pipConfigSource": "per-user pip.conf only",
+      "loopbackOnly": true,
+      "trustedCustomCA": true,
+      "mirrorOnlyReachableThroughProxy": true,
+      "installedMcpAndKeyring": true,
+      "blockedInstallTarget": true,
+      "timeSeconds": 11.09,
+      "approvedConnect": 72,
+      "projectIndexGet": 36,
+      "wheelDownload": 36
+    },
+    "runtimeSourceSHA256": "dd609c4b6c24f2117f44935e6d768a5aa1c85d6d4d2ed547eeed2fce3a99f186",
+    "requirementsSHA256": "606512f28bbf53a98c04114e25a2fd8602d751c4cfcb32e82a8dcd64277300fb",
+    "wheelCount": 36,
+    "wheelBytes": 9900571
+  },
+  "chatgptAppServer": {
+    "configuredVia": "OpenAI bundled app-server config/read and versioned config/batchWrite",
+    "existingPreferenceRetained": true,
+    "secondRegistrationWasUnchanged": true,
+    "linuxPackageVersion": "26.1120.50957",
+    "appServer": "usr/lib/chatgpt/resources/codex",
+    "appServerSha256": "13f4960291147ba63dca2508920962f97dccf8710e11cb931125048b5436e9b2",
+    "appServerVersion": "codex-cli 0.171.0-alpha.13.2",
+    "transport": "Vendor app-server JSON-RPC over stdio, local workspace MCP over stdio",
+    "methods": [
+      "initialize",
+      "mcpServerStatus/list",
+      "thread/start",
+      "mcpServer/tool/call"
+    ],
+    "tools": [
+      "get_workspace_git_status",
+      "list_workspace_directory",
+      "read_workspace_text"
+    ],
+    "readOnly": true,
+    "ephemeralThread": true,
+    "modelTurns": 0,
+    "vendorLogin": false,
+    "cloudGit": {
+      "state": "ready",
+      "branch": "reviewed-edits",
+      "changedFiles": 0
+    },
+    "readback": {
+      "checkoutRevision": "5b479ccce52cab21517f93ba9414839af086873a",
+      "file": "docs/measurements/native-linux-clients.json",
+      "size": 18172,
+      "sha256": "43c22021d6daffe04397ca44ff5c6f1f4518ca10039a747ce1b9a7924c8b84c6",
+      "matchesGit": true
+    }
+  },
+  "limits": {
+    "realWindows11OrWslgInThisRun": false,
+    "vendorSignIn": false,
+    "conversationsOrArtifactsTested": false
+  },
+  "freshUbuntuProfile": {
+    "entry": "start-workspace.sh, GNOME Activities, client selection, project selection, cancel",
+    "projectPreconfigured": false,
+    "clientFilesAfterCancel": {
+      "claude": null,
+      "codex": null
+    },
+    "projectFileCreatedAfterCancel": false,
+    "networkInterfaces": [
+      "lo"
+    ]
+  },
+  "otherSettingsDuringRegistration": [
+    "Claude custom sample-manual server and preferences",
+    "Codex custom sample-manual server and existing TOML comment"
+  ],
+  "claudeStartup": {
+    "launch": "GNOME desktop double-click, no existing Claude process",
+    "vendorExecutableSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "firstSeenSeconds": 2.391,
+    "configOpen": [
+      {
+        "syscall": "IN_OPEN",
+        "elapsed": 2.847
+      }
+    ],
+    "limitation": "inotify reports the file event but not the opener PID. The original vendor process was observed separately, in the same isolated namespace during the watch.",
+    "afterReopen": {
+      "observedMcpEntryUnchanged": true,
+      "unrelatedManualServerPreserved": true,
+      "unrecognizedSyntheticPreference": "Vendor startup normalized away the artificial localExampleFlag. The config writer and repeated setup retained it byte-for-byte before the official client started."
+    },
+    "vendorLogin": false,
+    "toolCallObserved": false
+  },
+  "installationWindow": {
+    "scope": "Real Ubuntu Zenity, runtime and registration; app choice, fixture project and consent supplied by test. No real vendor account or external routes.",
+    "ubuntu": "24.04.5 amd64",
+    "zenity": "4.0.1",
+    "cases": {
+      "normal": {
+        "vendorConfigInFixture": true,
+        "installedPrivateVenvPresentOnReturn": true,
+        "eofToCloseSeconds": 0.013
+      },
+      "dismiss": {
+        "vendorConfigInFixture": false,
+        "installedPrivateVenvPresentOnReturn": false,
+        "eofToCloseSeconds": null
+      },
+      "dismiss-during-pip": {
+        "vendorConfigInFixture": false,
+        "installedPrivateVenvPresentOnReturn": true,
+        "eofToCloseSeconds": null
+      }
+    }
+  }
+}
