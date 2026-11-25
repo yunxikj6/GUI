@@ -41,7 +41,8 @@
     "initialWindowSizeRecord": "native-gnome-window-size.json",
     "projectFilesRecord": "native-project-files.json",
     "desktopShortcutIconsRecord": "native-shortcut-icons.json",
-    "officialLinuxClientsRecord": "native-linux-clients.json"
+    "officialLinuxClientsRecord": "native-linux-clients.json",
+    "browserHandoffRecord": "native-browser-handoff.json"
   },
   "claudeDesktop": {
     "debianPackage": "claude-desktop",
@@ -129,7 +130,17 @@
       "modelRequestTested": false
     },
     "desktopConnectionRecord": "native-client-connections.json",
-    "gitDiffPermissionRecord": "native-git-review.json"
+    "gitDiffPermissionRecord": "native-git-review.json",
+    "publishedGitPatchReadback": {
+      "commit": "31b2d609c222076efdf2cb55d5f81784af91007a",
+      "firstParent": "bfc722051d1140409a2a0a38a178db5ffebab1bc",
+      "patchBytes": 65536,
+      "completeGitPatchBytes": 78581,
+      "sha256": "ba2075372a87163cc6d6a098fa185911e5d976b7278c74b55a471e726b1bce36",
+      "truncated": true,
+      "matchesIndependentGit": true,
+      "via": "ChatGPT desktop bundled Codex in an ephemeral thread against the authorized clean InstaBox staging checkout; zero model turns."
+    }
   },
   "windows": {
     "launcherPeArchitectures": [
@@ -152,10 +163,10 @@
     "applicationWindowVerifierRecord": "native-app-window-verifier.json"
   },
   "pythonRegression": {
-    "archiveRevision": "bfc722051d1140409a2a0a38a178db5ffebab1bc",
-    "passed": 314,
+    "archiveRevision": "31b2d609c222076efdf2cb55d5f81784af91007a",
+    "passed": 328,
     "skipped": 0,
-    "snapshotFiles": 224,
+    "snapshotFiles": 229,
     "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }

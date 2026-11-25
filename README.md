@@ -4,7 +4,7 @@ Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面�
 
 在 Windows 11 上解压整个源码包。首次使用时，准备好带 WSLg 的 Ubuntu 24.04 WSL 2，双击 `Setup.cmd` 安装桌面依赖。以后直接双击 `Start.cmd` 进入 GNOME。启动程序会选择 x64 或 ARM64 版本。有多个 Ubuntu 时用 `Start.cmd --distro Ubuntu-24.04` 指定发行版。[Windows 准备和验收](docs/native-windows.md)
 
-在 GNOME 的“活动”里搜索 **安装官方客户端**（英文为 **Install official desktop apps**），选择 ChatGPT、Claude 或两者，在 Ubuntu 终端确认 APT 安装。随后从“活动”或桌面图标打开应用。两个 Linux 客户端都使用厂商提供的桌面程序和图标，窗口由同一个本机 GNOME 桌面管理。各自的账户负责聊天和登录。InstaBox 提供授权项目的文件和计算。[Ubuntu 安装与启动](docs/native-windows.md#打开原版应用) · [官方客户端的项目连接](docs/official-client-workspace.md)
+在 GNOME 的“活动”里搜索 **安装官方客户端**（英文为 **Install official desktop apps**），选择 ChatGPT、Claude 或两者，在 Ubuntu 终端确认 APT 安装。随后从“活动”或桌面图标打开应用。两个 Linux 客户端都使用厂商提供的桌面程序和图标，窗口由同一个本机 GNOME 桌面管理。ChatGPT 的登录链接会打开 Ubuntu 浏览器，Claude 的欢迎按钮会在原窗口显示登录选项。各自的账户负责聊天和登录。InstaBox 提供授权项目的文件和计算。[Ubuntu 安装与启动](docs/native-windows.md#打开原版应用) · [官方客户端的项目连接](docs/official-client-workspace.md)
 
 ![Ubuntu GNOME 桌面实拍，Claude for Linux 的官方欢迎窗口已打开，旁边可见桌面图标和 Dock](docs/native-floating-claude.png)
 

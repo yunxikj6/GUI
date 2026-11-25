@@ -19,12 +19,15 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
   gnome-text-editor gnome-terminal zenity gnome-keyring python3-venv python3-keyring libnotify-bin fonts-noto-cjk ca-certificates curl gpg
 ```
 
+Ubuntu 中已有可用的网页浏览器时，安装器沿用它。如果 HTTP 或 HTTPS 缺少可用浏览器，安装清单会包含 Ubuntu 官方仓库的 GNOME Web（`epiphany-browser`）。手工安装的最小系统如需补装，可运行 `sudo apt install epiphany-browser`。已安装过旧版本工作区的 Windows 用户可以再运行一次新版 `Setup.cmd`，随后重新打开工作区。
+
 ## 打开原版应用
 
 在 GNOME 顶栏打开“活动”，搜索 **安装官方客户端**（英文 **Install official desktop apps**），选择 ChatGPT、Claude 或两者。确认后由终端下载厂商提供的软件包，APT 列出依赖并根据需要请求 sudo。可用 Enter 取消选择。完成后搜索应用名称并启动。如果早期版本的工作区缺少终端，请从 Windows 再运行一次 `Setup.cmd`。也可以在已打开的 Ubuntu 终端中，从解压目录运行 `bash linux/setup-vendor-apps.sh`。[实际安装菜单](native-ubuntu-app-installer.png)
 
 - **ChatGPT**。OpenAI 提供 Ubuntu 24.04 的 x64 和 ARM64 Linux 桌面预览版。安装后 GNOME 通过软件包注册的 `chatgpt.desktop` 打开原程序。工作区会为这个 GNOME 会话选择 OpenAI 文档中的原生 Wayland 参数，让窗口由 Ubuntu 桌面管理。如果已在另一个显示器会话中运行 ChatGPT，请先从应用菜单完全退出，再从工作区打开。OpenAI 将原生 Wayland 支持标为实验性。[OpenAI 的 Linux 安装和兼容性说明](https://learn.chatgpt.com/docs/linux/linux-app)
 - **Claude**。Anthropic 的 Linux 客户端在应用菜单注册为 `com.anthropic.Claude.desktop`。桌面图标会打开它自己的窗口。Claude 对话与 Artifacts 的可用性取决于登录账户。[Anthropic 官方安装说明](https://support.claude.com/en/articles/10065433-install-claude-desktop)
+- **登录时打开浏览器**。在隔离的 Ubuntu 桌面中，点击 ChatGPT 的“Continue to sign in”后，同一个 GNOME 桌面里出现了 GNOME Web 窗口。独立的两次点击核对了目标主机 `chatgpt.com`。Claude 的“Get started”先在自己的窗口显示登录选项，选择“Continue with Google”后会发起前往 `claude.com` 的外部 HTTPS 请求。工作区沿用 Ubuntu 的应用关联。浏览器交回 `codex:` 或 `claude:` 链接时，系统会打开对应的官方程序。如果你曾手工将 HTTPS 默认应用设为 ChatGPT，可以在 GNOME 的默认应用设置中选择浏览器。[本机浏览器实拍](native-ubuntu-system-browser.png) · [登录入口与协议实测](measurements/native-browser-handoff.json)
 - **Windows 版本**。在 WSL 中，缺少相应 Linux 客户端时仍提供对应的 Windows 应用入口。用户选择该入口时，启动器调起已安装的官方 Microsoft Store 版本。如果尚未安装商店版，会询问是否打开官方商品页。Windows 应用在独立的 Windows 窗口中运行。[ChatGPT 商店页](https://apps.microsoft.com/detail/9plm9xgg6vks) · [Claude 商店页](https://apps.microsoft.com/detail/9p6k58ths811)
 
 - **项目数据**。需要在应用内读取云项目时，从 GNOME “活动”打开 **连接 InstaBox 到官方客户端**，选择应用并核对项目。默认可列目录、读文本及查询 Git 状态。需要在原厂对话中审阅代码改动时，在同一确认页选择“包含 Git 差异”。要保存文件，可用下述文件管理器操作。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)

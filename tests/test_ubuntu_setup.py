@@ -35,12 +35,12 @@ class UbuntuSetupTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.trace = Path(temp.name) / "calls"
 
-    def invoke(self, missing="", response="\n", fail="", terminal=True):
+    def invoke(self, missing="", response="\n", fail="", terminal=True, env=None):
         command = ["bash", "-c", SHELL]
         if terminal:
             command = ["script", "--quiet", "--return", "--command", shlex.join(command), "/dev/null"]
         return subprocess.run(command, env=dict(os.environ, SETUP=str(SCRIPT), TRACE=str(self.trace),
-                              MISSING=missing, FAIL_AT=fail), input=response, text=True,
+                              MISSING=missing, FAIL_AT=fail, **(env or {})), input=response, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
 
     def test_cancel_and_already_installed_never_run_apt(self):
@@ -51,6 +51,47 @@ class UbuntuSetupTests(unittest.TestCase):
             self.assertEqual(result.returncode, 130, result.stdout)
             self.assertIn("nautilus", result.stdout)
         self.assertFalse(self.trace.exists())
+
+    @unittest.skipUnless(shutil.which("update-desktop-database") and shutil.which("gio"), "requires GIO desktop handlers")
+    def test_offer_browser_only_when_gnome_has_no_web_browser(self):
+        root = self.trace.parent
+        env = {key: str(root / key) for key in
+               ("HOME", "XDG_CONFIG_HOME", "XDG_CONFIG_DIRS", "XDG_DATA_HOME", "XDG_DATA_DIRS", "XDG_CACHE_HOME")}
+        for directory in env.values():
+            Path(directory).mkdir()
+        apps = Path(env["XDG_DATA_DIRS"]) / "applications"
+        apps.mkdir()
+        schemes = ("x-scheme-handler/http", "x-scheme-handler/https")
+        def handler(app_id, category):
+            (apps / app_id).write_text("[Desktop Entry]\nType=Application\nName=Fixture\nExec=/bin/true %U\n"
+                                       f"Categories={category};\nMimeType={';'.join(schemes)};x-scheme-handler/codex;\n")
+            subprocess.run(["update-desktop-database", apps], check=True)
+
+        handler("chatgpt.desktop", "Utility")
+        user = Path(env["XDG_CONFIG_HOME"]) / "mimeapps.list"
+        user.write_text("[Default Applications]\nx-scheme-handler/codex=chatgpt.desktop\n")
+        before = user.read_bytes()
+        result = self.invoke("epiphany-browser", "\n", env=env)
+        self.assertEqual(result.returncode, 130, result.stdout)
+        self.assertIn("epiphany-browser", result.stdout)
+        self.assertFalse(self.trace.exists())
+        result = self.invoke("epiphany-browser", "y\n", env=env)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("install epiphany-browser", self.trace.read_text())
+        self.assertEqual(user.read_bytes(), before)
+
+        if subprocess.run(["/usr/bin/python3", "-I", "-c", "from gi.repository import Gio"],
+                          capture_output=True).returncode:
+            self.skipTest("system Python GIO unavailable")
+        handler("my-browser.desktop", "Network;WebBrowser")
+        calls = self.trace.read_text()
+        for choices in (b"x-scheme-handler/https=my-browser.desktop\nx-scheme-handler/http=my-browser.desktop\n",
+                        b"[Added Associations]\nx-scheme-handler/https=chatgpt.desktop;my-browser.desktop;\n"):
+            user.write_bytes(before + choices)
+            result = self.invoke("epiphany-browser", env=env)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(self.trace.read_text(), calls)
+            self.assertEqual(user.read_bytes(), before + choices)
 
     def test_failed_update_and_retry(self):
         result = self.invoke("nautilus gvfs", "y\n", "update")

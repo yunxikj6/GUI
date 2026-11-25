@@ -17,6 +17,29 @@ class LaunchError(Exception):
     pass
 
 
+def configure_browser(env, private_dir):
+    # Noble xdg-open uses DESKTOP_SESSION as its GNOME fallback for "ubuntu:GNOME".
+    # Desktop markers belonging to the outer display must not select a different opener.
+    for key in ("DE", "KDE_FULL_SESSION", "MATE_DESKTOP_SESSION_ID", "LXQT_SESSION_CONFIG", "DESKTOP"):
+        env.pop(key, None)
+    env["DESKTOP_SESSION"] = "gnome"
+    try:
+        result = subprocess.run(["/usr/bin/python3", "-I", str(Path(__file__).with_name("session_browser.py"))],
+                                env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, timeout=3)
+        if result.returncode or not result.stdout:
+            return
+        directory = Path(private_dir) / "browser-data"
+        apps = directory / "applications"
+        apps.mkdir(parents=True)
+        (apps / "mimeapps.list").write_bytes(result.stdout)
+        # Lower priority than all user and system preferences, ahead of implicit associations.
+        search = env.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+        env["XDG_DATA_DIRS"] = search + os.pathsep + str(directory)
+    except (OSError, subprocess.TimeoutExpired):
+        pass  # The offline desktop also runs without browser discovery.
+
+
 def configure_chatgpt_display(env, private_dir, child_display):
     # OpenAI's desktop entry invokes "chatgpt %U". DING can pass the outer X11
     # display as well as the nested Wayland socket. Select the documented native
@@ -264,6 +287,7 @@ def main():
                    CLOUDWORKSPACE_NESTED_GNOME="1",
                    XDG_SESSION_TYPE="wayland", GNOME_SHELL_SESSION_MODE=mode,
                    XDG_CURRENT_DESKTOP="ubuntu:GNOME" if mode == "ubuntu" else "GNOME")
+        configure_browser(env, private_dir)
         configure_chatgpt_display(env, private_dir, child_display)
         # D-Bus activated Wayland applications must inherit the child display. Only the compositor
         # and its viewer need the outer display while constructing the nested window.

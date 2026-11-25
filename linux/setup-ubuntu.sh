@@ -15,6 +15,10 @@ check_platform() {
     fi
 }
 
+has_session_browser() {
+    XDG_CURRENT_DESKTOP=ubuntu:GNOME /usr/bin/python3 -I "$(dirname -- "${BASH_SOURCE[0]}")/session_browser.py" --check 2>/dev/null
+}
+
 setup() {
     if [[ $# != 1 || $1 != --wsl ]]; then
         echo '用法：bash linux/setup-ubuntu.sh --wsl' >&2
@@ -28,6 +32,8 @@ setup() {
         xdg-user-dirs dbus-daemon x11-utils xwayland libgl1-mesa-dri
         gnome-text-editor gnome-terminal zenity gnome-keyring python3-venv python3-keyring libnotify-bin fonts-noto-cjk ca-certificates curl gpg
     )
+    # Noble's GNOME MIME defaults already select Web when no preferred browser exists.
+    if ! has_session_browser; then packages+=(epiphany-browser); fi
     local missing=() package status answer
     for package in "${packages[@]}"; do
         status=$(dpkg-query -W '-f=${db:Status-Status}' -- "$package" 2>/dev/null) || status=''

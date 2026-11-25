@@ -1,0 +1,231 @@
+{
+  "platform": {
+    "distribution": "Ubuntu 24.04.5 LTS amd64",
+    "testedHost": "Linux",
+    "desktop": "GNOME Shell 46.0, nested Mutter Wayland",
+    "packages": {
+      "epiphany-browser": "46.5-0ubuntu1",
+      "libwebkitgtk-6.0-4": "2.52.6-0ubuntu0.24.04.2",
+      "chatgpt": "26.1120.50957",
+      "claude-desktop": "6.28899.6",
+      "netsurf-gtk": "3.11-1build5",
+      "xdg-desktop-portal": "1.18.4-1ubuntu2.24.04.3",
+      "xdg-utils": "1.1.3-4.1ubuntu3"
+    },
+    "epiphanyDebSha256": "d11b912183292c47c6994c33fedd0a920559b87058caab93b64adc7c690d0547",
+    "browserExecutableSha256": "1506e04ad7e09f8678a1f92e54e8017b596952375722c142bba48754fce7b661",
+    "verifiedOnWindowsWSLg": false
+  },
+  "baseline": {
+    "wslImage": {
+      "amd64Packages": 523,
+      "arm64Packages": 521,
+      "bundledBrowser": false,
+      "wsluPresent": false,
+      "packageLists": [
+        "https://releases.ubuntu.com/noble/ubuntu-24.04.5-wsl-amd64.manifest",
+        "https://cdimage.ubuntu.com/releases/noble/release/ubuntu-24.04.5-wsl-arm64.manifest"
+      ]
+    },
+    "noBrowser": {
+      "gioDefaultHttp": "chatgpt.desktop",
+      "gioDefaultHttps": "chatgpt.desktop",
+      "xdgSettingsOutput": "chatgpt.desktop",
+      "xWwwBrowserAlternative": false
+    },
+    "installingOnlyGnomeWeb": {
+      "gioOpenHttp": "loaded loopback page in GNOME Web",
+      "xdgOpenHttps": "the unmodified prior nested environment launched ChatGPT; GNOME Web did not load the loopback page"
+    }
+  },
+  "candidate": {
+    "sessionDesktop": "gnome",
+    "xdgCurrentDesktop": "ubuntu:GNOME",
+    "sha256": {
+      "gnome_session.py": "2c0a53bdb27f2a7730ef6d811c46847579cd44292e76c07f189344dc6f62ec37",
+      "session_browser.py": "b5015adc2616338329979651f10cea5552718b8f5a88dc55f80dce1784a59d40",
+      "setup-ubuntu.sh": "cf5e53313c9110c7bc5e14668f9893e3fd2be0485b4cb5185405a889c0e09f08"
+    },
+    "freshHomeDefaults": {
+      "http": "org.gnome.Epiphany.desktop",
+      "https": "org.gnome.Epiphany.desktop",
+      "codex": "chatgpt.desktop",
+      "claude": "com.anthropic.Claude.desktop"
+    },
+    "customUserDefaults": {
+      "before": {
+        "x-scheme-handler/http": "netsurf-gtk.desktop",
+        "x-scheme-handler/https": "netsurf-gtk.desktop",
+        "text/html": "org.gnome.TextEditor.desktop",
+        "x-scheme-handler/claude": "com.anthropic.Claude.desktop",
+        "x-scheme-handler/codex": "chatgpt.desktop"
+      },
+      "after": {
+        "x-scheme-handler/http": "netsurf-gtk.desktop",
+        "x-scheme-handler/https": "netsurf-gtk.desktop",
+        "text/html": "org.gnome.TextEditor.desktop",
+        "x-scheme-handler/claude": "com.anthropic.Claude.desktop",
+        "x-scheme-handler/codex": "chatgpt.desktop"
+      },
+      "mimeappsSha256Before": "6fdfc41f5f9198257f87848151ad765ec0d7b46e7173440c0b846a2615535a49",
+      "mimeappsSha256After": "6fdfc41f5f9198257f87848151ad765ec0d7b46e7173440c0b846a2615535a49",
+      "recognizedBySetup": true
+    },
+    "regressionFixtures": {
+      "nobleGioPrecedenceChecks": 54,
+      "cases": "Current and legacy user preferences, administrator or distribution defaults and implicitly chosen handlers. Both HTTP and HTTPS retain explicitly assigned applications."
+    }
+  },
+  "loopbackBrowser": {
+    "gnomeEntry": "linux/start-workspace.sh",
+    "entrypoints": [
+      {
+        "call": "gio open",
+        "scheme": "http",
+        "host": "127.0.0.1",
+        "pageRendered": true
+      },
+      {
+        "call": "xdg-open",
+        "scheme": "https",
+        "host": "127.0.0.1",
+        "pageRendered": true
+      }
+    ],
+    "network": "only loopback, no external routes",
+    "tls": "A test CA trusted only in this test root signed the loopback server certificate; certificate errors were not bypassed.",
+    "engine": "WebKitGTK",
+    "originalBrowserElf": "/usr/bin/epiphany",
+    "nestedWayland": true,
+    "outerX11HasBrowserTopLevel": false,
+    "screen": {
+      "content": "GNOME Web renders the non-sensitive local HTTPS page inside the Ubuntu workspace.",
+      "width": 1312,
+      "height": 924,
+      "sha256": "f5067990388aab5d4f486ccdaeebf9985fef079833d9f41e1f6c02f9af026a85",
+      "path": "../native-ubuntu-system-browser.png"
+    }
+  },
+  "publicSigninButtons": {
+    "measurement": "Cold, disposable profiles; actual vendor buttons; OS handler records only scheme and hostname.",
+    "chatgpt": {
+      "control": "Continue to sign in",
+      "external": {
+        "scheme": "https",
+        "host": "chatgpt.com"
+      },
+      "independentColdStarts": 2,
+      "alternate": "Sign in another way opens the first-party alternate methods panel."
+    },
+    "claude": [
+      {
+        "control": "Get started",
+        "external": false,
+        "sameWindowAndProcess": true,
+        "choices": [
+          "Continue with Google",
+          "Email"
+        ]
+      },
+      {
+        "control": "Continue with Google",
+        "external": {
+          "scheme": "https",
+          "host": "claude.com"
+        }
+      }
+    ]
+  },
+  "schemeDispatch": {
+    "method": "In a fresh nested GNOME session, xdg-open a bare codex scheme then a bare claude scheme; compare running ELF with the installed package.",
+    "eachOpenedCorrectOriginalELF": {
+      "codex": true,
+      "claude": true
+    },
+    "authorizationResponseSimulated": false
+  },
+  "limits": {
+    "accountUsed": false,
+    "oauthRoundTripVerified": false,
+    "authenticatedConversationVerified": false,
+    "windowsWslgDesktopVerifiedHere": false
+  },
+  "evidence": [
+    {
+      "description": "Real GNOME Web and vendor protocol dispatch",
+      "filename": "result.json",
+      "sha256": "249a5f6d8b442dd73490f4854594bb05c8b83b805fa8c4be90dbfed1c029cc95"
+    },
+    {
+      "description": "Real user-selected NetSurf preserved",
+      "filename": "user-choice.json",
+      "sha256": "bf8631bca0e1dc784b71ef48b985cd58a0bbeb0f7948043960964a12aaf0fd24"
+    },
+    {
+      "description": "Actual ChatGPT continue button, host-only route",
+      "filename": "chatgpt-click2.log",
+      "sha256": "94425e8c2d395ba910e047b84e52acd6d634df7b133723a01f3f4f07d6e8ecc2"
+    },
+    {
+      "description": "Actual Claude first and Google buttons, host-only route",
+      "filename": "claude-google-observed.log",
+      "sha256": "ac4264fa94a3909b97979339953e3c29a4865640588b4b5478023418fce832d8"
+    },
+    {
+      "description": "Real Ubuntu APT installation",
+      "filename": "apt-web.log",
+      "sha256": "070ab30b1b6dfec17602640daf47a113ef915da679860297529f7daf615e2b80"
+    },
+    {
+      "description": "HTTPS loopback page in the real GNOME workspace",
+      "filename": "https-in-ubuntu.png",
+      "sha256": "f5067990388aab5d4f486ccdaeebf9985fef079833d9f41e1f6c02f9af026a85"
+    },
+    {
+      "description": "Normal same-session portal caller, browser and loopback-render receipt",
+      "filename": "receipt.json",
+      "sha256": "d1a0c20a855e761994bb67a6048026efdf9ffefca2bc3a058e9974ce756f13c1"
+    },
+    {
+      "description": "Direct real ChatGPT sign-in button to real Epiphany in the same Mutter session",
+      "filename": "vendor-signin-final.json",
+      "sha256": "1b575602927431dccdb9661d6417cc0f30bd925e71392f231f2818a37ebde9c7"
+    }
+  ],
+  "standardPortal": {
+    "method": "org.freedesktop.portal.OpenURI.OpenURI",
+    "caller": "Separate test application launched normally by the same nested GNOME session bus",
+    "sameMountUserAndPidNamespace": true,
+    "response": 0,
+    "pageShownInPrivateWaylandBrowser": true,
+    "scheme": "http",
+    "host": "127.0.0.1",
+    "browserExecutableSha256": "1506e04ad7e09f8678a1f92e54e8017b596952375722c142bba48754fce7b661"
+  },
+  "chatgptButtonToRealBrowser": {
+    "control": "Continue to sign in",
+    "launch": "linux/start-workspace.sh then Ubuntu Activities search ChatGPT and press Return",
+    "previousBrowserWindows": 0,
+    "sameRunOrigin": null,
+    "originSource": "real window observed; origin available independently in host-only handler test",
+    "independentHostOnlyObservation": {
+      "scheme": "https",
+      "host": "chatgpt.com"
+    },
+    "mutterWindows": [
+      {
+        "desktopId": "chatgpt.desktop",
+        "childWayland": true,
+        "matchesAptExecutable": true
+      },
+      {
+        "desktopId": "org.gnome.Epiphany.desktop",
+        "childWayland": true,
+        "matchesAptExecutable": true
+      }
+    ],
+    "accountUsed": false,
+    "network": "loopback only; no remote page fetched",
+    "captureAfterClick": false
+  }
+}
