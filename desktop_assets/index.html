@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linux 桌面 · 云端工作区</title><link rel="stylesheet" href="/desktop/style.css"></head>
+<body><header><a class="back" href="/" aria-label="返回工作区">‹ 工作区</a><span class="separator"></span>
+<h1>Linux 桌面</h1><span id="status" role="status">正在连接</span>
+<div class="toolbar"><button id="control" disabled>接管输入</button><button id="mode" disabled>逐帧查看</button><button id="retry">重新连接</button></div></header>
+<main id="screen" aria-label="云端 Linux 桌面"></main>
+<form id="textForm" hidden><label for="typing">发送到云端输入框</label><input id="typing" autocomplete="off" maxlength="2048"><button type="submit">发送文字</button></form>
+<script type="module" src="/desktop/viewer.js"></script></body></html>

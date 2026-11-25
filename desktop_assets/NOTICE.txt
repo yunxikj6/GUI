@@ -1,0 +1,6 @@
+The desktop viewer uses noVNC 1.7.0. Its original npm source package is
+included unmodified as novnc-1.7.0.tgz. Authors, license texts (including
+MPL 2.0), individual file notices and the bundled pako license are included
+in the archive. Upstream: https://github.com/novnc/noVNC/tree/v1.7.0
+Package: https://registry.npmjs.org/@novnc/novnc/-/novnc-1.7.0.tgz
+SHA-256: 32689f18d6abe96bc6530828a6bd0b9ae33bda07c083a6575ed255b5a8f2e903

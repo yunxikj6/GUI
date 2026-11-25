@@ -1,0 +1,122 @@
+{
+  "date": "2026-11-25",
+  "warmRemoteRead": {
+    "mode": "instabox",
+    "path": "README.md",
+    "count": 15,
+    "medianMs": 230.4,
+    "p95Ms": 297.5,
+    "samples": [
+      {
+        "ms": 275.6,
+        "responseBytes": 473
+      },
+      {
+        "ms": 230.4,
+        "responseBytes": 473
+      },
+      {
+        "ms": 227.9,
+        "responseBytes": 473
+      },
+      {
+        "ms": 249.0,
+        "responseBytes": 473
+      },
+      {
+        "ms": 297.5,
+        "responseBytes": 473
+      },
+      {
+        "ms": 224.4,
+        "responseBytes": 473
+      },
+      {
+        "ms": 260.2,
+        "responseBytes": 473
+      },
+      {
+        "ms": 219.1,
+        "responseBytes": 473
+      },
+      {
+        "ms": 250.3,
+        "responseBytes": 473
+      },
+      {
+        "ms": 198.4,
+        "responseBytes": 473
+      },
+      {
+        "ms": 199.0,
+        "responseBytes": 473
+      },
+      {
+        "ms": 274.9,
+        "responseBytes": 473
+      },
+      {
+        "ms": 210.8,
+        "responseBytes": 473
+      },
+      {
+        "ms": 236.4,
+        "responseBytes": 473
+      },
+      {
+        "ms": 210.7,
+        "responseBytes": 473
+      }
+    ]
+  },
+  "cachedVisibleFrame": {
+    "samples": [
+      {
+        "syncContent": false,
+        "readyFrame": 13.4,
+        "nextFrame": 29.7,
+        "networkStillPending": true
+      },
+      {
+        "syncContent": false,
+        "readyFrame": 13.1,
+        "nextFrame": 29.5,
+        "networkStillPending": true
+      },
+      {
+        "syncContent": false,
+        "readyFrame": 8.5,
+        "nextFrame": 21.5,
+        "networkStillPending": true
+      },
+      {
+        "syncContent": false,
+        "readyFrame": 11,
+        "nextFrame": 27.1,
+        "networkStillPending": true
+      },
+      {
+        "syncContent": false,
+        "readyFrame": 5,
+        "nextFrame": 21.4,
+        "networkStillPending": true
+      },
+      {
+        "syncContent": false,
+        "readyFrame": 6.9,
+        "nextFrame": 25.1,
+        "networkStillPending": true
+      },
+      {
+        "syncContent": false,
+        "readyFrame": 10.8,
+        "nextFrame": 27.8,
+        "networkStillPending": true
+      }
+    ],
+    "count": 7,
+    "waitInjectedMs": 1200,
+    "firstFrameMedian": 10.8,
+    "secondFrameMedian": 27.1
+  }
+}

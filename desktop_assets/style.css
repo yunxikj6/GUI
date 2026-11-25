@@ -1,0 +1,13 @@
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#182130;color:#f2f5fa;font:14px "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;display:flex;flex-direction:column}
+header{background:#fbfcff;color:#263345;display:flex;align-items:center;gap:16px;min-height:58px;padding:8px 20px;flex-wrap:wrap;border-bottom:1px solid #d6dce7}
+h1{font-size:17px;margin:0;letter-spacing:-.02em}.back{color:#40527b;text-decoration:none;font-weight:600}.separator{height:21px;border-left:1px solid #d9dfeb}#status{font-size:13px;color:#5c687c}
+.toolbar{margin-left:auto;display:flex;gap:6px}button{font:inherit;border:1px solid #ccd4e3;border-radius:6px;background:white;color:#23324b;padding:7px 11px;cursor:pointer}
+button:hover{background:#eef1fb}button:disabled{opacity:.5;cursor:default}
+button:focus-visible,a:focus-visible,input:focus-visible,#screen img:focus-visible{outline:3px solid #7a8df2;outline-offset:1px}
+#screen{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden}
+#screen img{display:block;max-width:100%;max-height:100%;width:auto;height:auto}
+#textForm{display:flex;align-items:center;gap:12px;background:#f1f4fa;color:#344056;padding:8px 16px}
+#textForm[hidden]{display:none}input{flex:1;min-width:80px;padding:8px;border:1px solid #ccd4e3;border-radius:4px}
+@media(max-width:720px){header{gap:8px;padding:8px 10px}.toolbar{width:100%;margin:0}.separator{display:none}#textForm label{display:none}}
