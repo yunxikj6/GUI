@@ -1,0 +1,91 @@
+{
+  "files": [
+    ".gitignore",
+    "count_lines.py",
+    "README.md"
+  ],
+  "edit_diff_conflict": "pass",
+  "check": {
+    "provider": "check",
+    "status": "succeeded",
+    "events": 9,
+    "seconds": 1.0,
+    "final": "项目检查通过。"
+  },
+  "codex": {
+    "provider": "codex",
+    "status": "failed",
+    "events": 3,
+    "seconds": 15.92,
+    "final": "云端 codex 认证失败，请在服务器检查 CLI 登录或密钥配置。"
+  },
+  "claude": {
+    "provider": "claude",
+    "status": "failed",
+    "events": 3,
+    "seconds": 2.29,
+    "final": "云端 claude 认证失败，请在服务器检查 CLI 登录或密钥配置。"
+  },
+  "warm_file_samples": [
+    [
+      207.1,
+      473
+    ],
+    [
+      265.3,
+      473
+    ],
+    [
+      271.2,
+      473
+    ],
+    [
+      238.7,
+      473
+    ],
+    [
+      234.9,
+      473
+    ],
+    [
+      222.5,
+      473
+    ],
+    [
+      199.7,
+      473
+    ],
+    [
+      216.9,
+      473
+    ],
+    [
+      233.6,
+      473
+    ],
+    [
+      219.8,
+      473
+    ],
+    [
+      205.6,
+      473
+    ],
+    [
+      205.2,
+      473
+    ],
+    [
+      225.3,
+      473
+    ],
+    [
+      209.4,
+      473
+    ],
+    [
+      244.1,
+      473
+    ]
+  ]
+}

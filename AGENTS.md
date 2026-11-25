@@ -1,0 +1,49 @@
+# 云端工作台开发交接
+
+从这里接手工程，可以先运行本机模式完成一次“编辑 → 保存 → 查看差异 → 运行项目检查”，再用同一套界面连接 InstaBox。产品需求和完整场景见[需求与验收](docs/requirements.md)，用户启动说明见[README](README.md)。
+
+## 当前基线
+
+首个真机验证版本为 `v0.1.0`，对应提交 `dd835d363559cce5e89aa7a5402d8123499d78a1`。GitHub 的 `main` 包含这份实现和后续交接资料。原始发布资产 `cloud-workbench.zip` 为 334,015 字节，SHA-256 为 `f719081d013fe89ab809603cdc6449547e0144db8a364ac50d5a3cab4faf931f`。此校验值对应带启动器的上传资产。[0.1 发布页](https://github.com/yunxikj6/GUI/releases/tag/v0.1.0)
+
+| 需要继续的工作 | 从哪里进入 | 已有证据 |
+| --- | --- | --- |
+| 本机界面、文件编辑和 Git 差异 | [前端](web/app.js)通过 [本机桥接](launcher.py) 的同源 `POST /api/rpc` 调用[文件服务](cloud/workspace.py) | 真机读写和冲突已测试；[浏览器回归](tests/test_browser.py)覆盖中文草稿、图片、窄屏和断线。 |
+| 编程助手和任务恢复 | [任务执行器](cloud/tasks.py)启动独立子进程，把请求、状态和输出写入 SQLite。客户端从事件游标补读 | [任务测试](tests/test_tasks.py)覆盖真实 Git 检查、并发去重、分页、进程终止和模型 CLI 替身；两个真实模型 CLI 只验证到未认证响应。 |
+| 云机生命周期及适配其他主机 | [InstaBox 接入](instabox.py)负责选择、唤醒、按内容摘要安装工作进程，并用官方 HTTPS exec API 传输请求 | 真机挂起再恢复后，测试进程仍在，同一请求找回同一任务及全部 9 条事件。[实机记录](docs/validation.md) |
+| 原有 Linux 图形软件 | [桌面代理](desktop.py)和[查看器](desktop_assets/viewer.js)提供 noVNC 实时连接、逐帧备用模式和输入交接 | 两种模式都操作过真实 Xfce；[桌面模块测试](tests/test_desktop.py)覆盖资源、连接和输入处理。 |
+| 调研、性能实验 | [选型依据](docs/technology-review.md)、[GTK 实验脚本](experiments/broadway_probe.py)、[暖读测量](tools/measure.py)和[热缓存显示实验](experiments/cache_revalidation.py) | [云端计时样本](docs/measurements/first-cloud-run.json)、[云机验收数据](docs/measurements/instabox-acceptance.json)和[三轮 GTK 原始记录](docs/measurements/broadway-runs.json)。 |
+
+## 复现起点
+
+在 Linux 上准备 Python 3.10+ 和 Git。完整浏览器回归还需要 Python Playwright 和 Chromium；测试会从 PATH 寻找浏览器，也可用 `CLOUD_WORKSPACE_TEST_CHROMIUM` 指定可执行文件。测试会创建自己的临时 Git 项目，通常十几秒完成。
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+基线是 **28 项通过，0 项跳过**。[首轮完整测试清单](docs/measurements/regression-v0.1.txt)。缺少浏览器依赖时会跳过 6 项浏览器测试，终端仍可能显示 `OK`。本机图形工作区可用下列命令单独启动，终端会打印回环地址：
+
+```sh
+python3 launcher.py --local --project "$(mktemp -d)/project" --no-browser
+```
+
+真机验证使用带桌面的 Linux `agent-browser` 实例。在本机启动器的隐藏提示中输入 InstaBox 密钥，或通过环境变量 `INSTABOX_API_KEY` 提供。模型认证属于云机上的 Codex 或 Claude CLI。在账号只有一台实例时运行：
+
+```sh
+python3 launcher.py --remote-project /data/cloud-workspace/source
+```
+
+这会打开首轮交付的 Git 源码工作副本。其中 `work` 分支固定在已部署的基线，后续从 GitHub 获取的新提交需单独同步。省略 `--remote-project` 会使用独立的示例仓库 `/data/cloud-workspace/project`；从多个实例中选择时加上 `--machine`。工作进程的版本目录在 `/data/cloud-workspace/runtime/`，原交付包在 `/data/cloud-workspace/releases/cloud-workbench.zip`。公开仓库只存放源码和可公开的结果；云机及模型访问使用各自的私有凭据。
+
+## 修改时容易混淆的行为
+
+- **文件新鲜度。** 云端用内容摘要作 `revision`。打开缓存文件先显示本地正文，再用 `ifRevision` 校验；保存携带编辑开始时的版本，旧版本会收到 `conflict`。文本编辑和文件缓存在当前页面内存，助手输入草稿与未确认的任务请求按工作区区分存储。页面刷新和短暂断网对文件草稿的影响不同。[前端实现](web/app.js) · [文件测试](tests/test_workspace.py)
+- **任务重试。** 一次用户提交复用一个 `requestId`，云端将它映射到持久任务。补读从最后确认的 `cursor` 继续；云端状态已经结束时，仍要读取到 `hasMore` 为假。页大小上限为 256 KiB，列表显示最近 80 条摘要。事件历史在项目对应的 `${XDG_STATE_HOME:-~/.local/state}/cloudwork/` 中。[任务执行器](cloud/tasks.py)
+- **首版边界。** 本机桥接监听 `127.0.0.1`。每个远端 RPC 都有控制面与启动 Python 的开销。文件服务每目录最多列出 400 项，文本上限 128 KiB，图片上限 256 KiB，差异上限 64 KiB。客户端区分本地反馈和云端确认。首轮测试实例闲置 30 分钟会暂停，免费套餐单次运行从 2 小时开始、活跃时最长 8 小时；恢复测试应分别覆盖暂停和停止。[文件服务](cloud/workspace.py) · [平台生命周期](https://instabox.sh/docs/machines/auto-pause)
+
+## 下一轮从哪里开始
+
+1. **闭合两种模型的成功路径。** 在各自已登录的测试环境里，分别从图形界面发送一条只读请求。以“真实回复可见、最终状态正确、刷新后输出完整、相同请求只执行一次”作为验收。保留 CLI 版本、事件种类和观察结果，账号凭据通过运行环境提供。
+2. **把一次性任务扩展为可恢复的多轮会话。** 对照 Codex App Server、Claude Agent SDK 和 ACP 的实际能力，先选一种实现会话 ID、工具审批和取消。在隔离的 Git 工作区走通“提出改动 → 用户审批 → 云端写入 → 本地查看差异”。验收包括审批时掉线、拒绝操作和恢复后的重复点击。
+3. **用对照实验证明下一类应用的收益。** 已有 GTK 实验显示，能显示原生控件和能获得本地文本选区是不同能力。以同一 Linux 应用比较工作区本地控件、完整 VNC 桌面、逐窗或工具包转发，再决定第二类应用和第二种主机后端。Windows、macOS 启动流程、真实中文输入法和公网弱网表现仍需实机覆盖。[实验条件与判据](docs/technology-review.md)

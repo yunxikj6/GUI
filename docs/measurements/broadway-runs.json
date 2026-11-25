@@ -1,0 +1,215 @@
+[
+  {
+    "browser": "156.0.8078.79",
+    "playwright": "1.62.0",
+    "dom": {
+      "tags": {
+        "DIV": 39,
+        "IMG": 8
+      },
+      "hasLabel": false,
+      "inputCount": 0
+    },
+    "browserSelection": "",
+    "pixelsChanged": true,
+    "noGtkEventWhileStopped": true,
+    "cdpInsertTextChangedGtk": false,
+    "gtkEvents": [
+      {
+        "gtk": [
+          4,
+          18,
+          6
+        ]
+      },
+      {
+        "text": "P"
+      },
+      {
+        "text": "Pr"
+      },
+      {
+        "text": "Pro"
+      },
+      {
+        "text": "Prob"
+      },
+      {
+        "text": "Probe"
+      },
+      {
+        "text": "Probe4"
+      },
+      {
+        "text": "Probe42"
+      },
+      {
+        "enter": "Probe42",
+        "selected": [
+          0,
+          7
+        ]
+      },
+      {
+        "text": "Probe42Z"
+      }
+    ],
+    "socketPaths": [
+      "socket"
+    ],
+    "wireFrames": {
+      "fromServer": {
+        "frames": 2313,
+        "bytes": 57150,
+        "binary": 2313
+      },
+      "toServer": {
+        "frames": 2338,
+        "bytes": 46788,
+        "binary": 2338
+      }
+    }
+  },
+  {
+    "browser": "156.0.8078.79",
+    "playwright": "1.62.0",
+    "dom": {
+      "tags": {
+        "DIV": 38,
+        "IMG": 8
+      },
+      "hasLabel": false,
+      "inputCount": 0
+    },
+    "browserSelection": "",
+    "pixelsChanged": true,
+    "noGtkEventWhileStopped": true,
+    "cdpInsertTextChangedGtk": false,
+    "gtkEvents": [
+      {
+        "gtk": [
+          4,
+          18,
+          6
+        ]
+      },
+      {
+        "text": "P"
+      },
+      {
+        "text": "Pr"
+      },
+      {
+        "text": "Pro"
+      },
+      {
+        "text": "Prob"
+      },
+      {
+        "text": "Probe"
+      },
+      {
+        "text": "Probe4"
+      },
+      {
+        "text": "Probe42"
+      },
+      {
+        "enter": "Probe42",
+        "selected": [
+          0,
+          7
+        ]
+      },
+      {
+        "text": "Probe42Z"
+      }
+    ],
+    "socketPaths": [
+      "socket"
+    ],
+    "wireFrames": {
+      "fromServer": {
+        "frames": 3068,
+        "bytes": 66283,
+        "binary": 3068
+      },
+      "toServer": {
+        "frames": 3093,
+        "bytes": 61888,
+        "binary": 3093
+      }
+    }
+  },
+  {
+    "browser": "156.0.8078.79",
+    "playwright": "1.62.0",
+    "dom": {
+      "tags": {
+        "DIV": 38,
+        "IMG": 8
+      },
+      "hasLabel": false,
+      "inputCount": 0
+    },
+    "browserSelection": "",
+    "pixelsChanged": true,
+    "noGtkEventWhileStopped": true,
+    "cdpInsertTextChangedGtk": false,
+    "gtkEvents": [
+      {
+        "gtk": [
+          4,
+          18,
+          6
+        ]
+      },
+      {
+        "text": "P"
+      },
+      {
+        "text": "Pr"
+      },
+      {
+        "text": "Pro"
+      },
+      {
+        "text": "Prob"
+      },
+      {
+        "text": "Probe"
+      },
+      {
+        "text": "Probe4"
+      },
+      {
+        "text": "Probe42"
+      },
+      {
+        "enter": "Probe42",
+        "selected": [
+          0,
+          7
+        ]
+      },
+      {
+        "text": "Probe42Z"
+      }
+    ],
+    "socketPaths": [
+      "socket"
+    ],
+    "wireFrames": {
+      "fromServer": {
+        "frames": 2289,
+        "bytes": 60405,
+        "binary": 2289
+      },
+      "toServer": {
+        "frames": 2314,
+        "bytes": 46308,
+        "binary": 2314
+      }
+    }
+  }
+]

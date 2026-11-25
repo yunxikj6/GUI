@@ -24,6 +24,8 @@ GTK 程序创建一个 480 × 180 窗口，含可选中的中英文 `GtkLabel` �
 | 2 | 3,068 / 66,283 | 3,093 / 61,888 |
 | 3 | 2,289 / 60,405 | 2,314 / 46,308 |
 
+三次运行均保留了浏览器版本、控件事件、DOM 计数、WebSocket 帧数和字节数。[下载三轮原始记录](measurements/broadway-runs.json)
+
 ## 复现
 
 从仓库根目录运行。实验脚本独立于产品，开发机需要 Linux x86-64、可运行 GTK 4 的 PyGObject、Chromium 和 Playwright。安装了 Debian 系统 GTK 4 与 Broadway 的环境可直接运行第一条命令。脚本默认用 `/usr/bin/python3` 运行 GTK、`/usr/bin/chromium` 运行浏览器，可通过 `GTK_PYTHON` 和 `CHROMIUM` 改写。标准输出是 JSON，包含原生控件事件序列、DOM 检查及网络计数。

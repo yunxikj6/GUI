@@ -2,6 +2,8 @@
 
 一个在本机浏览器中使用云端 Linux 项目的图形客户端。文件预览、编辑器、差异和编程助手输出由本机渲染。Linux 图形桌面可以在单独的窗口中打开，和这些工具访问同一台机器。
 
+第一次使用可以下载已在 InstaBox 验证的 [0.1 发布包](https://github.com/yunxikj6/GUI/releases/tag/v0.1.0)。继续开发请从[项目需求](docs/requirements.md)和[开发交接](AGENTS.md)开始。
+
 ![在本机工作台查看 InstaBox 上的 Python 文件和项目检查记录](docs/workbench.png)
 
 ## 连接云机
@@ -43,15 +45,14 @@ python3 launcher.py --remote-project /data/workspace/my-project
 
 ## 开发与验证
 
-本机 Linux 开发模式使用相同文件与任务代码，需要 Git。下列命令使用一个专用目录：
+本机 Linux 开发模式使用相同文件与任务代码，需要 Git。先运行回归，再启动一个临时工作区：
 
 ```sh
-python3 launcher.py --local --project ./workbench-example
 python3 -m unittest discover -s tests -v
-python3 tools/measure.py --file README.md --samples 15
+python3 launcher.py --local --project "$(mktemp -d)/project"
 ```
 
-最后一条命令连接已启动的工作台，测量已运行实例的文件读取往返。浏览器自动化测试需要 Python Playwright 和 Chromium，缺少时测试标记跳过。具体环境、实测结论、限制与下一轮实验见项目文档。
+保持启动器运行，在另一个终端执行 `python3 tools/measure.py --file README.md --samples 15` 可测量当前模式的文件读取往返。浏览器自动化测试需要 Python Playwright 和 Chromium，缺少时测试标记跳过。具体环境、实测结论、限制与下一轮实验见项目文档。
 
 - [架构调研与选型依据](docs/technology-review.md)
 - [GTK 图形工具包实验](docs/toolkit-experiment.md)

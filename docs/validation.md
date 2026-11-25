@@ -22,6 +22,15 @@
 1. 浏览器现在按工作区保留有限的内存文件缓存。切回已下载的文件，先显示内容，再向云端校验。测试在真实云桥上人为延迟文件请求 1,200 毫秒，7 次切回操作都在校验完成前显示正文。点击到首次检测正文可见的动画帧回调为 5.0–13.4 毫秒，中位数 10.8 毫秒。该数字没有覆盖首次打开或物理显示器延迟。
 2. 文件请求增加 `ifRevision`。服务端发现版本未变时，省略正文和图片数据。本机集成测试中，一个 16,800 字节的 UTF-8 文档首次响应体为 17,564 字节，重复校验为 141 字节。更新种子文档后的真机复核中，当前 README 首次响应 470 字节，匹配版本时 134 字节。这里只计应用 JSON 有效载荷。远端仍须读取文件核对摘要。
 
-[原始计时样本](measurements/first-cloud-run.json) · [暖读复测工具](../tools/measure.py) · [架构与后续对照实验](technology-review.md)
+交接归档保留了两组独立的云机读文件样本。上文 230.4 毫秒出自专门的 15 次暖读测量。另一个验收批次包含真实任务结果、事件条数、运行秒数和当批读文件的测量。其 `warm_file_samples` 每一行依次为往返毫秒数及 JSON 响应体字节数。[正式计时样本](measurements/first-cloud-run.json) · [云机验收批次](measurements/instabox-acceptance.json)
+
+复测时先启动工作台，打开含 `README.md` 和 `.gitignore` 的示例项目，在另一个终端执行以下脚本。第一个工具测量实际 RPC 往返；第二个实验使用 Playwright 和 Chromium，点击两个文件并人为延迟 README 的后台校验。第二个实验输出的是浏览器动画帧计时。
+
+```sh
+python3 tools/measure.py --port 8765 --file README.md --samples 15
+python3 experiments/cache_revalidation.py --port 8765 --samples 7 --delay-ms 1200
+```
+
+[暖读工具](../tools/measure.py) · [热缓存实验](../experiments/cache_revalidation.py) · [架构与后续对照实验](technology-review.md)
 
 现阶段优先补足两项证据。第一项是接入实际模型账户后的端到端模型输出、待审批修改及恢复。第二项是使用同一份文件、相同客户端缩放和受控网络，比较本地文本、工具包转发和 VNC 的带宽、输入响应及显示质量。首轮数据不足以给出平台平均时延或相对任意远程桌面的性能倍数。
