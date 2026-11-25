@@ -92,6 +92,19 @@ h1 {font-size:17px;letter-spacing:.02em;font-weight:720}
 .hunk-line {background:#edf0fb;color:#4a5186}
 .meta-line {color:#5a6981;font-weight:630}
 .diff-line .line-no {background:transparent}
+.diff-layer {border-top:1px solid var(--line)}
+.diff-layer summary {position:sticky;top:0;z-index:1;cursor:pointer;background:#f5f6fa;color:#354154;padding:9px 16px;font-size:13px;font-weight:650}
+.diff-layer summary::marker {color:#657085}
+.diff-notice,.diff-layer .subtle-button {margin:6px 16px}
+.diff-notice {color:var(--muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.diff-notice:empty {display:none}
+.diff-pages {display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:5px 16px;font-size:12px}
+.diff-pages button {color:var(--indigo);padding:4px}
+.diff-pages button:enabled:hover {text-decoration:underline}
+.diff-lines {overflow:auto;scrollbar-width:thin}
+.diff-layer:not([data-diff-scope=combined]) .diff-lines,.diff-pages ~ .diff-lines {max-height:min(42dvh,38rem)}
+.diff-pages ~ .diff-lines .line-no {min-width:calc(5ch + 13px)}
+.diff-lines:empty {display:none}
 .preview-image {max-width:calc(100% - 40px);max-height:100%;height:auto;display:block;margin:12px auto}
 .task-pane {background:#fafbfc;border-left:1px solid var(--line);overflow:auto}
 .task-top {gap:9px;padding:0 18px;height:44px;flex:none;border-bottom:1px solid var(--line)}
@@ -158,6 +171,8 @@ textarea::placeholder {color:#7d8798}
   .workbench[data-mobile=tasks] {grid-template-columns:minmax(0,1fr)}
   .task-pane {border-left:0}
   .history-nav button,.output-nav button,.tree-more {min-width:44px;min-height:44px}
+  .diff-layer summary,.diff-layer .subtle-button {min-height:44px}
+  .diff-pages select,.diff-pages button {min-width:44px;min-height:44px}
   .compose,.activity {padding-left:20px;padding-right:20px}
   .sidebar {padding-top:17px}
   .editor-head {padding:18px}

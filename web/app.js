@@ -105,7 +105,7 @@ function fileSync(message = '', stale = false) {
   taskControls();
 }
 const state = {
-  project: null, workspaceId: null, providers: {}, gitIssue: '', ready: false, view: 'files', file: null,
+  project: null, workspaceId: null, providers: {}, gitIssue: '', diffScopes: false, ready: false, view: 'files', file: null,
   fileScope: null, fileVersion: 0, treeVersion: 0, refreshVersion: 0, taskListVersion: 0, taskVersion: 0,
   tasks: [], historyAnchors: [], historyNext: null, historyTarget: null,
   selectedTask: null, selectedRecord: null, timer: null,
@@ -201,12 +201,9 @@ function resetPreview() {
   $('editBar').hidden = true; $('fileEditArea').hidden = true;
   state.file = null; fileSync();
 }
-function drawLines(value, diff) {
-  const preview = $('preview');
-  const lines = String(value).slice(0, 180000).split('\n');
-  const shown = lines.slice(0, 3200);
+function drawRows(preview, rows, diff, offset = 0) {
   const fragment = document.createDocumentFragment();
-  for (const [i, line] of shown.entries()) {
+  for (const [i, line] of rows.entries()) {
     const row = el('div', 'code-row');
     if (diff) {
       row.classList.add('diff-line');
@@ -215,15 +212,17 @@ function drawLines(value, diff) {
       else if (line.startsWith('+')) row.classList.add('add-line');
       else if (line.startsWith('-')) row.classList.add('remove-line');
     }
-    const number = el('span','line-no', String(i + 1));
+    const number = el('span','line-no', String(offset + i + 1));
     number.setAttribute('aria-hidden','true');
     row.append(number, el('span','line-text',line || ' '));
     fragment.append(row);
   }
   preview.replaceChildren(fragment);
-  if (shown.length < lines.length || String(value).length > 180000) {
-    $('fileNotice').textContent = '预览已限制显示长度。';
-  }
+}
+function drawFileLines(value) {
+  const lines = value.slice(0,180000).split('\n'), shown = lines.slice(0,3200);
+  drawRows($('preview'),shown,false);
+  return shown.length < lines.length || value.length > 180000;
 }
 function textareaText(raw) { return raw.replace(/\r\n?/g,'\n'); }
 function editedFileText(edit, value, caret) {
@@ -311,7 +310,8 @@ function renderFile(f) {
     image.addEventListener('error', () => { $('fileNotice').textContent = '图片解码失败。'; }, {once:true});
     $('preview').replaceChildren(image);
   } else {
-    drawLines(textareaText(f.content), false); drawEdit();
+    if (drawFileLines(textareaText(f.content))) $('fileNotice').textContent = '预览已限制显示长度。';
+    drawEdit();
   }
 }
 function sameFile(a,b) {
@@ -410,36 +410,123 @@ async function recheckDiffRepository(current) {
     return state.gitIssue;
   } catch { /* Keep the diff result and last confirmed repository status. */ }
 }
+const diffLabels = {staged:'已暂存', unstaged:'未暂存（含未跟踪）', combined:'合并差异'};
+function makeDiffLayer(scope, onRetry) {
+  const box = el('details','diff-layer'), heading = el('summary','',diffLabels[scope]);
+  box.open = true; box.dataset.diffScope = scope;
+  const lines = el('div','diff-lines'), notice = el('p','diff-notice','正在读取改动…');
+  notice.setAttribute('role','status');
+  lines.setAttribute('role','region'); lines.setAttribute('aria-label',diffLabels[scope] + '差异正文');
+  const retry = el('button','subtle-button','重试读取');
+  retry.setAttribute('aria-label','重试读取' + diffLabels[scope] + '差异');
+  retry.hidden = true; retry.addEventListener('click',onRetry);
+  box.append(heading,notice,retry,lines);
+  return {box,lines,notice,retry,empty:false};
+}
+const diffPageSize = 800;
+function drawDiffPages(layer, scope, text) {
+  const rows = text.split('\n');
+  if (rows.at(-1) === '') rows.pop();
+  if (rows.length <= diffPageSize) { drawRows(layer.lines,rows,true); return; }
+  const total = Math.ceil(rows.length / diffPageSize);
+  const nav = el('nav','diff-pages'), select = el('select','diff-page');
+  nav.setAttribute('aria-label',diffLabels[scope] + '差异分页');
+  select.setAttribute('aria-label',diffLabels[scope] + '差异页码');
+  const prev = el('button','diff-prev','上一页'), next = el('button','diff-next','下一页');
+  for (let page = 1; page <= total; page++) {
+    const first = (page - 1) * diffPageSize + 1, last = Math.min(page * diffPageSize,rows.length);
+    const option = el('option','','第 ' + page + ' 页 · ' + first + '–' + last + ' 行');
+    option.value = String(page); select.append(option);
+  }
+  function show(page) {
+    const offset = (page - 1) * diffPageSize;
+    drawRows(layer.lines,rows.slice(offset,offset + diffPageSize),true,offset);
+    layer.lines.scrollTop = layer.lines.scrollLeft = 0;
+    select.value = String(page);
+    const from = document.activeElement;
+    prev.disabled = page === 1; next.disabled = page === total;
+    if ((from === prev && prev.disabled) || (from === next && next.disabled)) select.focus({preventScroll:true});
+  }
+  select.addEventListener('change',() => show(Number(select.value)));
+  prev.addEventListener('click',() => show(Number(select.value) - 1));
+  next.addEventListener('click',() => show(Number(select.value) + 1));
+  nav.append(prev,select,next); layer.lines.before(nav); show(1);
+}
+function renderDiffLayer(layer, scope, data) {
+  if (data.diff) { drawDiffPages(layer,scope,data.diff); layer.lines.tabIndex = 0; }
+  layer.empty = !data.diff && !data.truncated;
+  const empty = {staged:'没有已暂存的改动。', unstaged:'没有未暂存或未跟踪的改动。'};
+  layer.notice.textContent = data.truncated ? '服务端已截断此差异，当前仅显示开头部分。' :
+    layer.empty ? empty[scope] || '' : '';
+}
 async function openDiff() {
   const ticket = ++state.fileVersion;
   const current = () => ticket === state.fileVersion;
-  viewButtons('diff'); resetPreview(); $('preview').hidden = false;
+  const preview = $('preview'), notice = $('fileNotice');
+  viewButtons('diff'); resetPreview(); preview.hidden = false;
   fileHeading('版本控制', 'Git 差异', state.project || '');
-  $('fileNotice').textContent = '正在读取改动…';
-  try {
-    const data = await rpc('diff',{},current);
-    if (!current()) return;
-    if (data.gitState === 'none' || data.gitState === 'error') {
-      updateGitStatus(data); taskControls();
-      $('fileNotice').textContent = state.gitIssue;
-      return;
+  const layers = new Map();
+  let settled = false, statusCheck = null;
+  const accepting = () => current() && !settled;
+  const checkRepository = () => statusCheck ??= recheckDiffRepository(settled ? current : accepting);
+  function addLayers(scopes) {
+    layers.clear(); preview.replaceChildren(); notice.textContent = '';
+    for (const scope of scopes) {
+      const layer = makeDiffLayer(scope,() => { statusCheck = null; read(scope); });
+      layers.set(scope,layer); preview.append(layer.box);
     }
-    if (typeof data.diff !== 'string') throw new Error('未能读取 Git 差异，请重试。');
+  }
+  function unavailable(message) {
+    settled = true; layers.clear(); preview.replaceChildren(); notice.textContent = message;
+  }
+  async function showEmpty() {
+    const applies = settled ? current : accepting;
     let issue = '';
-    if (state.gitIssue) {
-      issue = await recheckDiffRepository(current) ?? '差异结果为空，暂时无法核对 Git 仓库状态。';
-      if (!current()) return;
+    if (state.gitIssue) issue = await checkRepository() ?? '差异结果为空，暂时无法核对 Git 仓库状态。';
+    if (applies() && layers.size && [...layers.values()].every(layer => layer.empty)) {
+      notice.textContent = issue || '当前工作区没有 Git 差异。';
     }
-    $('fileNotice').textContent = data.diff ? '' : issue || '当前工作区没有 Git 差异。';
-    if (data.diff) drawLines(data.diff, true);
-    if (data.truncated) $('fileNotice').textContent = '云端差异较长，当前仅显示开头部分。';
-  } catch(err) {
-    if (!current()) return;
-    $('fileNotice').textContent = asError(err);
-    if (err.code === 'git_error') {
-      const issue = await recheckDiffRepository(current);
-      if (current() && issue) $('fileNotice').textContent = issue;
+  }
+  async function read(scope) {
+    const pending = layers.get(scope);
+    if (pending) { pending.retry.hidden = true; pending.notice.textContent = '正在读取改动…'; }
+    try {
+      const data = await rpc('diff',{scope},accepting);
+      if (!accepting()) return;
+      if (data.gitState === 'none' || data.gitState === 'error') {
+        updateGitStatus(data); taskControls(); unavailable(state.gitIssue); return;
+      }
+      if (typeof data.diff !== 'string' || (Object.hasOwn(data,'scope') && data.scope !== scope)) {
+        throw new Error('未能读取此范围的 Git 差异，请重试。');
+      }
+      if (!Object.hasOwn(data,'scope')) {
+        // Older workers accept but ignore scope. Only the first combined reply is shown.
+        settled = true; statusCheck = null; state.diffScopes = false;
+        addLayers(['combined']); renderDiffLayer(layers.get('combined'),'combined',data);
+        await showEmpty();
+        return;
+      }
+      const probe = !layers.size;
+      if (probe) { state.diffScopes = true; addLayers(['staged','unstaged']); }
+      renderDiffLayer(layers.get(scope),scope,data);
+      await Promise.all([showEmpty(),probe ? read('unstaged') : null]);
+    } catch(err) {
+      if (!accepting()) return;
+      const layer = layers.get(scope);
+      if (layer) { layer.notice.textContent = asError(err); layer.retry.hidden = false; }
+      else notice.textContent = asError(err);
+      if (err.code === 'git_error') {
+        const issue = await checkRepository();
+        if (accepting() && issue) unavailable(issue);
+      }
     }
+  }
+  if (state.diffScopes) {
+    addLayers(['staged','unstaged']);
+    await Promise.all([read('staged'),read('unstaged')]);
+  } else {
+    notice.textContent = '正在读取改动…';
+    await read('staged');
   }
 }
 function beginEdit() {
@@ -1149,6 +1236,7 @@ function restore(status) {
   state.mode = status.mode;
   const firstCapabilities = !state.providers.codex && Boolean(status.providers?.codex);
   state.project = projectName; state.providers = status.providers || {};
+  state.diffScopes = Array.isArray(status.diffScopes) && ['staged','unstaged'].every(scope => status.diffScopes.includes(scope));
   $('topProject').textContent = projectName;
   updateGitStatus(status);
   if (state.loadedKey === scope) {

@@ -1,0 +1,168 @@
+{
+  "gitChangesThroughWorkbench": {
+    "mode": "instabox",
+    "previousCommit": "f2f626b3ea3a4818e0a8e18c05ec4d1f2f787412",
+    "fixtureRemoved": true,
+    "git": "git version 2.47.3",
+    "nativeTrackedBytesAndStatus": {
+      "cancel": {
+        "porcelain": [
+          "MM tracked.txt"
+        ],
+        "stagedTrackedBytes": 134,
+        "unstagedTrackedBytes": 134,
+        "combinedTrackedBytes": 0
+      },
+      "mixed": {
+        "porcelain": [
+          "MM tracked.txt",
+          "?? \"空 文件.txt\""
+        ],
+        "stagedTrackedBytes": 134,
+        "unstagedTrackedBytes": 134,
+        "combinedTrackedBytes": 133
+      },
+      "large-staged": {
+        "porcelain": [
+          "A  large.txt",
+          "MM tracked.txt",
+          "?? \"空 文件.txt\""
+        ],
+        "stagedTrackedBytes": 95741,
+        "unstagedTrackedBytes": 134,
+        "combinedTrackedBytes": 95740
+      },
+      "large-unstaged": {
+        "porcelain": [
+          "MM tracked.txt",
+          "?? large.txt",
+          "?? \"空 文件.txt\""
+        ],
+        "stagedTrackedBytes": 134,
+        "unstagedTrackedBytes": 134,
+        "combinedTrackedBytes": 133
+      }
+    },
+    "chromium": "156.0.8078.79",
+    "previousWorker": "a05bb568b06aede83ad7",
+    "previousWebPreviousWorker": {
+      "requests": [
+        "combined"
+      ],
+      "falseCleanForMM": true
+    },
+    "newWebPreviousWorker": {
+      "requests": [
+        "staged"
+      ],
+      "combinedPanels": 1,
+      "indexIntermediateVisible": false
+    },
+    "currentWorker": "acca9cbf45bac1deb9f3",
+    "cancel": {
+      "staged": {
+        "bytes": 134,
+        "truncated": false
+      },
+      "unstaged": {
+        "bytes": 134,
+        "truncated": false
+      }
+    },
+    "mixed": {
+      "staged": {
+        "bytes": 134,
+        "truncated": false
+      },
+      "unstaged": {
+        "bytes": 200,
+        "truncated": false
+      }
+    },
+    "retry": {
+      "failedScope": "staged",
+      "completedRequestsAfterRetry": [
+        "staged",
+        "unstaged",
+        "staged"
+      ],
+      "otherLayerStayedReadable": true
+    },
+    "large-staged": {
+      "staged": {
+        "bytes": 65536,
+        "truncated": true
+      },
+      "unstaged": {
+        "bytes": 200,
+        "truncated": false
+      }
+    },
+    "large-unstaged": {
+      "staged": {
+        "bytes": 134,
+        "truncated": false
+      },
+      "unstaged": {
+        "bytes": 65536,
+        "truncated": true
+      }
+    }
+  },
+  "patchPagingAndApplyThroughWorkbench": {
+    "staged": {
+      "bytes": 33131,
+      "lines": 11007,
+      "pages": 14,
+      "lastLineReached": true
+    },
+    "unstaged": {
+      "bytes": 33286,
+      "lines": 11014,
+      "pages": 14,
+      "lastLineReached": true
+    },
+    "diffRequests": [
+      "staged",
+      "unstaged"
+    ],
+    "rawNameExecutableRoundTrip": true,
+    "viewportCssPixels": 320
+  },
+  "instaboxRegression": {
+    "tests": 84,
+    "passed": 81,
+    "skipped": [
+      [
+        "test_native_relative_worktree_with_configured_git_on_narrow_path (test_git_worktrees.GitWorktreeTests.test_native_relative_worktree_with_configured_git_on_narrow_path)",
+        "'no installed Git supports worktree add --relative-paths'"
+      ],
+      [
+        "test_chat_keeps_custom_provider_and_excludes_mcp_on_new_and_legacy_turns (test_native_codex.NativeCodexTests.test_chat_keeps_custom_provider_and_excludes_mcp_on_new_and_legacy_turns)",
+        "'Bubblewrap is unavailable for the system MCP fixture'"
+      ],
+      [
+        "test_proposal_excludes_system_mcp_before_starting_codex (test_native_codex.NativeCodexTests.test_proposal_excludes_system_mcp_before_starting_codex)",
+        "'Bubblewrap is unavailable for the system MCP fixture'"
+      ]
+    ],
+    "elapsedSeconds": 29.381,
+    "modules": [
+      "test_untracked_diff",
+      "test_diff_scopes",
+      "test_git_worktrees",
+      "test_tree_pages",
+      "test_tree_transport.CloudFilenameTransport",
+      "test_workspace",
+      "test_bridge",
+      "test_history",
+      "test_output_pages",
+      "test_tasks",
+      "test_proposals",
+      "test_task_cancel",
+      "test_native_claude",
+      "test_claude_isolation",
+      "test_native_codex"
+    ]
+  }
+}

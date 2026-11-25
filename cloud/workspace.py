@@ -2,12 +2,13 @@
 
 import base64
 import binascii
+import codecs
 from contextlib import contextmanager
-import difflib
 import errno
 import fcntl
 import hashlib
 import heapq
+import io
 import json
 import os
 from pathlib import Path
@@ -26,6 +27,8 @@ MAX_ENTRIES = 400
 _TREE_PAGE_BYTES = 256 * 1024
 _TREE_CURSOR_LIMIT = 8192
 _NO_TREE_CURSOR = object()
+_NO_DIFF_SCOPE = object()
+_DIFF_SCOPES = ("staged", "unstaged")
 MAX_TEXT = 128 * 1024
 MAX_IMAGE = 256 * 1024
 MAX_DIFF = 64 * 1024
@@ -181,7 +184,7 @@ def tree(root, path, cursor=_NO_TREE_CURSOR):
     return result
 
 
-def read_bytes(root, path, limit):
+def _read_regular_file(root, path, limit):
     with open_path(root, relative_parts(path)) as fd:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
@@ -192,7 +195,12 @@ def read_bytes(root, path, limit):
             content = stream.read(limit + 1)
         if len(content) > limit:
             raise WorkspaceError("too_large", "文件超过预览大小上限。")
-        return content
+        return content, info.st_mode
+
+
+def read_bytes(root, path, limit):
+    content, _ = _read_regular_file(root, path, limit)
+    return content
 
 
 def image_type(content):
@@ -414,7 +422,7 @@ def status(root):
     if state != "ready":
         providers["check"] = {"available": False, "detail": message}
     return {"project": root.name, "branch": branch, "providers": providers,
-            "gitState": state, "gitMessage": message}
+            "gitState": state, "gitMessage": message, "diffScopes": list(_DIFF_SCOPES)}
 
 
 def disabled_filters(root, *, git_dir=None):
@@ -432,43 +440,110 @@ def disabled_filters(root, *, git_dir=None):
     return overrides
 
 
+_GIT_PATH_ESCAPES = {
+    **{code: f"\\{code:03o}" for code in (*range(32), 127)},
+    # os.fsdecode preserves non-UTF-8 filename bytes with surrogateescape.
+    **{0xDC00 + byte: f"\\{byte:03o}" for byte in range(128, 256)},
+    **str.maketrans({'"': '\\"', "\\": "\\\\", "\a": "\\a", "\b": "\\b", "\t": "\\t",
+                     "\n": "\\n", "\v": "\\v", "\f": "\\f", "\r": "\\r"}),
+}
+
+
+def _git_path(path):
+    escaped = path.translate(_GIT_PATH_ESCAPES)
+    return f'"{escaped}"' if escaped != path else path
+
+
 def new_file_patch(root, path):
     try:
-        content = read_bytes(root, path, MAX_TEXT)
+        content, mode = _read_regular_file(root, path, MAX_TEXT)
         if b"\x00" in content:
             raise UnicodeError()
-        lines = content.decode("utf-8").splitlines(keepends=True)
+        text = content.decode("utf-8")
     except (WorkspaceError, UnicodeError, OSError):
-        return f"Untracked file: {path} (preview unavailable)\n"
-    patch = difflib.unified_diff([], lines, "/dev/null", f"b/{path}")
-    return f"diff --git a/{path} b/{path}\nnew file mode 100644\n" + "".join(patch).rstrip("\n") + "\n"
+        return f"Untracked file: {_git_path(path)} (preview unavailable)\n"
+    source, target = _git_path("a/" + path), _git_path("b/" + path)
+    git_mode = "100755" if mode & stat.S_IXUSR else "100644"
+    header = f"diff --git {source} {target}\nnew file mode {git_mode}\n"
+    if not text:
+        return header
+    # A Git patch counts LF bytes. CR, VT and Unicode separators belong to the content.
+    terminated = text.endswith("\n")
+    count = text.count("\n") + (not terminated)
+    extent = "1" if count == 1 else f"1,{count}"
+    added = text.removesuffix("\n").replace("\n", "\n+")
+    ending = "\n" if terminated else "\n\\ No newline at end of file\n"
+    delimiter = "\t" if " " in path else ""
+    return header + f"--- /dev/null\n+++ {target}{delimiter}\n@@ -0,0 +{extent} @@\n+{added}{ending}"
 
 
-def diff(root):
+def _has_non_utf8_diff_path(raw, truncated):
+    for line in io.BytesIO(raw):
+        if line.startswith((b"diff --git ", b"diff --cc ", b"diff --combined ", b"* Unmerged path ")):
+            try:
+                codecs.utf_8_decode(line, "strict", not truncated or line.endswith(b"\n"))
+            except UnicodeDecodeError:
+                return True
+    return False
+
+
+def diff(root, scope=_NO_DIFF_SCOPE):
+    legacy = scope is _NO_DIFF_SCOPE
+    if not legacy and scope not in _DIFF_SCOPES:
+        raise WorkspaceError("invalid_request", "Git 差异范围应为 staged 或 unstaged。")
+    result = {"diff": "", "truncated": False}
+    if not legacy:
+        result["scope"] = scope
     git_dir = repository_dir(root)
     if git_dir is None:
-        return {"diff": "", "truncated": False, "gitState": "none"}
-    base, _, code = git(root, "rev-parse", "--verify", "HEAD", git_dir=git_dir, check=False)
-    if code:
-        git(root, "symbolic-ref", "--quiet", "HEAD", git_dir=git_dir)
-        base, _, _ = git(root, "hash-object", "-t", "tree", "--stdin", git_dir=git_dir)
-    raw, truncated, _ = git(root, "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames",
-                            "--ignore-submodules=all", base.decode("ascii").strip(), "--", *VISIBLE_PATHS,
-                            git_dir=git_dir, overrides=disabled_filters(root, git_dir=git_dir))
-    if truncated:
-        return {"diff": raw.decode("utf-8", "replace"), "truncated": True}
-    paths, names_cut, _ = git(root, "ls-files", "--others", "--exclude-standard", "-z", "--", *VISIBLE_PATHS,
-                              git_dir=git_dir)
-    result = bytearray(raw)
-    for name in paths.split(b"\x00")[:-1]:
-        path = os.fsdecode(name)
-        patch = new_file_patch(root, path).encode("utf-8", "replace")
-        remaining = MAX_DIFF - len(result)
-        result.extend(patch[:remaining])
-        if len(patch) > remaining:
+        return {**result, "gitState": "none"}
+
+    comparison = []
+    if legacy:
+        base, _, code = git(root, "rev-parse", "--verify", "HEAD", git_dir=git_dir, check=False)
+        if code:
+            git(root, "symbolic-ref", "--quiet", "HEAD", git_dir=git_dir)
+            base, _, _ = git(root, "hash-object", "-t", "tree", "--stdin", git_dir=git_dir)
+        comparison = [base.decode("ascii").strip()]
+    elif scope == "staged":
+        # With no explicit base, --cached also handles a branch with no commits.
+        comparison = ["--cached"]
+    arguments = ("diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames",
+                 "--ignore-submodules=all", *comparison, "--", *VISIBLE_PATHS)
+    overrides = disabled_filters(root, git_dir=git_dir)
+    raw, truncated, _ = git(root, *arguments, git_dir=git_dir, overrides=overrides)
+    if not legacy and _has_non_utf8_diff_path(raw, truncated):
+        # Git can quote original path bytes without changing the patch body.
+        raw, truncated, _ = git(root, *arguments, git_dir=git_dir, overrides=[*overrides, "-c", "core.quotePath=true"])
+    content = bytearray(raw)
+    if not truncated and scope != "staged":
+        paths, names_cut, _ = git(root, "ls-files", "--others", "--exclude-standard", "-z", "--", *VISIBLE_PATHS,
+                                  git_dir=git_dir)
+        for name in paths.split(b"\x00")[:-1]:
+            remaining = MAX_DIFF - len(content)
+            if not remaining:
+                truncated = True
+                break
+            patch = new_file_patch(root, os.fsdecode(name)).encode("utf-8", "replace")
+            content.extend(patch[:remaining])
+            if len(patch) > remaining:
+                truncated = True
+                break
+        truncated = truncated or names_cut
+
+    if legacy:
+        text = content.decode("utf-8", "replace")
+    else:
+        # A byte limit can leave a valid character incomplete. Only replace
+        # genuinely invalid bytes, which may expand when encoded for transport.
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        text = decoder.decode(content, final=not truncated)
+        encoded = text.encode("utf-8")
+        if len(encoded) > MAX_DIFF:
+            text = encoded[:MAX_DIFF].decode("utf-8", "ignore")
             truncated = True
-            break
-    return {"diff": result.decode("utf-8", "replace"), "truncated": truncated or names_cut}
+    result.update(diff=text, truncated=truncated)
+    return result
 
 
 SEED = {
@@ -540,7 +615,7 @@ def dispatch(request, root):
     if op == "save":
         return save(root, request.get("path"), request.get("content"), request.get("revision"))
     if op == "diff":
-        return diff(root)
+        return diff(root, request.get("scope", _NO_DIFF_SCOPE))
     import tasks
     if op == "tasks":
         if "beforeTaskId" in request:

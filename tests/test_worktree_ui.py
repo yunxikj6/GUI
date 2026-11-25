@@ -134,9 +134,10 @@ class WorktreeAcceptance(BrowserFixture):
         hold_status = False
 
         def observe(route):
-            op = route.request.post_data_json["op"]
+            query = route.request.post_data_json
+            op = query["op"]
             if op in ("diff", "status"):
-                requests.append(op)
+                requests.append((op, query.get("scope")))
             if hold_status and op == "status":
                 held.append(route)
             else:
@@ -145,7 +146,7 @@ class WorktreeAcceptance(BrowserFixture):
         page.route("**/api/rpc", observe)
         diff.click()
         expect(notice).to_contain_text("没有 Git 差异")
-        self.assertEqual(requests, ["diff"])
+        self.assertCountEqual(requests, [("diff", "staged"), ("diff", "unstaged")])
 
         marker = root / ".git"
         original = marker.read_bytes()
