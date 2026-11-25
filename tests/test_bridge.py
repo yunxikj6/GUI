@@ -66,7 +66,7 @@ class TestHttpBoundary(unittest.TestCase):
         self.assertEqual(self.post({'op': 'tasks'}, **expected)[0], 200)
         self.server.workspace.project = '/data/moved/one'
         with patch.object(self.server.workspace, 'rpc', side_effect=AssertionError('unexpected cloud call')):
-            for operation in ('save', 'start', 'events', 'file'):
+            for operation in ('save', 'start', 'cancel', 'events', 'file'):
                 with self.subTest(operation=operation):
                     code, body = self.post({'op': operation}, **expected)
                     self.assertEqual(code, 409)

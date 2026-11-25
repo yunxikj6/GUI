@@ -367,6 +367,8 @@ def dispatch(request, root):
                                 request.get("path"), request.get("revision"))
     if op == "events":
         return tasks.events(root, request.get("taskId"), request.get("after", 0))
+    if op == "cancel":
+        return tasks.cancel_task(root, request.get("taskId"))
     if op == "proposal":
         return tasks.get_proposal(root, request.get("taskId"))
     if op == "decideProposal":

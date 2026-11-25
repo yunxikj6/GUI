@@ -5,18 +5,23 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import select
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import uuid
 
 if __package__:
-    from . import proposals
+    from . import codex_tools, proposals, workspace
 else:
+    import codex_tools
     import proposals
+    import workspace
 
 
 _PAGE_BYTES = 256 * 1024
@@ -70,6 +75,8 @@ def _database(root):
             );
             CREATE INDEX IF NOT EXISTS task_created ON task(createdAt);
             CREATE INDEX IF NOT EXISTS task_active ON task(status) WHERE status IN ('queued', 'running');
+            CREATE INDEX IF NOT EXISTS task_unfinished ON task(status)
+                WHERE status IN ('queued', 'running', 'cancelling');
             CREATE TABLE IF NOT EXISTS codex_turn (
                 taskId TEXT PRIMARY KEY, parentTaskId TEXT UNIQUE, threadId TEXT
             );
@@ -78,12 +85,18 @@ def _database(root):
                 original TEXT NOT NULL, candidate TEXT, decision TEXT NOT NULL DEFAULT 'generating',
                 applyIntent INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS task_control (
+                taskId TEXT PRIMARY KEY, success INTEGER, message TEXT
+            );
             CREATE VIEW IF NOT EXISTS task_history AS
                 SELECT t.*, t.rowid AS taskRowId, turn.parentTaskId, child.taskId AS nextTaskId,
                        (t.status = 'succeeded' AND turn.threadId IS NOT NULL
                         AND child.taskId IS NULL) AS canContinue
                 FROM task t LEFT JOIN codex_turn turn ON turn.taskId = t.id
                             LEFT JOIN codex_turn child ON child.parentTaskId = t.id;
+            CREATE VIEW IF NOT EXISTS controlled_task_history AS
+                SELECT h.*, (c.taskId IS NOT NULL AND h.status IN ('queued','running')) AS canCancel
+                FROM task_history h LEFT JOIN task_control c ON c.taskId=h.id;
         """)
         yield db
 
@@ -106,6 +119,7 @@ def _public(row):
         "parentTaskId", "nextTaskId"
     )}
     result["canContinue"] = bool(row["canContinue"])
+    result["canCancel"] = bool(row["canCancel"])
     return result
 
 
@@ -139,9 +153,14 @@ def _finish(db, task_id, success, message):
 
 
 def _recover(db):
-    for row in db.execute("SELECT id, pid, processKey FROM task WHERE status IN ('queued', 'running')").fetchall():
+    for row in db.execute("""
+        SELECT id, pid, processKey, status FROM task WHERE status IN ('queued', 'running', 'cancelling')
+    """).fetchall():
         if not row["processKey"] or _process_key(row["pid"]) != row["processKey"]:
-            _finish(db, row["id"], False, "云端任务进程已退出。已保留输出，可创建新任务重试。")
+            message = ("云端监督进程已退出，无法确认所有子进程已经停止。"
+                       if row["status"] == "cancelling" else
+                       "云端任务进程已退出。已保留输出，可创建新任务重试。")
+            _finish(db, row["id"], False, message)
 
 
 def start_task(root: Path, request_id: str, provider: str, prompt: str,
@@ -163,7 +182,7 @@ def start_task(root: Path, request_id: str, provider: str, prompt: str,
     with _database(root) as db, db:
         db.execute("BEGIN IMMEDIATE")
         _recover(db)
-        existing = db.execute("SELECT * FROM task_history WHERE requestId=?", (request_id,)).fetchone()
+        existing = db.execute("SELECT * FROM controlled_task_history WHERE requestId=?", (request_id,)).fetchone()
         if existing:
             if (existing["provider"] != provider or existing["prompt"] != prompt
                     or existing["parentTaskId"] != parent_task_id):
@@ -186,6 +205,7 @@ def start_task(root: Path, request_id: str, provider: str, prompt: str,
             INSERT INTO task (id, requestId, provider, prompt, status, createdAt)
             VALUES (?, ?, ?, ?, 'queued', ?)
         """, (task_id, request_id, provider, prompt, _now()))
+        db.execute("INSERT INTO task_control (taskId) VALUES (?)", (task_id,))
         if provider == "codex":
             db.execute("INSERT INTO codex_turn (taskId, parentTaskId) VALUES (?, ?)",
                        (task_id, parent_task_id))
@@ -206,7 +226,25 @@ def start_task(root: Path, request_id: str, provider: str, prompt: str,
             db.execute("UPDATE task SET pid=?, processKey=? WHERE id=?",
                        (worker.pid, _process_key(worker.pid), task_id))
             threading.Thread(target=worker.wait, daemon=True).start()
-        return _public(db.execute("SELECT * FROM task_history WHERE id=?", (task_id,)).fetchone())
+        return _public(db.execute("SELECT * FROM controlled_task_history WHERE id=?", (task_id,)).fetchone())
+
+
+def cancel_task(root: Path, task_id: str) -> dict:
+    if not isinstance(task_id, str) or not task_id or len(task_id) > 128:
+        raise ValueError("请选择需要取消的任务。")
+    with _database(root) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        _recover(db)
+        row = db.execute("SELECT * FROM controlled_task_history WHERE id=?", (task_id,)).fetchone()
+        if not row:
+            raise workspace.WorkspaceError("not_found", "找不到该任务。")
+        if row["status"] not in ("queued", "running"):
+            return _public(row)
+        if not row["canCancel"]:
+            raise workspace.WorkspaceError("cancel_unsupported", "当前执行器无法安全取消这项任务。")
+        db.execute("UPDATE task SET status='cancelling' WHERE id=?", (task_id,))
+        _append(db, task_id, "status", "已请求取消，正在停止云端任务。")
+        return _public(db.execute("SELECT * FROM controlled_task_history WHERE id=?", (task_id,)).fetchone())
 
 
 def list_tasks(root: Path) -> list[dict]:
@@ -215,8 +253,8 @@ def list_tasks(root: Path) -> list[dict]:
         _recover(db)
         return [_public(row) for row in db.execute("""
             SELECT id, requestId, provider, substr(prompt, 1, 160) AS prompt, status,
-                   createdAt, finishedAt, parentTaskId, nextTaskId, canContinue
-            FROM task_history ORDER BY createdAt DESC, taskRowId DESC LIMIT ?
+                   createdAt, finishedAt, parentTaskId, nextTaskId, canContinue, canCancel
+            FROM controlled_task_history ORDER BY createdAt DESC, taskRowId DESC LIMIT ?
         """, (_TASK_LIMIT,))]
 
 
@@ -244,7 +282,7 @@ def events(root: Path, task_id: str, after: int) -> dict:
     with _database(root) as db, db:
         db.execute("BEGIN IMMEDIATE")
         _recover(db)
-        row = db.execute("SELECT * FROM task_history WHERE id=?", (task_id,)).fetchone()
+        row = db.execute("SELECT * FROM controlled_task_history WHERE id=?", (task_id,)).fetchone()
         if not row:
             raise ValueError("找不到该任务。")
         result = {"task": _public(row), "events": [], "cursor": after, "hasMore": False}
@@ -275,10 +313,11 @@ def decide_proposal(root: Path, task_id: str, decision: str) -> dict:
 def _git_check(root, emit):
     emit("正在统计 Git 跟踪的项目文件。")
     git = ["git", "--no-optional-locks"]
-    listed = subprocess.run(git + ["ls-files", "--cached", "-z"], cwd=root, capture_output=True)
-    if listed.returncode:
-        return False, "无法读取 Git 项目，请检查远端工作区和 Git 权限。"
-    count = listed.stdout.count(b"\0")
+    with subprocess.Popen(git + ["ls-files", "--cached", "-z"], cwd=root, stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL) as listing:
+        count = sum(chunk.count(b"\0") for chunk in codex_tools.output_chunks(listing))
+        if listing.wait():
+            return False, "无法读取 Git 项目，请检查远端工作区和 Git 权限。"
     emit(f"Git 索引包含 {count} 个文件条目。")
     clean = True
     for name, args in (("工作区", []), ("暂存区", ["--cached"])):
@@ -314,7 +353,13 @@ def _error_hint(message, provider):
 
 def _agent(root, provider, prompt, emit, resume_thread):
     if provider == "codex":
-        command = ["codex", "-a", "never", "exec", "--sandbox", "read-only", "--json"]
+        try:
+            tool_args = codex_tools.restricted_tool_args(root)
+        except FileNotFoundError:
+            raise
+        except (OSError, ValueError, RecursionError):
+            return False, "无法确认此工作区的 Codex 外部工具已关闭。请检查 CLI 版本和 MCP 配置后重试。", None
+        command = ["codex", "-a", "never", "exec", "--sandbox", "read-only", "--json", *tool_args]
         if resume_thread:
             command.extend(["resume", resume_thread])
         command.append("-")
@@ -334,9 +379,9 @@ def _agent(root, provider, prompt, emit, resume_thread):
         source.write((prompt + "\n").encode("utf-8"))
         source.seek(0)
         proc = subprocess.Popen(command, cwd=root, stdin=source, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+                                stderr=subprocess.STDOUT)
     with proc:
-        for line in proc.stdout:
+        for line in codex_tools.output_lines(proc):
             try:
                 event = json.loads(line)
             except ValueError:
@@ -386,20 +431,20 @@ def _agent(root, provider, prompt, emit, resume_thread):
     return False, hint[1] or f"云端 {provider} 未正常完成，请在服务器检查 CLI 版本、登录和模型配置。", None
 
 
-def _worker(root, task_id):
+def _execute(root, task_id, supervised):
     with _database(root) as db:
-        with db:
-            db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT * FROM task WHERE id=?", (task_id,)).fetchone()
-            if not row or row["status"] != "queued" or row["pid"] != os.getpid():
-                return
-            db.execute("UPDATE task SET status='running' WHERE id=?", (task_id,))
-            _append(db, task_id, "status", "任务正在云端运行。")
+        row = db.execute("SELECT * FROM task WHERE id=?", (task_id,)).fetchone()
+        owner = os.getppid() if supervised else os.getpid()
+        if not row or row["status"] != "running" or row["pid"] != owner:
+            return
 
         def emit(text, kind="output"):
             with db:
-                _append(db, task_id, kind, text)
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute("SELECT status FROM task WHERE id=?", (task_id,)).fetchone()[0] == "running":
+                    _append(db, task_id, kind, text)
 
+        thread_id = None
         provider = row["provider"]
         try:
             if provider == "check":
@@ -414,15 +459,153 @@ def _worker(root, task_id):
                 """, (task_id,)).fetchone()
                 success, message, thread_id = _agent(root, provider, row["prompt"], emit,
                                                      parent["threadId"] if parent else None)
-                if thread_id:
-                    db.execute("UPDATE codex_turn SET threadId=? WHERE taskId=?", (thread_id, task_id))
         except FileNotFoundError:
             binary = {"check": "git", "proposal": "codex"}.get(provider, provider)
             success, message = False, f"云端缺少 {binary}，请先安装并加入 PATH。"
         except Exception:
             success, message = False, "任务执行中断，请查看远端 CLI 安装和项目权限。"
         with db:
-            _finish(db, task_id, success, message)
+            # Proposal generation may already hold a write transaction with a staged candidate.
+            if not db.in_transaction:
+                db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT status FROM task WHERE id=?", (task_id,)).fetchone()[0] != "running":
+                db.rollback()
+                return
+            if thread_id:
+                db.execute("UPDATE codex_turn SET threadId=? WHERE taskId=?", (thread_id, task_id))
+            if supervised:
+                db.execute("UPDATE task_control SET success=?, message=? WHERE taskId=?",
+                           (success, message, task_id))
+            else:
+                _finish(db, task_id, success, message)
+
+
+def _child_pids():
+    owner = os.getpid()
+    try:
+        return [int(value) for value in Path(f"/proc/self/task/{owner}/children").read_text().split()]
+    except FileNotFoundError:
+        # Some Linux builds omit CONFIG_PROC_CHILDREN. The kernel's PPID is equivalent
+        # here: a direct child stays ours, including as a zombie, until this thread waits.
+        children = []
+        with os.scandir("/proc") as entries:
+            for entry in entries:
+                if entry.name.isdecimal():
+                    try:
+                        fields = (Path(entry.path) / "stat").read_bytes().rsplit(b") ", 1)[1].split()
+                        if int(fields[1]) == owner:
+                            children.append(int(entry.name))
+                    except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError):
+                        continue
+        return children
+
+
+def _enable_subreaper():
+    # Linux PR_SET_CHILD_SUBREAPER. Only this newly spawned, task-private process is changed.
+    try:
+        import ctypes
+        if (not os.access("/proc", os.R_OK | os.X_OK) or len(os.listdir("/proc/self/task")) != 1
+                or not _process_key(os.getpid())):
+            return False
+        try:
+            os.waitid(os.P_ALL, 0, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        except ChildProcessError:
+            pass
+        else:
+            return False  # Never supervise an interpreter which already owns children.
+        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+        return ctypes.CDLL(None).prctl(36, 1, 0, 0, 0) == 0
+    except (ImportError, AttributeError, OSError):
+        return False
+
+
+def _stop_children():
+    # No other thread reaps children here. A direct child cannot have its PID reused
+    # until we wait for it. Reparenting on exit exposes even descendants with new sessions.
+    escalate_at = time.monotonic() + 0.35
+    while True:
+        try:
+            while os.waitpid(-1, os.WNOHANG)[0]:
+                pass
+        except ChildProcessError:
+            return
+        sig = signal.SIGKILL if time.monotonic() >= escalate_at else signal.SIGTERM
+        for pid in _child_pids():
+            try:
+                os.kill(pid, sig)
+            except ProcessLookupError:
+                pass
+        time.sleep(0.025)
+
+
+def _cancelled(db, task_id):
+    db.execute("UPDATE task SET status='cancelled', finishedAt=? WHERE id=?", (_now(), task_id))
+    db.execute("UPDATE proposal SET candidate=NULL, decision='cancelled' WHERE taskId=?", (task_id,))
+    _append(db, task_id, "status", "云端任务已取消。")
+
+
+def _supervise(root, task_id):
+    # No SQLite connection is open across fork. The executor keeps the write end until
+    # exit; its CLI subprocesses close this non-inheritable descriptor on exec.
+    read_fd, write_fd = os.pipe()
+    with os.fdopen(read_fd, "rb") as finished, os.fdopen(write_fd, "wb") as keep_open:
+        try:
+            child = os.fork()
+        except OSError:
+            return
+        if child == 0:
+            finished.close()
+            try:
+                _execute(root, task_id, True)
+            finally:
+                os._exit(0)
+        keep_open.close()
+        try:
+            with _database(root) as db:
+                poll = select.poll()
+                poll.register(finished, select.POLLIN)
+                while db.execute("SELECT status FROM task WHERE id=?", (task_id,)).fetchone()[0] == "running":
+                    if poll.poll(120):
+                        break
+        finally:
+            _stop_children()
+
+
+def _worker(root, task_id):
+    supervised = _enable_subreaper()
+    with _database(root) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT status, pid, canCancel FROM controlled_task_history WHERE id=?",
+                         (task_id,)).fetchone()
+        if not row or row["pid"] != os.getpid():
+            return
+        if row["status"] == "cancelling":
+            _cancelled(db, task_id)
+            return
+        if row["status"] != "queued":
+            return
+        supervised = supervised and bool(row["canCancel"])
+        if not supervised:
+            db.execute("DELETE FROM task_control WHERE taskId=?", (task_id,))
+        db.execute("UPDATE task SET status='running' WHERE id=?", (task_id,))
+        _append(db, task_id, "status", "任务正在云端运行。")
+    if not supervised:
+        _execute(root, task_id, False)
+        return
+
+    # RPC processes never send signals to a PID obtained from the database.
+    _supervise(root, task_id)
+    with _database(root) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        result = db.execute("""
+            SELECT t.status, c.success, c.message FROM task t
+            JOIN task_control c ON c.taskId=t.id WHERE t.id=?
+        """, (task_id,)).fetchone()
+        if result["status"] == "cancelling":
+            _cancelled(db, task_id)
+        elif result["status"] == "running":
+            _finish(db, task_id, bool(result["success"]),
+                    result["message"] or "云端执行进程已中断，已保留任务输出。")
 
 
 if __name__ == "__main__":

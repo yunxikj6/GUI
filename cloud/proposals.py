@@ -1,25 +1,20 @@
 """Single-file Codex proposals. Only an explicit apply calls the workspace file writer."""
-from contextlib import contextmanager
 import difflib
 import json
 import os
 from pathlib import Path
-import re
-import signal
 import subprocess
 import tempfile
 
 if __package__:
-    from . import workspace
+    from . import codex_tools, workspace
 else:
+    import codex_tools
     import workspace
 
 
 LIMIT = 24 * 1024
 _TIMEOUT = 300
-_INVENTORY_TIMEOUT = 15
-_INVENTORY_LIMIT = 256 * 1024
-_NO_EXTENSIONS = ["--disable", "apps", "--disable", "plugins", "--disable", "hooks"]
 _OUTPUT_LIMIT = 6 * LIMIT + 1024  # JSON can escape each input byte as six ASCII bytes.
 _SCHEMA = {"type": "object", "properties": {"content": {"type": "string"}},
            "additionalProperties": False, "required": ["content"]}
@@ -40,65 +35,6 @@ def create(db, root, task_id, path, revision):
     """, (task_id, path, revision, source["content"]))
 
 
-@contextmanager
-def _process(command, directory, timeout, stdin, stderr, env=None):
-    # Runs in the detached Linux worker's main thread. Bound both stdout reads and wait().
-    def expired(*_):
-        raise TimeoutError
-    with subprocess.Popen(command, cwd=directory, stdin=stdin, stdout=subprocess.PIPE,
-                          stderr=stderr, env=env, start_new_session=True) as proc:
-        previous = signal.signal(signal.SIGALRM, expired)
-        signal.setitimer(signal.ITIMER_REAL, timeout)
-        try:
-            yield proc
-        finally:
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, previous)
-            if proc.poll() is None:
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-
-
-def _enabled_servers(directory, env, overrides):
-    command = ["codex", "mcp", "list", "--json", *_NO_EXTENSIONS, *overrides]
-    with _process(command, directory, _INVENTORY_TIMEOUT, subprocess.DEVNULL, subprocess.DEVNULL, env) as proc:
-        # Server descriptors can contain private arguments or headers. Never log or store them.
-        raw = proc.stdout.read(_INVENTORY_LIMIT + 1)
-        if len(raw) > _INVENTORY_LIMIT or proc.wait():
-            raise ValueError()
-        servers = json.loads(raw.decode("utf-8"))
-    if not isinstance(servers, list) or len(servers) > 256:
-        raise ValueError()
-    enabled = set()
-    for server in servers:
-        if not isinstance(server, dict):
-            raise ValueError()
-        name = server.get("name")
-        if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_:@/.-]{1,256}", name)
-                or type(server.get("enabled")) is not bool):
-            raise ValueError()
-        if server["enabled"]:
-            enabled.add(name)
-    return enabled
-
-
-def _disable_system_mcp(directory):
-    # exec ignores user config but still loads system MCP definitions. Inventory an
-    # empty user config with the same cwd and extension flags. Real exec retains auth.
-    with tempfile.TemporaryDirectory(prefix="mcp-inventory-", dir=directory) as empty_home:
-        env = dict(os.environ, CODEX_HOME=empty_home)
-        names = _enabled_servers(directory, env, [])
-        if not names:
-            return []
-        entries = ",".join(f'{json.dumps(name)}={{enabled=false}}' for name in sorted(names))
-        overrides = ["-c", "mcp_servers={" + entries + "}"]
-        if _enabled_servers(directory, env, overrides):
-            raise ValueError()
-        return overrides
-
-
 def _run(command, directory, prompt, error_hint):
     hint = (0, "")
     completed = False
@@ -106,10 +42,9 @@ def _run(command, directory, prompt, error_hint):
         source.write(prompt.encode("utf-8"))
         source.seek(0)
         try:
-            with _process(command, directory, _TIMEOUT, source, subprocess.STDOUT) as proc:
+            with codex_tools.bounded_process(command, directory, _TIMEOUT, source, subprocess.STDOUT) as proc:
                 # Diagnostics can contain file contents or account details. Never replay them.
-                for block in iter(lambda: proc.stdout.readline(_OUTPUT_LIMIT + 1), b""):
-                    line = block.decode("utf-8", "replace")
+                for line in codex_tools.output_lines(proc, _OUTPUT_LIMIT + 1):
                     try:
                         event = json.loads(line)
                     except (ValueError, RecursionError):
@@ -136,7 +71,9 @@ def generate(db, task_id, instruction, error_hint):
     with tempfile.TemporaryDirectory(prefix="cloudwork-proposal-") as temporary:
         directory = Path(temporary)
         try:
-            mcp_overrides = _disable_system_mcp(directory)
+            # --ignore-user-config still loads system MCP. Inventory with an empty user config.
+            with tempfile.TemporaryDirectory(prefix="mcp-inventory-", dir=directory) as empty_home:
+                tool_args = codex_tools.restricted_tool_args(directory, dict(os.environ, CODEX_HOME=empty_home))
         except FileNotFoundError:
             raise
         except (OSError, ValueError, RecursionError):
@@ -147,7 +84,7 @@ def generate(db, task_id, instruction, error_hint):
         command = ["codex", "-a", "never", "exec", "--sandbox", "read-only", "--ephemeral",
                    "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
                    "--disable", "shell_tool", "--disable", "view_image", "--disable", "multi_agent",
-                   "--disable", "goals", *_NO_EXTENSIONS, *mcp_overrides,
+                   "--disable", "goals", *tool_args,
                    "-c", 'web_search="disabled"', "-c", "tools.experimental_request_user_input.enabled=false",
                    "--output-schema", str(schema), "-o", str(output), "--json", "-"]
         error = _run(command, directory, prompt, error_hint)
@@ -195,8 +132,11 @@ def _diff(row):
 
 
 def _public(row):
+    decision = row["decision"]
+    if row["status"] != "succeeded":
+        decision = "generating" if row["status"] in ("queued", "running") else row["status"]
     return {"taskId": row["taskId"], "path": row["path"], "revision": row["revision"],
-            "decision": "failed" if row["status"] == "failed" else row["decision"], "diff": _diff(row)}
+            "decision": decision, "diff": _diff(row) if row["status"] == "succeeded" else ""}
 
 
 def _matches_file(root, path, content):
@@ -221,6 +161,8 @@ def inspect(db, root, task_id):
 
 
 def _terminal(db, row, action):
+    if row["status"] != "succeeded":
+        raise workspace.WorkspaceError("proposal_decided", "此提案尚无可审核的改动。")
     if row["decision"] == ("applied" if action == "apply" else "rejected"):
         return _public(row)
     if row["decision"] != "pending":

@@ -115,10 +115,13 @@ textarea::placeholder {color:#7d8798}
 .activity {padding:15px 17px;display:flex;flex-direction:column;min-height:160px;flex:1}
 .activity-heading {margin-bottom:8px}
 #taskHistory {width:100%;flex:none}
-.event-heading {align-items:flex-start;margin-top:15px;font-size:12px;font-weight:640}
+.event-heading {align-items:center;flex-wrap:wrap;margin-top:15px;font-size:12px;font-weight:640}
+#eventProvider {margin-right:auto}
+#cancelTask {margin:0;border-color:#cdd3df}
 .status-tag {font-weight:550;font-size:11px;line-height:1.6;white-space:nowrap;border:1px solid #d0d9e3;background:#eef2f7;color:#4d6076;border-radius:4px;padding:1px 5px}
 .status-tag[data-status=succeeded] {border-color:#cbe3d5;color:#22643e;background:#e8f5ed}
 .status-tag[data-status=failed] {border-color:#e7c9c5;color:#8a362e;background:#fbecea}
+.status-tag[data-status=cancelling] {border-color:#e7dbb9;color:#765a21;background:#fbf5e7}
 .event-log {overflow:auto;min-height:0;scrollbar-width:thin;font:12px/1.6 var(--mono);color:#364155}
 .event-log:empty {display:none}
 .event {padding:7px 0;border-bottom:1px solid #e3e7ee;white-space:pre-wrap;overflow-wrap:anywhere}

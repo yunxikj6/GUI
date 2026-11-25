@@ -2,8 +2,9 @@
 
 const $ = id => document.getElementById(id);
 const names = { check: '项目检查', codex: 'Codex', claude: 'Claude Code', proposal: 'Codex · 修改建议' };
-const labels = { queued: '排队中', running: '运行中', succeeded: '已完成', failed: '失败' };
-const isActive = task => ['queued', 'running'].includes(task?.status);
+const labels = { queued: '排队中', running: '运行中', cancelling: '正在取消', cancelled: '已取消', succeeded: '已完成', failed: '失败' };
+const isActive = task => ['queued', 'running', 'cancelling'].includes(task?.status);
+const cancelRequests = new Map();
 const drafts = new Map();
 const unbackedDrafts = new Map();
 // sessionStorage belongs to this tab. A launcher can serve different projects
@@ -516,6 +517,11 @@ function taskControls() {
   $('pendingWrap').hidden = !state.pending || state.sending;
   $('retryStart').disabled = state.sending || !state.ready;
   const task = selectedTurn();
+  const cancel = cancelRequests.get(task?.id);
+  $('cancelTask').hidden = task?.canCancel !== true;
+  $('cancelTask').disabled = !state.ready || Boolean(cancel?.pending);
+  $('cancelTask').textContent = cancel?.pending ? '正在提交…' : '取消任务';
+  $('cancelNotice').textContent = isActive(task) && task.status !== 'cancelling' ? cancel?.message || '' : '';
   const reply = $('replyPrompt').value;
   $('followUp').hidden = !task || (!task.canContinue && !reply);
   $('replyPrompt').readOnly = !task?.canContinue || state.pending?.parentTaskId === task?.id;
@@ -534,6 +540,7 @@ function taskLabel(task) {
 }
 function upsertTask(task) {
   if (!task?.id) return;
+  if (!isActive(task)) cancelRequests.delete(task.id);
   const index = state.tasks.findIndex(item => item.id === task.id);
   if (index < 0) state.tasks.unshift(task); else state.tasks[index] = task;
   if (state.tasks.length > 150) state.tasks.length = 150;
@@ -584,6 +591,32 @@ function appendEvent(event) {
 function scheduleEvents(ticket,delay) {
   clearTimeout(state.timer);
   state.timer = setTimeout(() => pollEvents(ticket),delay);
+}
+async function cancelSelectedTask() {
+  const task = selectedTurn();
+  if (!state.ready || !task?.canCancel || cancelRequests.get(task.id)?.pending) return;
+  const version = state.workspaceVersion;
+  cancelRequests.set(task.id,{pending:true}); taskControls();
+  try {
+    const result = await rpc('cancel',{taskId:task.id});
+    if (version !== state.workspaceVersion) return;
+    cancelRequests.delete(task.id);
+    ++state.taskListVersion;
+    // Event replay may already have reached a terminal state while the receipt travelled.
+    const current = state.tasks.find(item => item.id === task.id);
+    if (!current || isActive(current)) upsertTask(result);
+    drawHistory();
+  } catch(err) {
+    if (version !== state.workspaceVersion) return;
+    const uncertain = ['transport','network','timeout','worker_error','invalid_response'].includes(err.code);
+    if (cancelRequests.has(task.id)) cancelRequests.set(task.id,{message:asError(err) +
+      (uncertain ? ' 取消结果尚未确认，可再次取消此任务。' : '')});
+  }
+  if (state.selectedTask === task.id) {
+    drawTaskTitle(selectedTurn());
+    // Keep the log and its confirmed cursor, and discard any poll started before this receipt.
+    if (state.ready) scheduleEvents(++state.taskVersion,0);
+  }
 }
 async function pollEvents(ticket) {
   const taskId = state.selectedTask;
@@ -640,8 +673,10 @@ async function loadTasks() {
     const id = state.selectedTask || stored(key('task'),stored(key('task')),'sessionStorage');
     if (previous && id === previous.id) {
       const fresh = selectedTurn();
-      // A list refresh only carries an abbreviated prompt and can omit older turns.
-      upsertTask(fresh ? {...fresh, prompt:previous.prompt} : previous);
+      // A list snapshot can predate a poll that already observed cancellation or completion.
+      const stale = fresh && ((!isActive(previous) && isActive(fresh)) ||
+        (previous.status === 'cancelling' && fresh.canCancel));
+      upsertTask(fresh && !stale ? {...fresh, prompt:previous.prompt} : previous);
       drawHistory(); drawTaskTitle(selectedTurn(),true);
       if (!fresh && !isActive(previous)) pollEvents(state.taskVersion);
       return;
@@ -765,6 +800,7 @@ function restore(status) {
       (!state.providers.codex?.available && state.providers.claude?.available ? 'claude' : 'codex');
   }
   ++state.workspaceVersion;
+  cancelRequests.clear();
   if (state.loadedKey) {
     ++state.taskVersion; ++state.fileVersion; ++state.taskListVersion;
     clearTimeout(state.timer); state.tasks = []; state.selectedTask = null;
@@ -839,6 +875,7 @@ $('fileEditArea').addEventListener('keydown',event => {
   if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveEdit(); }
 });
 $('taskHistory').addEventListener('change',() => selectTask($('taskHistory').value,true));
+$('cancelTask').addEventListener('click',cancelSelectedTask);
 $('previousTurn').addEventListener('click',() => selectTask(selectedTurn().parentTaskId,true));
 $('nextTurn').addEventListener('click',() => selectTask(selectedTurn().nextTaskId,true));
 $('replyPrompt').addEventListener('input',() => {

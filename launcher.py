@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 from instabox import BridgeError, InstaBox
 
 APP = Path(__file__).resolve().parent
-PUBLIC_OPS = {'status', 'tree', 'file', 'diff', 'tasks', 'start', 'events', 'save',
+PUBLIC_OPS = {'status', 'tree', 'file', 'diff', 'tasks', 'start', 'cancel', 'events', 'save',
               'proposal', 'decideProposal'}
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'),
           '/index.html': ('index.html', 'text/html; charset=utf-8'),

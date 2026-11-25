@@ -42,8 +42,11 @@ class RemoteTaskTests(unittest.TestCase):
     def run_git(self, *args):
         subprocess.run([self.git, *args], cwd=self.root, capture_output=True, check=True)
 
-    def executable(self, name, source):
+    def executable(self, name, source, inventory="print('[]')"):
         path = self.bin / name
+        if name == "codex":
+            source = ("import sys\nif sys.argv[1:3] == ['mcp', 'list']:\n"
+                      + "    " + inventory + "\n    sys.exit(0)\n" + source)
         path.write_text(f"#!{sys.executable}\n" + source)
         path.chmod(0o700)
 
@@ -179,6 +182,16 @@ sys.exit(1)
         self.assertIn("认证", result["events"][-1]["text"])
         self.assertNotIn("secret-example", json.dumps(result))
 
+    def test_codex_inventory_failure_never_starts_model(self):
+        marker = self.base / "model-started"
+        self.executable("codex", f"open({str(marker)!r}, 'w').close()",
+                        inventory="print('synthetic-private-descriptor')")
+        result = self.terminal(tasks.start_task(self.root, "inventory", "codex", "read project")["id"])
+        self.assertEqual(result["task"]["status"], "failed")
+        self.assertIn("外部工具", result["events"][-1]["text"])
+        self.assertNotIn("synthetic-private-descriptor", str(result))
+        self.assertFalse(marker.exists())
+
     def test_codex_continuation_is_scoped_serial_and_idempotent(self):
         thread_id = "11111111-2222-4333-8444-555555555555"
         self.executable("codex", f"""
@@ -186,7 +199,8 @@ import json, sys
 prompt = sys.stdin.read().strip()
 args = sys.argv[1:]
 assert args[:6] == ['-a', 'never', 'exec', '--sandbox', 'read-only', '--json']
-assert args[6:] == (['-'] if prompt == 'first' else ['resume', {thread_id!r}, '-'])
+assert args[6:12] == ['--disable', 'apps', '--disable', 'plugins', '--disable', 'hooks']
+assert args[12:] == (['-'] if prompt == 'first' else ['resume', {thread_id!r}, '-'])
 print(json.dumps({{'type': 'thread.started', 'thread_id': {thread_id!r}}}))
 print(json.dumps({{'type': 'item.completed', 'item': {{'type':'agent_message', 'text': prompt}}}}))
 print(json.dumps({{'type': 'turn.completed'}}))

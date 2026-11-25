@@ -85,6 +85,9 @@ class BrowserFixture(unittest.TestCase):
         codex.write_text(f"#!{sys.executable}\n" + """
 import json, sys, uuid
 from pathlib import Path
+if sys.argv[1:3] == ["mcp", "list"]:
+    print("[]")
+    sys.exit(0)
 prompt = sys.stdin.read().strip()
 if "resume" in sys.argv:
     session = next(arg for arg in sys.argv if (Path(__file__).parent / ("turn-" + arg)).is_file())

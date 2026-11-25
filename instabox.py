@@ -25,7 +25,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 # Install an immutable worker directory in one rename. Another client may
 # install the same version while this one is connecting.
-WORKER_FILES = ('tasks.py', 'workspace.py', 'proposals.py')
+WORKER_FILES = ('tasks.py', 'workspace.py', 'proposals.py', 'codex_tools.py')
 _INSTALL = f"""
 import gzip, json, os, pathlib, shutil, sys, tempfile
 dest = pathlib.Path(sys.argv[1])

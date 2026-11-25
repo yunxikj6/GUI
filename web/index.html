@@ -60,7 +60,11 @@
       <section class="activity">
         <div class="activity-heading"><h3>任务记录</h3><button class="square small" id="reloadTasks" aria-label="刷新任务记录" title="刷新任务记录">↻</button></div>
         <label class="sr-only" for="taskHistory">选择任务</label><select id="taskHistory" disabled><option value="">暂无任务</option></select>
-        <div class="event-heading" id="eventHeading" hidden><span id="eventProvider"></span><span id="taskStatus" class="status-tag"></span></div>
+        <div class="event-heading" id="eventHeading" hidden>
+          <span id="eventProvider"></span><span id="taskStatus" class="status-tag" role="status"></span>
+          <button id="cancelTask" class="subtle-button" hidden>取消任务</button>
+        </div>
+        <p class="action-note" id="cancelNotice" role="status"></p>
         <nav class="turn-nav" id="turnNav" aria-label="对话回合" hidden><button id="previousTurn" hidden>← 上一轮</button><button id="nextTurn" hidden>下一轮 →</button></nav>
         <details id="taskRequest" class="task-request" hidden><summary>任务要求</summary><div id="taskRequestText"></div></details>
         <div class="event-log" id="eventLog" tabindex="0" aria-label="任务输出"></div>
