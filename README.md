@@ -32,6 +32,8 @@ python3 launcher.py --remote-project /data/workspace/my-project
 4. 需要改文件时，打开目标文本，选择 Codex 的修改建议并说明改动。任务记录中会显示目标路径和建议差异。你可以应用或拒绝建议。文件在等待期间被别人改过时，工作台会保留差异并提示重新生成。单文件的原文和建议内容各限 24 KiB。
 5. 点“Linux 桌面”打开 Xfce。选择接管后可以操作应用，用完可以交还控制。桌面默认使用 noVNC，连接受限时支持逐帧模式。
 
+任务记录每页显示 80 项。点“较早”查找以前的任务，用“较新”往回翻，从第三页起也可以直接点“最近记录”。翻页时，正在阅读的任务和追问草稿会保留。选好一项旧任务后，在同一标签页刷新即可回到该页和该任务。
+
 Claude Code 问答向模型开放读取和搜索项目的 `Read`、`Glob`、`Grep`。任务记录会在调用时显示工具名称，刷新后仍能查看。工作台为本次调用指定空的 MCP 配置，并用安全模式停用普通用户、项目和插件的执行钩子。主机管理员配置的受管钩子仍可运行。云机需安装支持 `--safe-mode` 的 Claude Code，已验证版本为 2.1.288。Codex 问答保留云机模型和登录配置，使用只读沙箱内的项目命令，并为该次调用关闭外部 MCP 工具、应用扩展、插件和钩子。
 
 ## 实现
@@ -41,7 +43,7 @@ Claude Code 问答向模型开放读取和搜索项目的 `Read`、`Glob`、`Gre
 | `launcher.py`、`web/` | 本机 HTTP 服务、同源校验、工作区界面、草稿及重连 |
 | `instabox.py` | 选择与唤醒机器、按内容摘要部署工作进程、调用官方 API |
 | `cloud/workspace.py` | 受限的文件访问、按文件版本保存、Git 差异与工作区请求 |
-| `cloud/tasks.py` | 云端任务、进程回收、SQLite 记录、请求去重、分页事件补读 |
+| `cloud/tasks.py` | 云端任务、进程回收、SQLite 记录、请求去重、历史翻页和事件补读 |
 | `cloud/codex_tools.py` | 核对并约束本次 Codex 调用可用的外部工具 |
 | `cloud/proposals.py` | 单文件修改建议、完整差异、按文件版本审批写入 |
 | `desktop.py`、`desktop_assets/` | 私有桌面连接、noVNC WebSocket 代理、备用截屏和输入 |
@@ -65,5 +67,6 @@ python3 launcher.py --local --project "$(mktemp -d)/project"
 - [续聊、草稿与修改审批验收](docs/validation-reviewed-edits.md)
 - [任务取消与只读问答验收](docs/validation-task-cancellation.md)
 - [Claude Code 续聊与升级验收](docs/validation-claude-conversations.md)
+- [任务历史翻页与云机升级验收](docs/validation-task-history.md)
 - [项目需求](docs/requirements.md)和[开发交接](AGENTS.md)
 - [桌面查看器第三方许可](desktop_assets/NOTICE.txt)

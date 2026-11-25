@@ -60,6 +60,12 @@
       <section class="activity">
         <div class="activity-heading"><h3>任务记录</h3><button class="square small" id="reloadTasks" aria-label="刷新任务记录" title="刷新任务记录">↻</button></div>
         <label class="sr-only" for="taskHistory">选择任务</label><select id="taskHistory" disabled><option value="">暂无任务</option></select>
+        <nav id="historyNav" class="history-nav" aria-label="任务记录分页" hidden>
+          <span id="historyPage" aria-live="polite"></span>
+          <button id="latestTasks" hidden>最近记录</button>
+          <button id="newerTasks">较新</button><button id="olderTasks">较早</button>
+        </nav>
+        <p id="historyNotice" class="action-note" role="status"></p>
         <div class="event-heading" id="eventHeading" hidden>
           <span id="eventProvider"></span><span id="taskStatus" class="status-tag" role="status"></span>
           <button id="cancelTask" class="subtle-button" hidden>取消任务</button>

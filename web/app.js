@@ -107,7 +107,8 @@ function fileSync(message = '', stale = false) {
 const state = {
   project: null, workspaceId: null, providers: {}, ready: false, view: 'files', file: null,
   fileScope: null, fileVersion: 0, treeVersion: 0, refreshVersion: 0, taskListVersion: 0, taskVersion: 0,
-  tasks: [], selectedTask: null, cursor: 0, timer: null, eventsSize: 0,
+  tasks: [], historyAnchors: [], historyNext: null, historyTarget: null,
+  selectedTask: null, selectedRecord: null, cursor: 0, timer: null, eventsSize: 0,
   selection: null, sending: false, pending: null, feedbackParent: null, taskNavigation: 0, retryCount: 0, loadedKey: null, workspaceVersion: 0,
 };
 function el(tag, cls, content) {
@@ -131,9 +132,10 @@ function connection(mode) {
   $('connection').dataset.state = mode;
   $('connectionLabel').textContent = {loading:'连接中', online:state.mode === 'local' ? '本机模式' : '云机已连接', error:'连接中断'}[mode];
 }
-async function rpc(op, fields = {}) {
+async function rpc(op, fields = {}, isCurrent = () => true) {
   let res, envelope;
   const workspace = state.workspaceId;
+  const reportConnection = () => workspace === state.workspaceId && isCurrent();
   const headers = {'Content-Type':'application/json'};
   if (op !== 'status' && state.workspaceId) headers['X-Workspace-Id'] = state.workspaceId;
   try {
@@ -144,7 +146,7 @@ async function rpc(op, fields = {}) {
     });
     envelope = await res.json();
   } catch {
-    if (op !== 'status' && workspace === state.workspaceId) connection('error');
+    if (op !== 'status' && reportConnection()) connection('error');
     const err = new Error('与工作区的连接中断。恢复网络后可重试。');
     err.code = 'transport';
     throw err;
@@ -152,16 +154,16 @@ async function rpc(op, fields = {}) {
   if (!res.ok || !envelope.ok) {
     const err = new Error(envelope.error?.message || '工作区请求失败');
     err.code = envelope.error?.code || 'transport';
-    if (workspace === state.workspaceId && err.code === 'workspace_changed') {
+    if (reportConnection() && err.code === 'workspace_changed') {
       state.ready = false;
       taskControls();
       connection('error');
       $('connectionLabel').textContent = '项目已切换，请刷新';
     }
-    if (op !== 'status' && workspace === state.workspaceId && (res.status >= 500 || err.code === 'transport')) connection('error');
+    if (op !== 'status' && reportConnection() && (res.status >= 500 || err.code === 'transport')) connection('error');
     throw err;
   }
-  if (op !== 'status' && workspace === state.workspaceId && state.ready) connection('online');
+  if (op !== 'status' && reportConnection() && state.ready) connection('online');
   return envelope.data;
 }
 function asError(err) { return String(err?.message || '操作失败').slice(0, 1200); }
@@ -501,7 +503,7 @@ async function loadTree(autoOpen = false) {
   }
 }
 
-function selectedTurn() { return state.tasks.find(task => task.id === state.selectedTask); }
+function selectedTurn() { return state.selectedRecord; }
 function taskControls() {
   const provider = $('provider').value;
   const caps = state.providers;
@@ -530,32 +532,70 @@ function taskControls() {
     (task?.nextTaskId ? '已有下一轮，可复制此草稿。' : '此回合无法续聊，可复制此草稿。');
   const target = state.feedbackParent && state.feedbackParent === state.selectedTask ? $('replyFeedback') : $('newTaskFeedback');
   if ($('submissionFeedback').parentElement !== target) target.append($('submissionFeedback'));
+  drawPageControls();
 }
-function taskLabel(task) {
+const taskTime = new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'});
+const taskDay = new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric'});
+const taskDate = new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'numeric',day:'numeric'});
+function taskLabel(task, today) {
   const label = names[task.provider] || task.provider;
   const prompt = (task.prompt || '').replace(/\s+/g,' ').trim().slice(0,38);
-  const stamp = new Date(task.createdAt).getTime();
-  const time = Number.isFinite(stamp) ? new Date(stamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) : '';
+  const created = new Date(task.createdAt);
+  let time = '';
+  if (Number.isFinite(created.getTime())) {
+    time = taskTime.format(created);
+    if (created.toDateString() !== today.toDateString()) {
+      const date = created.getFullYear() === today.getFullYear() ? taskDay : taskDate;
+      time = date.format(created) + ' ' + time;
+    }
+  }
   return [label, prompt, labels[task.status] || task.status, time].filter(Boolean).join(' · ');
 }
-function upsertTask(task) {
+function mergeTask(previous, incoming) {
+  if (!previous) return incoming;
+  // A list snapshot may predate a cancellation, terminal event, or committed follow-up.
+  if ((!isActive(previous) && isActive(incoming)) || (previous.status === 'cancelling' && incoming.canCancel)) return previous;
+  if (previous.nextTaskId && !incoming.nextTaskId) return {...incoming,nextTaskId:previous.nextTaskId,canContinue:false};
+  return incoming;
+}
+function updateTask(task) {
   if (!task?.id) return;
   if (!isActive(task)) cancelRequests.delete(task.id);
   const index = state.tasks.findIndex(item => item.id === task.id);
-  if (index < 0) state.tasks.unshift(task); else state.tasks[index] = task;
-  if (state.tasks.length > 150) state.tasks.length = 150;
+  if (index >= 0) state.tasks[index] = {...mergeTask(state.tasks[index],task),prompt:state.tasks[index].prompt};
+  if (task.id === state.selectedTask) state.selectedRecord = mergeTask(selectedTurn(),task);
+}
+function drawPageControls() {
+  const depth = state.historyAnchors.length;
+  $('historyNav').hidden = !depth && !state.historyNext;
+  const label = '第 ' + (depth + 1) + ' 页';
+  if ($('historyPage').textContent !== label) $('historyPage').textContent = label;
+  $('latestTasks').hidden = depth < 2;
+  const target = state.historyTarget;
+  $('latestTasks').disabled = !state.ready || target?.length === 0;
+  $('newerTasks').disabled = !state.ready || !depth || Boolean(target && target.at(-1) === state.historyAnchors.at(-2));
+  $('olderTasks').disabled = !state.ready || !state.historyNext || target?.at(-1) === state.historyNext;
 }
 function drawHistory() {
   const menu = $('taskHistory');
-  const options = state.tasks.map(item => {
-    const option = el('option','',taskLabel(item)); option.value = item.id; return option;
-  });
-  if (!options.length) {
-    const option = el('option','','暂无任务'); option.value = ''; options.push(option);
+  const today = new Date();
+  const rows = state.tasks.map(item => ({id:item.id,label:taskLabel(item,today)}));
+  if (state.selectedTask && !state.tasks.some(item => item.id === state.selectedTask)) {
+    const task = selectedTurn();
+    rows.unshift({id:state.selectedTask, label:task ? '当前任务 · ' + taskLabel(task,today) : '正在读取当前任务…'});
   }
-  menu.replaceChildren(...options);
-  menu.value = state.selectedTask || '';
-  menu.disabled = !state.tasks.length;
+  if (!rows.length) rows.push({id:'',label:'暂无任务'});
+  // Keep the opened native selector intact when polling only changes a status label.
+  if (menu.options.length === rows.length && rows.every((row,index) => menu.options[index].value === row.id)) {
+    rows.forEach((row,index) => {
+      if (menu.options[index].textContent !== row.label) menu.options[index].textContent = row.label;
+    });
+  } else {
+    menu.replaceChildren(...rows.map(row => new Option(row.label,row.id)));
+  }
+  if (menu.value !== (state.selectedTask || '')) menu.value = state.selectedTask || '';
+  menu.disabled = !state.tasks.length && !state.selectedTask;
+  drawPageControls();
 }
 function drawTaskTitle(task, reloadProposal = false) {
   showProposalReview(task, reloadProposal);
@@ -601,10 +641,7 @@ async function cancelSelectedTask() {
     const result = await rpc('cancel',{taskId:task.id});
     if (version !== state.workspaceVersion) return;
     cancelRequests.delete(task.id);
-    ++state.taskListVersion;
-    // Event replay may already have reached a terminal state while the receipt travelled.
-    const current = state.tasks.find(item => item.id === task.id);
-    if (!current || isActive(current)) upsertTask(result);
+    updateTask(result);
     drawHistory();
   } catch(err) {
     if (version !== state.workspaceVersion) return;
@@ -631,7 +668,7 @@ async function pollEvents(ticket) {
     const more = result.hasMore === true;
     const task = result.task;
     state.retryCount = 0;
-    upsertTask(task); drawTaskTitle(task); drawHistory();
+    updateTask(task); drawTaskTitle(selectedTurn()); drawHistory();
     $('taskNotice').textContent = !state.cursor && !isActive(task) ? '此任务没有输出。' : '';
     if (more) scheduleEvents(ticket,0);
     else if (isActive(task)) scheduleEvents(ticket,1000);
@@ -647,43 +684,67 @@ async function pollEvents(ticket) {
     }
   }
 }
-function selectTask(id, userNavigation = false) {
+function selectTask(id, userNavigation = false, record = null) {
   if (userNavigation) ++state.taskNavigation;
   const next = ++state.taskVersion;
   clearTimeout(state.timer);
+  state.selectedRecord = record || state.tasks.find(t => t.id === id) || null;
   state.selectedTask = id || null; state.cursor = 0; state.eventsSize = 0; state.retryCount = 0;
   remember(key('task'),state.selectedTask);
   remember(key('task'),state.selectedTask,'sessionStorage');
   $('eventLog').replaceChildren(); $('taskRequest').open = false;
   $('replyPrompt').value = id ? stored(key('reply.' + id),'','sessionStorage') : '';
   $('followUp').open = Boolean($('replyPrompt').value);
-  const item = state.tasks.find(t => t.id === id);
-  drawTaskTitle(item); drawHistory();
+  drawTaskTitle(selectedTurn()); drawHistory();
   $('taskNotice').textContent = id ? '正在读取任务输出…' : '运行一次项目检查或编码任务后，可在这里查看输出。';
   if (id) pollEvents(next);
 }
-async function loadTasks() {
-  const ticket = ++state.taskListVersion;
-  const selectionVersion = state.taskVersion;
+function restoredHistoryAnchors() {
   try {
-    const data = await rpc('tasks');
-    if (ticket !== state.taskListVersion || selectionVersion !== state.taskVersion) return;
-    const previous = selectedTurn();
-    state.tasks = data.tasks.slice(0,150);
-    const id = state.selectedTask || stored(key('task'),stored(key('task')),'sessionStorage');
-    if (previous && id === previous.id) {
-      const fresh = selectedTurn();
-      // A list snapshot can predate a poll that already observed cancellation or completion.
-      const stale = fresh && ((!isActive(previous) && isActive(fresh)) ||
-        (previous.status === 'cancelling' && fresh.canCancel));
-      upsertTask(fresh && !stale ? {...fresh, prompt:previous.prompt} : previous);
-      drawHistory(); drawTaskTitle(selectedTurn(),true);
-      if (!fresh && !isActive(previous)) pollEvents(state.taskVersion);
-      return;
-    }
-    selectTask(id || state.tasks[0]?.id || '');
+    const anchors = JSON.parse(stored(key('historyAnchors'),'[]','sessionStorage'));
+    if (Array.isArray(anchors) && anchors.every(id => typeof id === 'string' && id.length && id.length <= 128)) return anchors;
+  } catch { /* An incomplete navigation history can start on the newest page. */ }
+  return [];
+}
+function browseHistory(anchors) {
+  ++state.taskNavigation;
+  loadTasks(anchors,false);
+}
+async function loadTasks(anchors = state.historyAnchors, refreshSelected = true, notice = '') {
+  if (!state.loadedKey) return;
+  const ticket = ++state.taskListVersion;
+  const before = anchors.at(-1);
+  state.historyTarget = anchors;
+  $('historyNotice').textContent = '正在读取任务记录…'; drawPageControls();
+  if (!state.selectedTask) {
+    const saved = stored(key('task'),stored(key('task')),'sessionStorage');
+    if (saved) selectTask(saved);
+  }
+  try {
+    const data = await rpc('tasks',before ? {beforeTaskId:before} : {},() => ticket === state.taskListVersion);
+    if (ticket !== state.taskListVersion) return;
+    const known = new Map(state.tasks.map(task => [task.id,task]));
+    if (selectedTurn()) known.set(state.selectedTask,selectedTurn());
+    state.tasks = data.tasks.slice(0,80).map(task => mergeTask(known.get(task.id),task));
+    // A launcher serving the original API returns its newest page for every request.
+    state.historyAnchors = Object.hasOwn(data,'nextBeforeTaskId') ? anchors : [];
+    const next = data.nextBeforeTaskId;
+    state.historyNext = typeof next === 'string' && next && !anchors.includes(next) ? next : null;
+    remember(key('historyAnchors'),state.historyAnchors.length ? JSON.stringify(state.historyAnchors) : null,'sessionStorage');
+    $('historyNotice').textContent = notice;
+    if (!state.selectedTask) { selectTask(state.tasks[0]?.id || ''); return; }
+    const previous = selectedTurn(), summary = state.tasks.find(task => task.id === state.selectedTask);
+    if (summary) state.selectedRecord = previous ? {...summary,prompt:previous.prompt} : summary;
+    drawHistory(); drawTaskTitle(selectedTurn(),refreshSelected);
+    if (refreshSelected && previous && !summary && !isActive(previous)) pollEvents(state.taskVersion);
   } catch(err) {
-    if (ticket === state.taskListVersion && selectionVersion === state.taskVersion) $('taskNotice').textContent = asError(err);
+    if (ticket !== state.taskListVersion) return;
+    if (before && ['cursor_not_found','invalid_cursor'].includes(err.code)) {
+      return loadTasks([],refreshSelected,'原记录页已失效，已返回最近记录。');
+    }
+    $('historyNotice').textContent = asError(err);
+  } finally {
+    if (ticket === state.taskListVersion) { state.historyTarget = null; drawPageControls(); }
   }
 }
 function rememberPending(value) {
@@ -732,11 +793,11 @@ async function submitStart(request) {
   try {
     const item = await rpc('start',request);
     if (state.workspaceVersion !== version) return;
-    ++state.taskListVersion;
-    upsertTask(item); rememberPending(null);
+    updateTask(item); rememberPending(null);
     if (request.parentTaskId) {
-      const parent = state.tasks.find(task => task.id === request.parentTaskId);
-      if (parent) { parent.canContinue = false; parent.nextTaskId = item.id; }
+      const parent = state.selectedTask === request.parentTaskId ? selectedTurn() :
+        state.tasks.find(task => task.id === request.parentTaskId);
+      if (parent) updateTask({...parent,canContinue:false,nextTaskId:item.id});
       const draftKey = key('reply.' + request.parentTaskId);
       if (stored(draftKey,'','sessionStorage').trim() === request.prompt) remember(draftKey,null,'sessionStorage');
       if (state.selectedTask === request.parentTaskId && $('replyPrompt').value.trim() === request.prompt) $('replyPrompt').value = '';
@@ -746,8 +807,10 @@ async function submitStart(request) {
       $('prompt').value = ''; remember(key('prompt'),null);
     }
     $('startNotice').textContent = '';
-    if (state.taskNavigation === navigation) selectTask(item.id);
+    if (state.taskNavigation === navigation) selectTask(item.id,false,item);
     else { drawHistory(); drawTaskTitle(selectedTurn()); }
+    // Reload membership from the server so insertion at the head cannot skip a page boundary.
+    if (!state.historyAnchors.length && !state.historyTarget) loadTasks();
   } catch(err) {
     if (state.workspaceVersion !== version) return;
     if (['invalid_request','invalid_argument','bad_request','unknown_provider','unavailable','provider_unavailable','invalid_prompt',
@@ -803,13 +866,15 @@ function restore(status) {
   cancelRequests.clear();
   if (state.loadedKey) {
     ++state.taskVersion; ++state.fileVersion; ++state.taskListVersion;
-    clearTimeout(state.timer); state.tasks = []; state.selectedTask = null;
+    clearTimeout(state.timer); state.tasks = []; state.selectedTask = null; state.selectedRecord = null;
     state.pending = null; state.sending = false; $('eventLog').replaceChildren();
     $('fileNotice').textContent = ''; $('startNotice').textContent = '';
     $('replyPrompt').value = ''; $('followUp').open = false; $('taskRequest').open = false;
     $('pendingMessage').textContent = '';
   }
   state.loadedKey = scope;
+  state.historyAnchors = restoredHistoryAnchors(); state.historyNext = null; state.historyTarget = null;
+  $('historyNotice').textContent = '';
   restoreComposerDraft();
   state.pending = restorePending();
   state.feedbackParent = state.pending?.parentTaskId || null;
@@ -855,7 +920,10 @@ $('mobileFiles').addEventListener('click', () => mobilePage('files'));
 $('mobileTasks').addEventListener('click', () => mobilePage('tasks'));
 $('refresh').addEventListener('click',refresh);
 $('reloadTree').addEventListener('click',() => loadTree());
-$('reloadTasks').addEventListener('click',loadTasks);
+$('reloadTasks').addEventListener('click',() => loadTasks());
+$('olderTasks').addEventListener('click',() => browseHistory([...state.historyAnchors,state.historyNext]));
+$('newerTasks').addEventListener('click',() => browseHistory(state.historyAnchors.slice(0,-1)));
+$('latestTasks').addEventListener('click',() => browseHistory([]));
 $('showDiff').addEventListener('click',openDiff);
 $('showFiles').addEventListener('click',() => { viewButtons('files'); if (state.selection) openFile(state.selection); else loadTree(true); });
 $('editFile').addEventListener('click',beginEdit);

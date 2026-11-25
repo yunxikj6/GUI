@@ -27,6 +27,7 @@ else:
 _PAGE_BYTES = 256 * 1024
 _CHUNK_CHARS = 8192
 _TASK_LIMIT = 80
+_FIRST_PAGE = object()
 _TURN_TABLES = {"codex": "codex_turn", "claude": "claude_turn"}
 _CLAUDE_TOOLS = {
     "Read": "Claude 正在使用 Read 读取文件。",
@@ -270,15 +271,42 @@ def cancel_task(root: Path, task_id: str) -> dict:
         return _public(db.execute("SELECT * FROM model_task_history WHERE id=?", (task_id,)).fetchone())
 
 
-def list_tasks(root: Path) -> list[dict]:
+def _summary_rows(db, limit, where="", values=()):
+    return db.execute(f"""
+        SELECT id, requestId, provider, substr(prompt, 1, 160) AS prompt, status,
+               createdAt, finishedAt, parentTaskId, nextTaskId, canContinue, canCancel
+        FROM model_task_history {where} ORDER BY createdAt DESC, taskRowId DESC LIMIT ?
+    """, (*values, limit)).fetchall()
+
+
+def task_page(root: Path, before_task_id=_FIRST_PAGE) -> dict:
+    if before_task_id is not _FIRST_PAGE and (
+        not isinstance(before_task_id, str) or not 1 <= len(before_task_id) <= 128
+        or not before_task_id.isprintable() or not before_task_id.strip()
+    ):
+        raise workspace.WorkspaceError("invalid_cursor", "beforeTaskId 应为上一页返回的任务 ID。")
+    limit = _TASK_LIMIT + 1
     with _database(root) as db, db:
         db.execute("BEGIN IMMEDIATE")
         _recover(db)
-        return [_public(row) for row in db.execute("""
-            SELECT id, requestId, provider, substr(prompt, 1, 160) AS prompt, status,
-                   createdAt, finishedAt, parentTaskId, nextTaskId, canContinue, canCancel
-            FROM model_task_history ORDER BY createdAt DESC, taskRowId DESC LIMIT ?
-        """, (_TASK_LIMIT,))]
+        if before_task_id is _FIRST_PAGE:
+            rows = _summary_rows(db, limit)
+        else:
+            anchor = db.execute("SELECT createdAt, rowid FROM task WHERE id=?", (before_task_id,)).fetchone()
+            if not anchor:
+                raise workspace.WorkspaceError("cursor_not_found", "当前工作区找不到分页起点，请刷新任务历史。")
+            # The createdAt index also stores rowid. Two disjoint seeks use both keys
+            # even on SQLite versions that only seek the first column of a tuple inequality.
+            rows = _summary_rows(db, limit, "WHERE createdAt=? AND taskRowId<?", tuple(anchor))
+            if len(rows) < limit:
+                rows.extend(_summary_rows(db, limit - len(rows), "WHERE createdAt<?", (anchor["createdAt"],)))
+    has_more = len(rows) > _TASK_LIMIT
+    items = [_public(row) for row in rows[:_TASK_LIMIT]]
+    return {"tasks": items, "nextBeforeTaskId": items[-1]["id"] if has_more else None}
+
+
+def list_tasks(root: Path) -> list[dict]:
+    return task_page(root)["tasks"]
 
 
 def _wire_size(value):

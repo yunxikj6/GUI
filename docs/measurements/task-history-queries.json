@@ -1,0 +1,142 @@
+[
+  {
+    "baseline": "ac9c08e9",
+    "rows": 8000,
+    "deep_offset": 7920,
+    "samples": 21,
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "worker": {
+      "baseline_first": {
+        "median_ms": 51.692,
+        "p95_ms": 53.959,
+        "stdout_bytes": 44351
+      },
+      "current_first": {
+        "median_ms": 50.892,
+        "p95_ms": 55.91,
+        "stdout_bytes": 44405
+      },
+      "current_deep": {
+        "median_ms": 51.972,
+        "p95_ms": 73.391,
+        "stdout_bytes": 44545
+      }
+    },
+    "current_first_selects": {
+      "median_ms": 0.294,
+      "p95_ms": 0.367,
+      "plan": [
+        [
+          "SEARCH task USING INDEX task_unfinished (status=?)"
+        ],
+        [
+          "SCAN t USING INDEX task_created",
+          "SEARCH turn USING INDEX sqlite_autoindex_codex_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_codex_turn_2 (parentTaskId=?) LEFT-JOIN",
+          "SEARCH c USING COVERING INDEX sqlite_autoindex_task_control_1 (taskId=?) LEFT-JOIN",
+          "SEARCH turn USING INDEX sqlite_autoindex_claude_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_claude_turn_2 (parentTaskId=?) LEFT-JOIN"
+        ]
+      ]
+    },
+    "current_deep_selects": {
+      "median_ms": 0.278,
+      "p95_ms": 0.475,
+      "plan": [
+        [
+          "SEARCH task USING INDEX task_unfinished (status=?)"
+        ],
+        [
+          "SEARCH task USING INDEX sqlite_autoindex_task_1 (id=?)"
+        ],
+        [
+          "SEARCH t USING INDEX task_created (createdAt=? AND rowid<?)",
+          "SEARCH turn USING INDEX sqlite_autoindex_codex_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_codex_turn_2 (parentTaskId=?) LEFT-JOIN",
+          "SEARCH c USING COVERING INDEX sqlite_autoindex_task_control_1 (taskId=?) LEFT-JOIN",
+          "SEARCH turn USING INDEX sqlite_autoindex_claude_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_claude_turn_2 (parentTaskId=?) LEFT-JOIN"
+        ],
+        [
+          "SEARCH t USING INDEX task_created (createdAt<?)",
+          "SEARCH turn USING INDEX sqlite_autoindex_codex_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_codex_turn_2 (parentTaskId=?) LEFT-JOIN",
+          "SEARCH c USING COVERING INDEX sqlite_autoindex_task_control_1 (taskId=?) LEFT-JOIN",
+          "SEARCH turn USING INDEX sqlite_autoindex_claude_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_claude_turn_2 (parentTaskId=?) LEFT-JOIN"
+        ]
+      ]
+    }
+  },
+  {
+    "baseline": "ac9c08e9",
+    "rows": 80000,
+    "deep_offset": 79920,
+    "samples": 21,
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "worker": {
+      "baseline_first": {
+        "median_ms": 89.303,
+        "p95_ms": 171.255,
+        "stdout_bytes": 44271
+      },
+      "current_first": {
+        "median_ms": 91.361,
+        "p95_ms": 223.373,
+        "stdout_bytes": 44325
+      },
+      "current_deep": {
+        "median_ms": 89.014,
+        "p95_ms": 203.442,
+        "stdout_bytes": 44545
+      }
+    },
+    "current_first_selects": {
+      "median_ms": 0.282,
+      "p95_ms": 0.368,
+      "plan": [
+        [
+          "SEARCH task USING INDEX task_unfinished (status=?)"
+        ],
+        [
+          "SCAN t USING INDEX task_created",
+          "SEARCH turn USING INDEX sqlite_autoindex_codex_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_codex_turn_2 (parentTaskId=?) LEFT-JOIN",
+          "SEARCH c USING COVERING INDEX sqlite_autoindex_task_control_1 (taskId=?) LEFT-JOIN",
+          "SEARCH turn USING INDEX sqlite_autoindex_claude_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_claude_turn_2 (parentTaskId=?) LEFT-JOIN"
+        ]
+      ]
+    },
+    "current_deep_selects": {
+      "median_ms": 0.319,
+      "p95_ms": 0.485,
+      "plan": [
+        [
+          "SEARCH task USING INDEX task_unfinished (status=?)"
+        ],
+        [
+          "SEARCH task USING INDEX sqlite_autoindex_task_1 (id=?)"
+        ],
+        [
+          "SEARCH t USING INDEX task_created (createdAt=? AND rowid<?)",
+          "SEARCH turn USING INDEX sqlite_autoindex_codex_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_codex_turn_2 (parentTaskId=?) LEFT-JOIN",
+          "SEARCH c USING COVERING INDEX sqlite_autoindex_task_control_1 (taskId=?) LEFT-JOIN",
+          "SEARCH turn USING INDEX sqlite_autoindex_claude_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_claude_turn_2 (parentTaskId=?) LEFT-JOIN"
+        ],
+        [
+          "SEARCH t USING INDEX task_created (createdAt<?)",
+          "SEARCH turn USING INDEX sqlite_autoindex_codex_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_codex_turn_2 (parentTaskId=?) LEFT-JOIN",
+          "SEARCH c USING COVERING INDEX sqlite_autoindex_task_control_1 (taskId=?) LEFT-JOIN",
+          "SEARCH turn USING INDEX sqlite_autoindex_claude_turn_1 (taskId=?) LEFT-JOIN",
+          "SEARCH child USING INDEX sqlite_autoindex_claude_turn_2 (parentTaskId=?) LEFT-JOIN"
+        ]
+      ]
+    }
+  }
+]

@@ -360,7 +360,9 @@ def dispatch(request, root):
         return diff(root)
     import tasks
     if op == "tasks":
-        return {"tasks": tasks.list_tasks(root)}
+        if "beforeTaskId" in request:
+            return tasks.task_page(root, request["beforeTaskId"])
+        return tasks.task_page(root)
     if op == "start":
         return tasks.start_task(root, request.get("requestId"), request.get("provider"),
                                 request.get("prompt"), request.get("parentTaskId"),
