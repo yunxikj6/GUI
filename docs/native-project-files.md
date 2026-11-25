@@ -29,11 +29,17 @@ python3 native_files.py integrate --machine m_example --project "/data/my-projec
 
 Ubuntu 24.04 上，外层会话的密钥环已经运行时，Nautilus 首次打开可能要等待桌面门户服务就绪。Linux 冷启动实测约 28 秒。
 
+需要在另一个应用里选这份文件时，打开 Ubuntu 文件选择器的 **最近使用**。它列出刚才取回并显示的本地工作副本。若文件管理器刚打开了一份与本地草稿有分歧的云端新版本，新副本也会出现在列表里。
+
+关闭了 GNOME 文件历史时，可以在文件管理器中单击所需文件并按 **Ctrl+C**。切到应用的“打开文件”对话框，按 **Ctrl+L**、**Ctrl+V**，再按 **Enter**。在 Ubuntu 的 GTK 3 和 GTK 4 选择器中都可以这样选中文件名含中文、空格或百分号的工作副本。
+
 工作副本默认在 `~/.local/share/cloudworkspace/file-copies/projects/` 下，保留项目内相对目录。发生分歧时取回的副本在相邻的 `revisions/` 目录中。如果设置过 `XDG_DATA_HOME`，两个目录位于该位置的 `cloudworkspace/file-copies/` 内。文件管理器的云端动作根据选中的已登记路径确定机器和项目。
 
 这套操作使用 InstaBox 官方 HTTPS 接口。Claude 和 ChatGPT 各自管理登录、对话与授权。想在厂商客户端对话中读取同一云项目，可以单独配置工作区工具。[官方客户端连接](official-client-workspace.md)
 
 ## 实测
+
+在 Ubuntu 的项目文件入口逐级选择一份真实 InstaBox 文件后，Nautilus 显示了本机副本。重新启动独立的 GTK 4 文件选择器，在“最近使用”单击文件并点“打开”，返回的路径与 Nautilus 中的是同一份。读出的 16,242 字节与云端 Git 版本逐字节一致。厂商账户中的附件上传仍待登录验收。[Ubuntu 系统选择器实拍](native-insta-file-selection.png) · [文件来源与校验记录](measurements/native-attachment-selection.json)
 
 首次连接时，用 Ubuntu 原版 Zenity 从密钥环复用测试所用云机的凭据，选中真实机器、输入临时项目目录并确认。从 GNOME 活动搜索并打开项目入口，在系统选择器点选云机上的文件。这一步首次建立本机副本，随后 Nautilus 46.4 自动选中该文件。双击用 GNOME Text Editor 46.3 保存中文后，回到原来那个 Nautilus 窗口点击“脚本 → 保存到 InstaBox”。桌面收到保存通知，随后独立从云机磁盘读回 40 字节，与本机逐字节一致。让云机先修改文件后再发布，旧稿收到冲突，取回新副本、合并后发布成功。[保存菜单原图](native-cloud-file-menu.png) · [往返测量](measurements/native-project-files.json)
 

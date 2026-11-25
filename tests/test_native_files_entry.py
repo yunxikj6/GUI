@@ -94,8 +94,47 @@ class NativeFilesEntry(unittest.TestCase):
 
     def test_file_manager_uri_keeps_special_characters_out_of_dbus_arguments(self):
         selected = self.root / "note' #?\n.txt"
-        with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+        with patch.object(native_files, "remember_shown_copy"), \
+                patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
             native_files.show_file(selected)
         args = run.call_args.args[0]
         self.assertIn("org.freedesktop.FileManager1.ShowItems", args)
         self.assertEqual(json.loads(args[-2]), [selected.as_uri()])
+
+    def test_only_successfully_shown_explicit_selections_enter_recent_files(self):
+        self.invoke("integrate", "--machine", "m_fixture", "--project", "/data/project")
+        with patch.object(native_files, "remember_shown_copy") as remember, patch.object(subprocess, "run") as show:
+            local = Path(self.invoke("checkout", "note.txt")[0])
+            self.invoke("inspect", local)
+            with patch("linux.native_file_picker.choose_file", return_value=None):
+                self.invoke("browse")
+            remember.assert_not_called()
+            show.return_value.returncode = 1
+            self.invoke("checkout", "--show", "note.txt", expect=1)
+            remember.assert_not_called()
+            show.return_value.returncode = 0
+            self.invoke("checkout", "--show", "note.txt")
+            remember.assert_called_once_with(local)
+            with patch("linux.native_file_picker.choose_file", return_value="note.txt"):
+                self.invoke("browse")
+            self.assertEqual(remember.call_count, 2)
+            remember.assert_called_with(local)
+            remember.reset_mock()
+            with patch.object(native_files, "message"):
+                self.invoke("refresh", "--notify", local)
+                remember.assert_not_called()
+                local.write_text("本地草稿\n")
+                (self.cloud / "note.txt").write_text("最新云版本\n")
+                notice, _ = self.invoke("refresh", "--notify", local)
+            newer = Path(json.loads(notice)["remoteCopy"])
+            self.assertNotEqual(newer, local)
+            remember.assert_called_once_with(newer)
+
+    def test_file_display_succeeds_without_recent_file_helper(self):
+        overrides = {"INSTABOX_API_KEY": "test", "XDG_CONFIG_HOME": "relative", "XDG_DATA_HOME": "/absolute"}
+        with patch.dict(os.environ, overrides), patch.object(subprocess, "run", side_effect=subprocess.TimeoutExpired("GTK", 3)) as call:
+            native_files.remember_shown_copy(self.root / "note.txt")
+        env = call.call_args.kwargs["env"]
+        self.assertNotIn("INSTABOX_API_KEY", env)
+        self.assertNotIn("XDG_CONFIG_HOME", env)
+        self.assertEqual(env["XDG_DATA_HOME"], "/absolute")

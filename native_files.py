@@ -75,14 +75,29 @@ def integrate(machine, project):
 
 def show_file(path):
     # GNOME Files accepts file URIs with arbitrary filesystem bytes via the standard D-Bus API.
-    uri = Path(path).absolute().as_uri()
+    local = Path(path).absolute()
     # On Noble a cold desktop portal can take 25 seconds before Files serves this call.
     result = subprocess.run(["gdbus", "call", "--session", "--timeout", "45",
                              "--dest", "org.freedesktop.FileManager1", "--object-path", "/org/freedesktop/FileManager1",
-                             "--method", "org.freedesktop.FileManager1.ShowItems", json.dumps([uri]), ""],
+                             "--method", "org.freedesktop.FileManager1.ShowItems", json.dumps([local.as_uri()]), ""],
                             capture_output=True)
     if result.returncode:
         raise ValueError(f"工作副本已就绪。请在 Ubuntu 文件管理器中打开 {path}")
+    remember_shown_copy(local)
+
+
+def remember_shown_copy(path):
+    # The project environment may lack GI. Use the desktop's Python and settings.
+    env = os.environ.copy()
+    env.pop("INSTABOX_API_KEY", None)
+    for key in ("XDG_DATA_HOME", "XDG_CONFIG_HOME"):
+        if key in env and not os.path.isabs(env[key]):
+            del env[key]  # GLib accepts relative values; the XDG specification requires absolute paths.
+    try:
+        subprocess.run(["/usr/bin/python3", "-I", str(ROOT / "linux" / "recent_file.py"), str(path)],
+                       env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        pass  # Files already showed the copy, even if recent history is unavailable.
 
 
 def message(body, *, error=False, title="InstaBox 项目文件"):

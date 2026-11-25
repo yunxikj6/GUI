@@ -1,0 +1,143 @@
+{
+  "scope": "Find a local InstaBox text working copy using the Ubuntu system file chooser. Linux GNOME desktop. No signed-in vendor session, attachment upload, or Windows machine.",
+  "before": {
+    "commit": "39944870b940bf96b6ab01042d8b2772df0aa718",
+    "showItemsSucceeded": true,
+    "fileWasListedInGtkRecent": false,
+    "couldSelectByExactPath": true,
+    "isolatedFixtureSha256": "a5e125d64d50144e7e75054d639405d2ea6826dab2eaff085500dfd4c345cdec"
+  },
+  "sources": {
+    "native_files.py": "e0bd77b70ef4cb8795cd214e8ed68cdedb69d9efd549cfb8dace5f94e45faafc",
+    "linux/recent_file.py": "59bdc3cafc0bc4c9ef9339a1330c5b19ae2b5fa16ce74e50926e29b381b3e1c2"
+  },
+  "liveReadAndSelection": {
+    "remoteGitCommit": "39944870b940bf96b6ab01042d8b2772df0aa718",
+    "project": "/data/cloud-workspace/checkouts/reviewed-edits-39944870b940",
+    "method": "Read-only AF_UNIX adapter with a fixed live remote checkout; actual cloud tree filtered to one real row per parent.",
+    "guestModules": {
+      "officialNativeFilesSha256": "e0bd77b70ef4cb8795cd214e8ed68cdedb69d9efd549cfb8dace5f94e45faafc",
+      "executedNativeFilesWithOnlyClientFactoryReplacedSha256": "47e91b67b0137a7f2f37182ac668f05a558ca5467d044730e8f0fc0a434009f7",
+      "recentFileSha256": "59bdc3cafc0bc4c9ef9339a1330c5b19ae2b5fa16ce74e50926e29b381b3e1c2"
+    },
+    "chooserHost": "Separate test application opening the stock GTK 4 file dialog, without a prefilled path or selection.",
+    "credentialsInDesktopGuest": false,
+    "file": "docs/measurements/native-first-launch.json",
+    "remoteCalls": [
+      {
+        "op": "tree",
+        "path": "",
+        "names": [
+          {
+            "name": "docs",
+            "type": "dir"
+          }
+        ]
+      },
+      {
+        "op": "tree",
+        "path": "docs",
+        "names": [
+          {
+            "name": "measurements",
+            "type": "dir"
+          }
+        ]
+      },
+      {
+        "op": "tree",
+        "path": "docs/measurements",
+        "names": [
+          {
+            "name": "native-first-launch.json",
+            "type": "file"
+          }
+        ]
+      },
+      {
+        "op": "file",
+        "path": "docs/measurements/native-first-launch.json",
+        "size": 16242,
+        "revision": "822f04a9dabb78636af482b2957206a120015048a52aa351b08fb924b209dd82"
+      }
+    ],
+    "pickerRestarted": true,
+    "workingCopyListedBeforeOpened": true,
+    "versions": [
+      "gnome-shell 46.0-0ubuntu6~24.04.17",
+      "libgtk-4-1 4.14.5+ds-0ubuntu0.10",
+      "nautilus 1:46.4-0ubuntu0.2",
+      "zenity 4.0.1-1build3"
+    ],
+    "selectedFileSize": 16242,
+    "selectedFileSha256": "822f04a9dabb78636af482b2957206a120015048a52aa351b08fb924b209dd82",
+    "sameLocalPath": true,
+    "screenshot": {
+      "file": "../native-insta-file-selection.png",
+      "sha256": "b99bf320679650255c9037f51190b42e7726ce638c388216cd8d2a3500cf843c"
+    },
+    "submittedToVendor": false
+  },
+  "localGuiControls": {
+    "environment": "Ubuntu 24.04.5 LTS GNOME 46; real Nautilus and GTK file chooser widgets; offline fresh private HOME; synthetic paths only",
+    "versions": {
+      "3": "3.24.41",
+      "4": "4.14.5"
+    },
+    "preexistingGtkDocumentAndTwoNewFilesListed": true,
+    "threeFileTestSources": {
+      "native_files.py": "83cea66642551e54dd4aafd421032826465b68593af2b85a3d3d06b5c86fec34",
+      "linux/recent_file.py": "59bdc3cafc0bc4c9ef9339a1330c5b19ae2b5fa16ce74e50926e29b381b3e1c2"
+    },
+    "threeFileTestSelectedByEachChooser": true,
+    "finalReleaseDifferentCopies": {
+      "draftKept": true,
+      "oldAndNewUrisDiffer": true,
+      "newCopySelectedByBothChoosers": true,
+      "historyDisabled": {
+        "newCopyCreated": true,
+        "gtk3CanSelectNewCopyInRecent": false,
+        "gtk4CanSelectNewCopyInRecent": false
+      }
+    },
+    "sourceRecordSha256": "48b879fa6e124f364e509451414f0462d9129d37f341056b233efd45fa3f1472"
+  },
+  "shortProcessChecks": {
+    "coldIndividualWriteAndReadCount": 5,
+    "concurrentWriterCountSeenByIndependentReader": [
+      12,
+      12,
+      12
+    ],
+    "disabledHistoryResults": [
+      {
+        "setting": "remember-recent-files",
+        "processes": 3,
+        "records": 0,
+        "databaseCreated": false
+      },
+      {
+        "setting": "recent-files-max-age",
+        "processes": 3,
+        "records": 0,
+        "databaseCreated": false
+      }
+    ]
+  },
+  "clipboardFallback": {
+    "desktop": "Ubuntu 24.04.5 amd64, GNOME Shell 46, native Wayland clients",
+    "nautilus": "46.4",
+    "scope": "Real Nautilus and two separate native GTK file chooser applications on the same private Mutter display and session bus. An offline local worker provided the fixture content. No authenticated vendor window, upload, cloud credentials or external network. No bookmarks or recent file registrations written by the fixture; toolkit may update Recent after accepting a file.",
+    "selectedFilename": "Budget 会议 A's 50% 策略.txt",
+    "otherFilename": "Alpha other.txt",
+    "steps": [
+      "In Files, click the named working copy once to give the file view focus.",
+      "Press Ctrl+C.",
+      "Switch to the Open File dialog, press Ctrl+L, then Ctrl+V, then Enter."
+    ],
+    "sameFileAndBytes": {
+      "3": true,
+      "4": true
+    }
+  }
+}

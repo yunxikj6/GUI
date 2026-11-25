@@ -2,6 +2,8 @@
 
 在 Claude Desktop 对话或 ChatGPT Desktop 的本地 Codex 项目中，可以列出云目录、读取文本并查看 Git 状态。文件和用来读取它的 Python 进程都在选定的 InstaBox Linux 实例上。你选择调用的工具结果会进入官方客户端的对话上下文。账户、订阅、对话记录和工具授权由各自的官方客户端及组织管理。
 
+要手动附上一份文本，可以先在 GNOME 的 **InstaBox 项目文件** 中取回它。回到原厂应用，使用会话中的附件按钮。如果出现 Ubuntu 的系统文件选择器，点 **最近使用**，选择刚取回的文件。应用收到的是这份本地副本，上传与发送由原厂应用处理。[在 Ubuntu 中取回文件](native-project-files.md#日常操作) · [Claude 的附件说明](https://support.claude.com/en/articles/8241126-upload-files-to-claude)
+
 ## 在 Ubuntu 桌面连接
 
 1. 从 GNOME 顶栏进入“活动”，搜索 **连接 InstaBox 到官方客户端**（英文 **Connect InstaBox to desktop apps**）。选择 **Claude** 或 **ChatGPT**。ChatGPT 使用已安装的 Ubuntu 官方桌面程序中的本地 Codex 项目。
