@@ -9,6 +9,37 @@ const desktopScale = byId('desktopScale');
 const panView = byId('panView');
 const panHint = byId('panHint');
 const textForm = byId('textForm');
+const typing = byId('typing');
+const typingStatus = byId('typingStatus');
+const typeSubmit = textForm.querySelector('button[type=submit]');
+let inputLease = 0, typingRevision = 0, typingBusy = false, typingComposing = false;
+
+function syncTypeSubmit() {
+  typeSubmit.disabled = typingBusy || !typing.value || typingComposing;
+}
+
+function clearFrameText() {
+  if (document.activeElement === typing) typing.blur();
+  typing.value = ''; typingStatus.textContent = '';
+  ++typingRevision; typingBusy = typingComposing = false; syncTypeSubmit();
+}
+
+typing.onkeydown = e => {
+  if (e.key === 'Enter' && !e.shiftKey && !typingComposing && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    if (!e.repeat) textForm.requestSubmit();
+  }
+};
+typing.oninput = () => {
+  ++typingRevision; typingStatus.textContent = ''; syncTypeSubmit();
+};
+typing.addEventListener('compositionstart', () => { typingComposing = true; syncTypeSubmit(); });
+typing.addEventListener('compositionend', () => { typingComposing = false; syncTypeSubmit(); });
+// Keep a pointer press on Send from blurring the field and committing the unfinished syllable.
+textForm.addEventListener('pointerdown', e => {
+  if (typingComposing && e.target === typeSubmit) e.preventDefault();
+}, true);
+typeSubmit.addEventListener('click', e => { if (e.detail > 1) e.preventDefault(); });
 const clipboardToggle = byId('clipboardToggle');
 const clipboardPanel = byId('clipboardPanel');
 const sendText = byId('clipboardSendText');
@@ -141,7 +172,7 @@ function cleanup() {
   clearTimeout(timer);
   if (rfb) { rfb.disconnect(); rfb = null; }
   if (frameUrl) { URL.revokeObjectURL(frameUrl); frameUrl = null; }
-  screen.replaceChildren(); syncPan();
+  screen.replaceChildren(); syncPan(); clearFrameText();
   mode.disabled = true; control.disabled = true; textForm.hidden = true;
   return session;
 }
@@ -152,7 +183,9 @@ function syncControl(state) {
   control.disabled = state.kind === 'x11' && state.agentPausable === false;
   control.textContent = controlled ? '交还输入' : '接管输入';
   if (rfb) rfb.viewOnly = !controlled;
-  if (!controlled) panRequested = false;
+  if (!controlled) {
+    ++inputLease; panRequested = false; clearFrameText();
+  }
   syncPan();
   textForm.hidden = !(controlled && stills);
   syncClipboard();
@@ -244,14 +277,28 @@ async function showFrames() {
   let chain = Promise.resolve();
   const sendInput = payload => {
     if (!controlled || n !== session) return Promise.resolve();
+    const lease = inputLease, revision = typingRevision;
     chain = chain.then(async () => {
-      if (!controlled || n !== session) return;
-      try { await call('input', payload); await refresh(); }
-      catch(e) {
-        if (n === session) {
-          if (e.status === 409) { desktop = {...desktop, yours:false}; syncControl(desktop); }
-          status.textContent = e.message;
+      if (!controlled || n !== session || lease !== inputLease) return;
+      try {
+        const response = await call('input', payload);
+        if (payload.key === 'type' && response?.ok !== true) throw Error('未收到逐帧输入回执。');
+      } catch(e) {
+        if (n !== session || lease !== inputLease) return;
+        if (e.status === 409) { desktop = {...desktop, yours:false}; syncControl(desktop); }
+        if (payload.key === 'type' && controlled) {
+          typingStatus.textContent = [400, 422].includes(e.status) ? e.message :
+            '无法确认文字是否已送达。请先查看云端窗口，再决定是否重发。';
         }
+        status.textContent = e.message;
+        return;
+      }
+      if (n === session && lease === inputLease) {
+        if (payload.key === 'type' && typingRevision === revision) {
+          typing.value = '';
+          typingStatus.textContent = '已发出按键，请在云端窗口核对文字。';
+        }
+        await refresh();
       }
     });
     return chain;
@@ -280,8 +327,18 @@ async function showFrames() {
     sendInput({key:'press',value:[e.ctrlKey?'ctrl':'',e.altKey?'alt':'',e.shiftKey?'shift':'',key].filter(Boolean).join('+')});
   };
   textForm.onsubmit = async e => {
-    e.preventDefault(); const input = byId('typing'); const text = input.value;
-    if (text) { await sendInput({key:'type',value:text}); }
+    e.preventDefault();
+    if (typeSubmit.disabled || typingComposing || !controlled || n !== session || !typing.value) return;
+    const text = typing.value;
+    if (/[^ -~]/u.test(text)) {
+      typingStatus.textContent = '整段文字未发送。逐帧输入仅支持单行可打印 ASCII。请先复制本框内容，切回实时桌面，打开“剪贴板”发送后在云端粘贴。';
+      return;
+    }
+    if (text.length > 2048) { typingStatus.textContent = '整段文字未发送。请将每次输入控制在 2048 个字符内。'; return; }
+    const lease = inputLease;
+    typingBusy = true; syncTypeSubmit(); typingStatus.textContent = '正在发送…';
+    try { await sendInput({key:'type',value:text}); }
+    finally { if (n === session && lease === inputLease) { typingBusy = false; syncTypeSubmit(); } }
   };
   await refresh();
 }

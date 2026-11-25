@@ -15,5 +15,5 @@
 </section>
 <main id="screen" tabindex="0" aria-label="云端 Linux 桌面" aria-describedby="panHint"></main>
 <p id="panHint" hidden></p>
-<form id="textForm" hidden><label for="typing">发送到云端输入框</label><input id="typing" autocomplete="off" maxlength="2048"><button type="submit">发送文字</button></form>
+<form id="textForm" hidden><label for="typing">逐帧输入</label><textarea id="typing" rows="1" aria-label="逐帧输入文字" placeholder="单行可打印 ASCII" autocomplete="off" spellcheck="false"></textarea><button type="submit">发送文字</button><p id="typingStatus" role="status"></p></form>
 <script type="module" src="/desktop/viewer.js"></script></body></html>

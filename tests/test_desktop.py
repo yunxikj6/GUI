@@ -137,12 +137,27 @@ class ViewerTest(unittest.TestCase):
         desktop.handle_desktop(r, self.instance)
         self.assertEqual(r.status, 400)
 
+    def test_frame_text_validation_precedes_cloud_input(self):
+        for text in ("ASCII 前缀", "A🙂B", "é", "a\nb", "a\r\nb", "\t", "\x00", "a\x7fb", "A\x01B"):
+            with self.subTest(text=text):
+                r = Request("/desktop/input", "POST", json.dumps({"key": "type", "value": text}).encode())
+                desktop.handle_desktop(r, self.instance)
+                self.assertEqual(r.status, 422)
+                self.assertIn("整段文字未发送", json.loads(r.wfile.getvalue())["error"])
+        self.instance.api.assert_not_called()
+        for text in ("".join(map(chr, range(32, 127))), "a" * 2048):
+            self.assertEqual(desktop.input_command({"key": "type", "value": text})["stdin"], text)
+        for text in ("", "a" * 2049):
+            with self.assertRaises(desktop.DesktopError) as e:
+                desktop.input_command({"key": "type", "value": text})
+            self.assertEqual(e.exception.status, 400)
+
     def test_guard_input_and_arguments(self):
         with self.assertRaises(desktop.DesktopError):
             desktop.input_command({"key": "press", "value": "alt+c --bad"})
         with self.assertRaises(desktop.DesktopError):
             desktop.input_command({"key": "click", "x": True, "y": 2, "button": 1})
-        text = "$(literal)\n你好"
+        text = "$(literal) ~!"
         cmd = desktop.input_command({"key": "type", "value": text})
         self.assertEqual(cmd["stdin"], text)
         self.assertNotIn(text, cmd["argv"])

@@ -206,7 +206,9 @@ def input_command(payload):
             return {"argv": ["xdotool", "key", "--", v]}
     if key == "type":
         v = payload.get("value")
-        if isinstance(v, str) and 0 < len(v) <= 2048 and "\x00" not in v:
+        if isinstance(v, str) and 0 < len(v) <= 2048:
+            if not re.fullmatch(r"[ -~]+", v):
+                raise DesktopError(422, "整段文字未发送。逐帧输入仅支持单行可打印 ASCII。其他文字请切回实时桌面，打开“剪贴板”发送后在云端粘贴。")
             return {"argv": ["xdotool", "type", "--delay", "1", "--file", "-"], "stdin": v}
     raise DesktopError(400, "无法识别此桌面输入。")
 

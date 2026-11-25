@@ -1,0 +1,163 @@
+{
+  "previousCommit": "c984507bca40e200c113e7ba7f77ac7b18d40455",
+  "method": "Normal /desktop/input HTTP handlers against the privately allocated InstaBox X11 display, original Mousepad from Debian trixie packages. The test provider redirected only to the isolated display. Files read after native Ctrl+S. No inputs targeted the existing user desktop.",
+  "previousHandler": {
+    "expectedProtocol": "permissive legacy",
+    "mode": "cloud",
+    "desktopPySha256": "01f32603b09950fb6b8a5b4caf94a15000b2e32eb4f93787b0c72a8050fbe4f9",
+    "program": "mousepad",
+    "source": "debian-trixie-amd64-private-0.6.3-1",
+    "privateUnix": true,
+    "serverTCP": false,
+    "ascii": {
+      "code": 200,
+      "marker": "FrameOK-42:[] !",
+      "savedUtf8": "FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+      "savesWithNativeControlS": true
+    },
+    "cases": [
+      {
+        "submitted": "ASCII lead [月月 雪🙂 café] ASCII tail.",
+        "status": 200,
+        "response": {
+          "ok": true
+        },
+        "executionsBeforeSave": 1,
+        "originalFileIntact": false,
+        "exactInsertion": false,
+        "savedUtf8": "ASCII lead [月月 雪 café] ASCII tail.FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+        "expectedUtf8Sha256": "096c99ec903c943a748561de90707c59a70778af888df2801d34e9801c43d784",
+        "savedUtf8Sha256": "d2ee604f0df963647f1f6bf77b9d3d9e9f642c50513fd15685f553d7764c27bc"
+      },
+      {
+        "submitted": "ASCII lead\nsecond line ASCII tail.",
+        "status": 200,
+        "response": {
+          "ok": true
+        },
+        "executionsBeforeSave": 1,
+        "originalFileIntact": false,
+        "exactInsertion": false,
+        "savedUtf8": "ASCII leadsecond line ASCII tail.ASCII lead [月月 雪 café] ASCII tail.FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+        "expectedUtf8Sha256": "485bfb3b8619157892ce28f46d2679c0a11e0bf2b16ad922e930bf47ac649bfa",
+        "savedUtf8Sha256": "6aa94095aca543e6ed567c2624a4b3942adb4771e730dde8a4fa4f592fc78f8b"
+      },
+      {
+        "submitted": "ASCII lead [月月 雪🙂 café]\nASCII tail.",
+        "status": 200,
+        "response": {
+          "ok": true
+        },
+        "executionsBeforeSave": 1,
+        "originalFileIntact": false,
+        "exactInsertion": false,
+        "savedUtf8": "ASCII lead [月月 雪🙂 café]ASCII tail.ASCII leadsecond line ASCII tail.ASCII lead [月月 雪 café] ASCII tail.FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+        "expectedUtf8Sha256": "9872d2a9dce1b56ed3287923aa3d2131d72ca65be4714eda3376100e30497650",
+        "savedUtf8Sha256": "a2ab2f7489a72e1a7906f2f9e27bd3d78530ac0e63cdaac5260de623246abd13"
+      }
+    ],
+    "fixtureStopped": true
+  },
+  "releaseHandler": {
+    "expectedProtocol": "reject unsupported text before dispatch",
+    "mode": "cloud",
+    "desktopPySha256": "2d7fd114b445e7b668079513867096ecb9efb87a4d7c2e2c3fa50f3945ed79ea",
+    "program": "mousepad",
+    "source": "debian-trixie-amd64-private-0.6.3-1",
+    "privateUnix": true,
+    "serverTCP": false,
+    "ascii": {
+      "code": 200,
+      "marker": "FrameOK-42:[] !",
+      "savedUtf8": "FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+      "savesWithNativeControlS": true
+    },
+    "cases": [
+      {
+        "submitted": "ASCII lead [月月 雪🙂 café] ASCII tail.",
+        "status": 422,
+        "response": {
+          "error": "整段文字未发送。逐帧输入仅支持单行可打印 ASCII。其他文字请切回实时桌面，打开“剪贴板”发送后在云端粘贴。"
+        },
+        "executionsBeforeSave": 0,
+        "originalFileIntact": true,
+        "exactInsertion": false,
+        "savedUtf8": "FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+        "expectedUtf8Sha256": "096c99ec903c943a748561de90707c59a70778af888df2801d34e9801c43d784",
+        "savedUtf8Sha256": "7c7367f4612391fd79b3edb04e08f33fc1f9a1117c7ac65733ae969ddd170af7"
+      },
+      {
+        "submitted": "ASCII lead\nsecond line ASCII tail.",
+        "status": 422,
+        "response": {
+          "error": "整段文字未发送。逐帧输入仅支持单行可打印 ASCII。其他文字请切回实时桌面，打开“剪贴板”发送后在云端粘贴。"
+        },
+        "executionsBeforeSave": 0,
+        "originalFileIntact": true,
+        "exactInsertion": false,
+        "savedUtf8": "FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+        "expectedUtf8Sha256": "2f083a41135c783a7cf07f91b1f0ee6592a7236e244e77264b4b22e9c2f68e28",
+        "savedUtf8Sha256": "7c7367f4612391fd79b3edb04e08f33fc1f9a1117c7ac65733ae969ddd170af7"
+      },
+      {
+        "submitted": "ASCII lead [月月 雪🙂 café]\nASCII tail.",
+        "status": 422,
+        "response": {
+          "error": "整段文字未发送。逐帧输入仅支持单行可打印 ASCII。其他文字请切回实时桌面，打开“剪贴板”发送后在云端粘贴。"
+        },
+        "executionsBeforeSave": 0,
+        "originalFileIntact": true,
+        "exactInsertion": false,
+        "savedUtf8": "FrameOK-42:[] !HEAD [OLD] tail\nuntouched: 月光\n",
+        "expectedUtf8Sha256": "4495dad5aa9e03fda6db3b4b0726eb2489ba9945e1be65bd5d6b4047d21a881c",
+        "savedUtf8Sha256": "7c7367f4612391fd79b3edb04e08f33fc1f9a1117c7ac65733ae969ddd170af7"
+      }
+    ],
+    "fixtureStopped": true
+  },
+  "existingSystemInputMethodPackages": {
+    "method": "System package metadata and /usr/bin executable checks only",
+    "systemCommands": {
+      "ibus-daemon": false,
+      "ibus": false,
+      "fcitx": false,
+      "fcitx5": false,
+      "fcitx5-remote": false,
+      "uim-xim": false,
+      "gcin": false,
+      "hime": false,
+      "scim": false,
+      "im-config": false
+    },
+    "debianPackages": {
+      "ibus": null,
+      "ibus-gtk": null,
+      "ibus-gtk3": null,
+      "ibus-gtk4": null,
+      "ibus-libpinyin": null,
+      "ibus-pinyin": null,
+      "ibus-rime": null,
+      "ibus-sunpinyin": null,
+      "fcitx": null,
+      "fcitx5": null,
+      "fcitx5-chinese-addons": null,
+      "fcitx5-pinyin": null,
+      "fcitx5-rime": null,
+      "fcitx-rime": null,
+      "fcitx-pinyin": null,
+      "fcitx-googlepinyin": null,
+      "fcitx-sunpinyin": null,
+      "fcitx5-frontend-gtk3": null,
+      "uim": null,
+      "gcin": null,
+      "hime": null,
+      "scim": null,
+      "im-config": null,
+      "xfce4-session": "4.20.2-2",
+      "thunar": "4.20.2-1+deb13u1",
+      "fonts-noto-cjk": "1:20240730+repack1-1",
+      "fonts-wqy-microhei": null,
+      "fonts-wqy-zenhei": null
+    }
+  }
+}

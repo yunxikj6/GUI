@@ -30,6 +30,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,#screen img:focus-visib
 #screen[data-local-pan=true] > *{pointer-events:none}
 #screen[data-local-pan=false][data-scale=original] img{touch-action:none}
 #panHint{flex:none;margin:0;padding:4px 10px;font-size:12px;color:#cad6ea;background:#202c3e}
-#textForm{display:flex;align-items:center;gap:12px;background:#f1f4fa;color:#344056;padding:8px 16px}
-#textForm[hidden]{display:none}input{flex:1;min-width:80px;padding:8px;border:1px solid #ccd4e3;border-radius:4px}
+#textForm{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#f1f4fa;color:#344056;padding:8px 16px}
+#typingStatus{width:100%;margin:0;font-size:13px}#typingStatus:empty{display:none}
+#typing{resize:none;font:inherit}#typing:focus-visible{outline:3px solid #7a8df2;outline-offset:1px}
+#textForm[hidden]{display:none}input,#typing{flex:1;min-width:80px;padding:8px;border:1px solid #ccd4e3;border-radius:4px}
 @media(max-width:720px){header{gap:8px;padding:8px 10px}.toolbar{width:100%;margin:0}.separator{display:none}#textForm label{display:none}}
