@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import errno
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,10 @@ STATE = '.verify.json'
 DBUS = 'org.freedesktop.DBus'
 FM = 'org.freedesktop.FileManager1'
 PROC = Path('/proc')
+APP_IMAGES = {
+    'chatgpt': ('chatgpt.desktop', '/usr/lib/chatgpt/ChatGPT'),
+    'claude': ('com.anthropic.Claude.desktop', '/usr/lib/claude-desktop/claude-desktop'),
+}
 
 
 class Failure(Exception):
@@ -223,12 +228,12 @@ def files_owner(shell):
     return {'owner': unique, 'pid': pid, 'start': proc[0]}
 
 
-def active(binding, state):
+def active(binding, state, *, check_files=True):
     shell = binding['shell']
     try:
         return (state['boot'] == boot_id() and shell_details(shell['pid'], state['nonce']) == shell and
                 bus_id(shell['bus']) == binding['busId'] and shell_owner(shell) == binding['shellOwner'] and
-                files_owner(shell) == binding['files'])
+                (not check_files or files_owner(shell) == binding['files']))
     except Failure:
         return False
 
@@ -298,13 +303,87 @@ def attach(root, fd, files_fd, state, expected):
     return public('attached', binding, expected)
 
 
-def active_binding(state):
+def active_binding(state, *, check_files=True):
     binding = state.get('binding')
     if not binding:
         raise Failure('not_attached')
-    if not active(binding, state):
+    if not active(binding, state, check_files=check_files):
         raise Failure('session_changed')
     return binding
+
+
+def focused_app(binding):
+    # Query the unique owner of this particular compositor, never a desktop-wide bus.
+    try:
+        observation = call(binding['shell']['bus'], binding['shellOwner'], '/org/cloudworkspace/AppFocus1',
+                           'org.cloudworkspace.AppFocus1.Read')
+    except Failure as exc:
+        # GNOME may unload session-mode extensions while the screen shield is active.
+        # The shell exports this object on its own connection; no service is activated.
+        try:
+            locked = call(binding['shell']['bus'], binding['shellOwner'], '/org/gnome/ScreenSaver',
+                          'org.gnome.ScreenSaver.GetActive')
+        except Failure:
+            locked = None
+        if locked == '(true,)':
+            return None
+        raise Failure('app_observer_unavailable') from exc
+    match = re.fullmatch(r"\('([^']*)', uint32 ([0-9]{1,10}), uint32 ([0-9]{1,10}), uint32 ([0-9]{1,10})\)", observation)
+    if not match or int(match[4]) != binding['shell']['pid']:
+        raise Failure('invalid_app_observation')
+    desktop, pid, sequence = match[1], int(match[2]), int(match[3])
+    if (desktop, pid, sequence) == ('', 0, 0):
+        return None
+    if desktop not in {item[0] for item in APP_IMAGES.values()} or not (0 < pid < 2**31 and 0 < sequence < 2**32):
+        raise Failure('invalid_app_observation')
+    return desktop, pid, sequence
+
+
+def image_identity(pid, installed_path):
+    # Hash the running image, and bind it to the vendor installation before and after the read.
+    proc = PROC / str(pid)
+    try:
+        if proc.stat().st_uid != os.getuid():
+            raise Failure('app_image_mismatch')
+        start = process_state(proc)
+        if start is None:
+            return None
+        with (proc / 'exe').open('rb') as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or not os.path.samestat(info, os.stat(installed_path)):
+                raise Failure('app_image_mismatch')
+            digest = hashlib.sha256()
+            for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                digest.update(chunk)
+            after = os.fstat(stream.fileno())
+            if (info.st_ctime_ns != after.st_ctime_ns or info.st_size != after.st_size or
+                    not os.path.samestat(after, (proc / 'exe').stat()) or
+                    not os.path.samestat(after, os.stat(installed_path)) or process_state(proc) != start):
+                raise Failure('app_image_changed')
+        return start, digest.hexdigest()
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+    except (OSError, IndexError, ValueError) as exc:
+        raise Failure('app_image_unavailable') from exc
+
+
+def observe_app(state, client):
+    # After the folder step the operator may close Nautilus and keep using this desktop.
+    binding = active_binding(state, check_files=False)
+    desktop, installed_path = APP_IMAGES[client]
+    if not os.access(installed_path, os.X_OK):
+        raise Failure('app_not_installed')
+    seen = focused_app(binding)
+    if not seen or seen[0] != desktop:
+        return {'status': 'pending'}
+    _, pid, sequence = seen
+    image = image_identity(pid, installed_path)
+    if not image or focused_app(binding) != seen:
+        return {'status': 'pending'}
+    if not active(binding, state, check_files=False):
+        raise Failure('session_changed')
+    return {'status': 'observed', 'client': client, 'desktopId': desktop, 'appPid': pid, 'appStartTicks': image[0],
+            'windowId': str(sequence), 'shellPid': binding['shell']['pid'], 'executableSha256': image[1]}
 
 
 def prompt(fd, files_fd, state, expected):
@@ -407,7 +486,7 @@ def execute(command, nonce):
     root = Path('/tmp') / f'cloudworkspace-verify-{os.getuid()}-{nonce}'
     if command == 'prepare':
         return prepare(root, nonce, expected)
-    if command not in ('attach', 'prompt', 'check', 'cleanup'):
+    if command not in ('attach', 'prompt', 'check', 'cleanup', 'app-chatgpt', 'app-claude'):
         raise Failure('invalid_command')
     try:
         with locked_root(root) as fd:
@@ -431,6 +510,8 @@ def execute(command, nonce):
                     return prompt(fd, files_fd, state, expected)
                 if command == 'check':
                     return check(fd, files_fd, state, expected)
+                if command.startswith('app-'):
+                    return observe_app(state, command[4:])
                 return cleanup(root, fd, files_fd, state, expected)
             finally:
                 os.close(files_fd)

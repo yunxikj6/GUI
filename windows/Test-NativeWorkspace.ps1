@@ -1,6 +1,6 @@
 ﻿# Run in an interactive Windows 11 session. Instructions go to stderr and the JSON report goes to stdout.
 [CmdletBinding()]
-param([string]$Distro, [ValidateRange(10,900)][int]$TimeoutSeconds = 180)
+param([string]$Distro, [ValidateRange(10,900)][int]$TimeoutSeconds = 180, [switch]$VerifyApps)
 $ErrorActionPreference = 'Stop'
 
 function Fail-WorkspaceTest([string]$Code) {
@@ -32,8 +32,9 @@ function New-ChildInfo([string]$Executable) {
     $info.CreateNoWindow = $true
     $info.EnvironmentVariables.Remove('INSTABOX_API_KEY')
     $info.EnvironmentVariables.Remove('CLOUDWORKSPACE_VERIFY_ID')
+    $info.EnvironmentVariables.Remove('CLOUDWORKSPACE_VERIFY_APPS')
     $entries = @($info.EnvironmentVariables['WSLENV'] -split ':' | Where-Object {
-        $_ -and ($_ -split '/',2)[0] -notin @('INSTABOX_API_KEY','CLOUDWORKSPACE_VERIFY_ID')
+        $_ -and ($_ -split '/',2)[0] -notin @('INSTABOX_API_KEY','CLOUDWORKSPACE_VERIFY_ID','CLOUDWORKSPACE_VERIFY_APPS')
     })
     $info.EnvironmentVariables['WSLENV'] = $entries -join ':'
     return $info
@@ -86,13 +87,17 @@ function Resolve-TestDistro($System, [string]$Name) {
     return $selected
 }
 
-function Start-TestDesktop($System, [string]$Root, [string]$Name, [string]$Id) {
+function Start-TestDesktop($System, [string]$Root, [string]$Name, [string]$Id, [bool]$ObserveApps=$false) {
     $info = New-ChildInfo $System.Cmd
     $info.EnvironmentVariables['WORKSPACE_TEST_ENTRY'] = Join-Path $Root 'Start.cmd'
     $info.EnvironmentVariables['WORKSPACE_TEST_DISTRO'] = $Name
     $info.EnvironmentVariables['CLOUDWORKSPACE_VERIFY_ID'] = $Id
     $prior = $info.EnvironmentVariables['WSLENV']
     $info.EnvironmentVariables['WSLENV'] = (@($prior,'CLOUDWORKSPACE_VERIFY_ID/u') | Where-Object { $_ }) -join ':'
+    if ($ObserveApps) {
+        $info.EnvironmentVariables['CLOUDWORKSPACE_VERIFY_APPS'] = '1'
+        $info.EnvironmentVariables['WSLENV'] += ':CLOUDWORKSPACE_VERIFY_APPS/u'
+    }
     $info.Arguments = '/d /v:off /s /c ""%WORKSPACE_TEST_ENTRY%" --distro "%WORKSPACE_TEST_DISTRO%""'
     $proc = [Diagnostics.Process]::Start($info)
     if ($null -eq $proc) { Fail-WorkspaceTest 'launcher-start-failed' }
@@ -114,12 +119,13 @@ function Read-Guest($System, [string]$Root, [string]$Name, [string]$Action, [str
 }
 
 function Find-TestWindow([string]$Id, [string]$Name) { [CloudWorkspace.DesktopWindow]::Find($Id,$Name) }
+function Find-AppTestWindow([string]$Id, [string]$Name) { [CloudWorkspace.DesktopWindow]::FindIncludingMinimized($Id,$Name) }
 function Test-GuestPid($Value) {
     return ($Value -is [int] -or $Value -is [long]) -and $Value -gt 0 -and $Value -le [int]::MaxValue
 }
 function Window-Identity($Window) { "$($Window.Hwnd)/$($Window.ProcessId)/$($Window.ProcessStartTime)" }
 
-function Invoke-NativeWorkspaceTest([string]$Name, [int]$InteractionSeconds, [int]$StartupSeconds=150) {
+function Invoke-NativeWorkspaceTest([string]$Name, [int]$InteractionSeconds, [int]$StartupSeconds=150, [switch]$CheckApps) {
     $report = [ordered]@{ schema=1; status='error'; phase='windows-environment'; cleanup='not-needed' }
     $id = [Guid]::NewGuid().ToString('N')
     $expected = 'Verified-' + $id.Substring(0,8)
@@ -137,9 +143,12 @@ function Invoke-NativeWorkspaceTest([string]$Name, [int]$InteractionSeconds, [in
         $ownsFixture = $true
         if ($prepared.expected -cne $expected) { Fail-WorkspaceTest 'wrong-folder-name' }
         [Console]::Error.WriteLine("正在启动 Ubuntu 桌面。等文件管理器打开验证目录后，请按提示新建文件夹。")
+        if ($CheckApps) {
+            [Console]::Error.WriteLine("创建文件夹后，请按提示依次打开 Ubuntu 里的 ChatGPT 和 Claude。每款都要从 Windows 任务栏最小化整个工作区，稍候再还原并点回原应用。请保留此控制台以查看当前步骤。")
+        }
         if (@(Find-TestWindow $id $name).Count) { Fail-WorkspaceTest 'window-already-existed' }
         $report.phase = 'start-workspace'
-        $launcher = Start-TestDesktop $system $root $name $id
+        $launcher = Start-TestDesktop $system $root $name $id ([bool]$CheckApps)
         $timer = [Diagnostics.Stopwatch]::StartNew()
         $attached = $null
         $window = $null
@@ -210,6 +219,15 @@ function Invoke-NativeWorkspaceTest([string]$Name, [int]$InteractionSeconds, [in
             Start-Sleep -Milliseconds 350
         }
         if ($report.status -ne 'verified') { Fail-WorkspaceTest 'folder-timeout' }
+        if ($CheckApps) {
+            $report.status = 'error'
+            $report.phase = 'observe-apps'
+            . (Join-Path $PSScriptRoot 'VerifyWorkspaceApps.ps1')
+            $report.apps = [ordered]@{}
+            $null = Invoke-WorkspaceAppObservations $system $root $name $id $window $attached $InteractionSeconds $report.apps
+            $report.status = 'verified'
+            $report.phase = 'complete'
+        }
     } catch {
         $code = $_.Exception.Data['WorkspaceCode']
         $report.errorCode = if ($code) { $code } else { 'probe-failed' }
@@ -230,7 +248,7 @@ function Invoke-NativeWorkspaceTest([string]$Name, [int]$InteractionSeconds, [in
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    $result = Invoke-NativeWorkspaceTest $Distro $TimeoutSeconds
+    $result = Invoke-NativeWorkspaceTest $Distro $TimeoutSeconds -CheckApps:$VerifyApps
     $result | ConvertTo-Json -Depth 4 -Compress
     if ($result.status -ne 'verified') { exit 1 }
 }

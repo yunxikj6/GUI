@@ -50,7 +50,23 @@ powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1
 
 命令使用本机临时目录，无需登录厂商账户或连接 InstaBox。验收结束后桌面继续运行，脚本清理它识别的临时目录。若向目录里添加了其他文件，`cleanup` 会显示 `preserved` 并保留内容。验收仅采样前台和文件系统结果，操作仍需由人在文件管理器内完成。[宿主验收脚本](../windows/Test-NativeWorkspace.ps1) · [Ubuntu 实测原图](native-ubuntu-files-verification.png) · [进程与文件记录](measurements/native-windows-verifier.json)
 
-在同一台 Windows 机器验收 Linux 客户端时，从 GNOME 内分别打开 ChatGPT 和 Claude。拖动应用标题栏，把窗口移到壁纸中央，再从 Windows 任务栏最小化整个工作区。还原后应回到同一个应用窗口。此项操作可在登录前完成。登录后再检查 ChatGPT 侧栏、输入与回复，以及 Claude 的 Artifacts 面板。在已授权项目里打开一个已知文件，并在云机上独立比对内容，作为项目连接的验收。[项目连接](official-client-workspace.md)
+### 验证两款应用在同一个桌面里
+
+先通过“安装官方客户端”安装 Ubuntu 版 ChatGPT 和 Claude。如果应用已在其他桌面上运行，请从那里完全退出。下面的命令会启动一次带标记的 GNOME 46 会话，并把本次 Windows 实机记录写入当前目录。PowerShell 会继续显示操作提示。
+
+```powershell
+powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1 -VerifyApps | Tee-Object -FilePath .\workspace-apps-verification.json
+```
+
+完成文件夹验证后，先在 GNOME 里双击 ChatGPT 并点进它的窗口。保持几秒，从 Windows 任务栏最小化整个工作区。等控制台显示已观察到最小化，再从任务栏还原，点回原来的 ChatGPT 窗口。对 Claude 重复同样的操作。每步默认有 180 秒，可通过 `-TimeoutSeconds` 调整。整个过程可以在登录前完成。
+
+成功的 JSON 中，`window` 对应 Windows 宿主，`apps.chatgpt` 和 `apps.claude` 分别记录 Ubuntu 应用的桌面 ID、Mutter 窗口编号、进程及可执行文件摘要。验收要求还原前后的宿主与应用身份各自一致。若某款应用超时，查看 `errorCode` 的应用名及步骤。已完成的应用仍在 `apps` 中。窗口标题、聊天及屏幕内容不进入报告。临时观测组件随这次桌面关闭而清理。
+
+在 Ubuntu 离线实测中，最小化整个工作区后，GNOME 仍把内部应用报告为聚焦。还原时，两款应用分别保留了原来的进程和窗口编号。Windows 端另外核对宿主的最小化状态。[断网双窗口同屏原图](native-ubuntu-both-clients.png)
+
+当前公开的窗口记录来自隔离的 Ubuntu 桌面和 Linux 上的 PowerShell 回归。Windows 宿主、登录后的 ChatGPT 侧栏与消息、Claude 的 Artifacts 均需在相应设备和已授权账户中实测。[窗口验收记录](measurements/native-app-window-verifier.json)
+
+在已授权项目中，可通过原厂客户端读取一个已知文件，再到云机独立比对。[项目连接](official-client-workspace.md)
 
 ## 官方客户端验收
 

@@ -41,7 +41,7 @@ Assert-Equal $receipt.status 'pending' 'WSL receipt'
 function Reset-Case([string]$Name) {
     $script:Mock = @{
         Name=$Name; Finds=0; Attaches=0; Prompts=0; PostChecks=0; PostFinds=0; Launches=0; Cleanups=0; Disposes=0; Stops=0; Sleeps=0
-        Id=$null; Expected=$null; Actions=[Collections.Generic.List[string]]::new()
+        Id=$null; Expected=$null; Actions=[Collections.Generic.List[string]]::new(); AppSamples=0; LauncherAppFlag=$null
     }
 }
 function Get-WindowsEnvironment {
@@ -85,10 +85,24 @@ function Find-TestWindow([string]$Id, [string]$Name) {
     }
     New-Window
 }
-function Start-TestDesktop($System, [string]$Root, [string]$Name, [string]$Id) {
+function Find-AppTestWindow([string]$Id, [string]$Name) {
+    $c = $script:Mock
+    Assert-Equal $Id $c.Id 'app window correlation'
+    Assert-Equal $Name $script:DistroName 'app window distro'
+    $c.AppSamples++
+    # Each app has two foreground samples, one real minimize sample, then two restored samples.
+    Assert-True ($c.AppSamples -le 10) 'expected app host observation count'
+    $minimized = $c.AppSamples -in @(3,8)
+    $window = New-Window -Focused (-not $minimized)
+    $window | Add-Member NoteProperty Minimized $minimized
+    if ($minimized) { $window.Width=0; $window.Height=0 }
+    return $window
+}
+function Start-TestDesktop($System, [string]$Root, [string]$Name, [string]$Id, [bool]$ObserveApps=$false) {
     $c = $script:Mock
     Assert-Equal $Name $script:DistroName 'launcher distro'
     Assert-Equal $Id $c.Id 'launcher correlation'
+    $c.LauncherAppFlag=$ObserveApps
     $c.Launches++
     if ($c.Name -eq 'launch-error') { Fail-WorkspaceTest 'launcher-start-failed' }
     $proc = [pscustomobject]@{ HasExited=($c.Name -eq 'launcher-exited'); ExitCode=2 }
@@ -154,15 +168,26 @@ function Read-Guest($System, [string]$Root, [string]$Name, [string]$Action, [str
         }
         'cleanup' {
             $c.Cleanups++
-            if ($c.Name -eq 'cleanup-error') { throw 'PRIVATE_CLEANUP' }
+            if ($c.Name -in @('cleanup-error','apps-cleanup-error')) { throw 'PRIVATE_CLEANUP' }
             $status=if ($c.Name -eq 'preserve') { 'preserved' } else { 'cleaned' }
             return @{ status=$status }
+        }
+        { $_ -in @('app-chatgpt','app-claude') } {
+            $client = $Action.Substring(4)
+            $app = @{ status='observed'; client=$client; desktopId='chatgpt.desktop'; shellPid=301
+                appPid=701; appStartTicks=[long]5100007001; windowId='44'; executableSha256=('a' * 64)
+                title='PRIVATE_DOCUMENT_TITLE' }
+            if ($client -eq 'claude') {
+                $app.desktopId='com.anthropic.Claude.desktop'; $app.appPid=702; $app.windowId='55'
+                if ($c.Name -eq 'apps-claude-replaced' -and $c.AppSamples -eq 9) { $app.windowId='56' }
+            }
+            return $app
         }
     }
     throw 'Unexpected guest action'
 }
 $checked=0
-function Check-Case([string]$Name, [string]$ErrorCode='', [int]$Launches=1, [int]$Disposes=1, [int]$Cleanups=1) {
+function Check-Case([string]$Name, [string]$ErrorCode='', [int]$Launches=1, [int]$Disposes=1, [int]$Cleanups=1, [switch]$CheckApps) {
     Reset-Case $Name
     $startup = if ($Name -in @('wait-attach','wait-window','late-window')) { 1 } else { 15 }
     $interaction = if ($Name -in @('wait-folder','late-folder')) { 1 } else { 15 }
@@ -170,7 +195,7 @@ function Check-Case([string]$Name, [string]$ErrorCode='', [int]$Launches=1, [int
     $script:Mock.Instructions = [IO.StringWriter]::new()
     try {
         [Console]::SetError($script:Mock.Instructions)
-        $result = @(Invoke-NativeWorkspaceTest $script:DistroName $interaction $startup)
+        $result = @(Invoke-NativeWorkspaceTest $script:DistroName $interaction $startup -CheckApps:$CheckApps)
     } finally {
         [Console]::SetError($stderr)
         $script:Mock.Instructions.Dispose()
@@ -187,6 +212,11 @@ function Check-Case([string]$Name, [string]$ErrorCode='', [int]$Launches=1, [int
         Assert-Equal $r.foregroundObserved $true "$Name foreground"
     }
     Assert-Equal $script:Mock.Launches $Launches "$Name launch count"
+    if ($Launches) { Assert-Equal $script:Mock.LauncherAppFlag ([bool]$CheckApps) "$Name desktop receives opt-in flag" }
+    if (-not $CheckApps) {
+        Assert-Equal $script:Mock.AppSamples 0 "$Name default skips application windows"
+        Assert-True (-not $r.Contains('apps')) "$Name default omits application receipts"
+    }
     Assert-Equal $script:Mock.Disposes $Disposes "$Name dispose count"
     Assert-Equal $script:Mock.Cleanups $Cleanups "$Name cleanup count"
     Assert-Equal $script:Mock.Stops 0 "$Name no application terminated"
@@ -200,6 +230,24 @@ function Check-Case([string]$Name, [string]$ErrorCode='', [int]$Launches=1, [int
 $normal=Check-Case 'normal'
 Assert-Equal ($script:Mock.Actions -join ',') 'prepare,attach,check,prompt,check,cleanup' 'normal action order'
 Assert-Equal $normal.cleanup 'cleaned' 'normal cleanup'
+$apps=Check-Case 'apps' -CheckApps
+Assert-Equal ($apps.apps.Keys -join ',') 'chatgpt,claude' 'both completed application observations'
+Assert-Equal ($script:Mock.Actions -join ',') 'prepare,attach,check,prompt,check,app-chatgpt,app-chatgpt,app-claude,app-claude,cleanup' 'guest observes each client before and after minimization'
+Assert-Equal $script:Mock.AppSamples 10 'host minimize and restore samples for both clients'
+foreach ($client in 'chatgpt','claude') {
+    $entry=$apps.apps[$client]
+    Assert-True ($entry.hostForegroundBefore -and $entry.hostMinimized -and $entry.hostForegroundAfter) "$client confirmed host transitions"
+}
+Assert-Equal $apps.apps.chatgpt.desktopId 'chatgpt.desktop' 'ChatGPT desktop entry'
+Assert-Equal $apps.apps.claude.desktopId 'com.anthropic.Claude.desktop' 'Claude desktop entry'
+$partial=Check-Case 'apps-claude-replaced' 'app-window-changed' -CheckApps
+Assert-Equal $partial.phase 'observe-apps' 'second app failure phase'
+Assert-Equal ($partial.apps.Keys -join ',') 'chatgpt' 'only first completed app survives second app failure'
+Assert-True $partial.apps.chatgpt.hostForegroundAfter 'first client finished restore before second client failure'
+Assert-Equal $partial.cleanup 'cleaned' 'app failure still cleans the guest fixture'
+$cleanup=Check-Case 'apps-cleanup-error' 'cleanup-failed' -CheckApps
+Assert-Equal $cleanup.cleanup 'failed' 'cleanup failure after successful app observations'
+Assert-Equal ($cleanup.apps.Keys -join ',') 'chatgpt,claude' 'cleanup failure retains both completed observations'
 $null=Check-Case 'wait-ready'
 Assert-Equal ($script:Mock.Actions -join ',') 'prepare,attach,attach,check,prompt,check,check,cleanup' 'pending polling order'
 $preserved=Check-Case 'preserve'
@@ -267,5 +315,21 @@ try {
     Assert-Equal $report.status 'error' 'CLI error status'
     Assert-Equal $report.errorCode 'fixture-preflight' 'CLI failure reason'
     Assert-Equal $report.cleanup 'not-needed' 'CLI preflight cleanup'
+
+    # Exercise the public switch binding without launching a desktop in this separate process.
+    $capture = @'
+function Invoke-NativeWorkspaceTest([string]$Name, [int]$InteractionSeconds, [switch]$CheckApps) {
+    return @{ status='verified'; checkApps=[bool]$CheckApps }
+}
+'@
+    [IO.File]::WriteAllText($copy, $text.Insert($offset,$capture+[Environment]::NewLine), [Text.UTF8Encoding]::new($true))
+    foreach ($optIn in @($false,$true)) {
+        $flags = @()
+        if ($optIn) { $flags += '-VerifyApps' }
+        $stdout=@(& $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $copy @flags)
+        Assert-Equal $LASTEXITCODE 0 'CLI switch forwarding exit code'
+        Assert-Equal $stdout.Count 1 'CLI switch forwarding emits one JSON line'
+        Assert-Equal (($stdout[0] | ConvertFrom-Json).checkApps) $optIn 'CLI opt-in forwarded to coordinator'
+    }
 } finally { [IO.Directory]::Delete($temp,$true) }
-"Passed $checked host workflow scenarios, WSL argv/quoting checks, and the failure JSON CLI test."
+"Passed $checked host workflow scenarios, WSL argv/quoting checks, and CLI failure and opt-in checks."

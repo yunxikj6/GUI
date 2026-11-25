@@ -12,6 +12,7 @@ namespace CloudWorkspace {
         // The UTC process-creation FILETIME, in 100-nanosecond ticks since 1601-01-01.
         public long ProcessStartTime { get; private set; }
         public bool Foreground { get; private set; }
+        public bool Minimized { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
 
@@ -70,15 +71,26 @@ namespace CloudWorkspace {
             return count > 0 && count < caption.Capacity - 1 && MatchesCaption(caption.ToString(), marker, distro);
         }
 
+        internal static bool MatchesPresentation(bool visible, bool iconic, int dwmResult, uint cloaked, bool minimized) {
+            return visible && iconic == minimized && dwmResult == 0 && cloaked == 0;
+        }
+
         internal static bool VisibleState(bool visible, bool iconic, int dwmResult, uint cloaked, int width, int height) {
-            return visible && !iconic && dwmResult == 0 && cloaked == 0 && width > 0 && height > 0;
+            return MatchesPresentation(visible, iconic, dwmResult, cloaked, false) && width > 0 && height > 0;
+        }
+
+        private const int DwmwaCloaked = 14;
+
+        private static bool HasPresentation(IntPtr hwnd, bool minimized) {
+            uint cloaked;
+            int result = DwmGetWindowAttribute(hwnd, DwmwaCloaked, out cloaked, 4);
+            return MatchesPresentation(IsWindowVisible(hwnd), IsIconic(hwnd), result, cloaked, minimized);
         }
 
         private static bool VisibleClient(IntPtr hwnd, out int width, out int height) {
             width = height = 0;
             uint cloaked;
             Rect client;
-            const int DwmwaCloaked = 14;
             if (!GetClientRect(hwnd, out client)) return false;
             width = client.Right - client.Left;
             height = client.Bottom - client.Top;
@@ -92,7 +104,7 @@ namespace CloudWorkspace {
             return screen.Right > screen.Left && screen.Bottom > screen.Top && MonitorFromRect(ref screen, 0) != IntPtr.Zero;
         }
 
-        private static DesktopWindow Observe(IntPtr hwnd, string marker, string distro) {
+        private static DesktopWindow Observe(IntPtr hwnd, string marker, string distro, bool includeMinimized) {
             uint pid;
             if (!HasCaption(hwnd, marker, distro) || GetWindowThreadProcessId(hwnd, out pid) == 0) return null;
             const uint QueryLimitedInformation = 0x1000, Synchronize = 0x100000;
@@ -105,27 +117,41 @@ namespace CloudWorkspace {
                 string basename = System.IO.Path.GetFileName(path.ToString());
                 if (!SupportedHost(basename)) return null;
                 long created, exited, kernel, user;
-                int width, height;
-                if (!GetProcessTimes(process, out created, out exited, out kernel, out user) ||
-                    !VisibleClient(hwnd, out width, out height)) return null;
+                if (!GetProcessTimes(process, out created, out exited, out kernel, out user)) return null;
+                bool minimized = IsIconic(hwnd);
+                int width = 0, height = 0;
+                // An iconic window has no on-screen client area to report.
+                if (minimized) {
+                    if (!includeMinimized || !HasPresentation(hwnd, true)) return null;
+                } else if (!VisibleClient(hwnd, out width, out height)) return null;
                 uint currentPid;
                 const uint WaitTimeout = 258;
                 if (!HasCaption(hwnd, marker, distro) || GetWindowThreadProcessId(hwnd, out currentPid) == 0 ||
-                    currentPid != pid || created <= 0 || WaitForSingleObject(process, 0) != WaitTimeout) return null;
+                    currentPid != pid || created <= 0 || WaitForSingleObject(process, 0) != WaitTimeout ||
+                    !HasPresentation(hwnd, minimized)) return null;
                 return new DesktopWindow {
                     Hwnd = "0x" + (IntPtr.Size == 4 ? unchecked((uint)hwnd.ToInt32()).ToString("X") : hwnd.ToInt64().ToString("X")), ProcessId = pid, ProcessImage = basename,
-                    ProcessStartTime = created, Foreground = GetForegroundWindow() == hwnd, Width = width, Height = height
+                    ProcessStartTime = created, Foreground = !minimized && GetForegroundWindow() == hwnd,
+                    Minimized = minimized, Width = width, Height = height
                 };
             } finally { CloseHandle(process); }
         }
 
         public static DesktopWindow[] Find(string nonce, string distro) {
+            return FindWindows(nonce, distro, false);
+        }
+
+        public static DesktopWindow[] FindIncludingMinimized(string nonce, string distro) {
+            return FindWindows(nonce, distro, true);
+        }
+
+        private static DesktopWindow[] FindWindows(string nonce, string distro, bool includeMinimized) {
             if (!ValidNonce(nonce)) throw new ArgumentException("Expected 32 lowercase hexadecimal characters.", "nonce");
             if (String.IsNullOrEmpty(distro)) throw new ArgumentException("Expected the selected distribution.", "distro");
             string marker = "Cloud Linux Workspace [" + nonce + "]";
             var windows = new List<DesktopWindow>();
             if (!EnumWindows(delegate(IntPtr hwnd, IntPtr unused) {
-                var observation = Observe(hwnd, marker, distro);
+                var observation = Observe(hwnd, marker, distro, includeMinimized);
                 if (observation != null) windows.Add(observation);
                 return true;
             }, IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());

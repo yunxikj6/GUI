@@ -1,6 +1,7 @@
 """Start a nested, local GNOME Shell on the user's existing graphical display."""
 import argparse
 import ctypes
+import json
 import os
 from pathlib import Path
 import re
@@ -179,6 +180,46 @@ def session_mode():
                            for d in directories.split(os.pathsep) if d) else "user"
 
 
+def app_observer_env(env, directory, version, backend, mode):
+    """Keep the verification extension and its Ubuntu mode in this compositor's lifetime."""
+    token = env.pop("CLOUDWORKSPACE_VERIFY_ID", "")
+    enabled = env.pop("CLOUDWORKSPACE_VERIFY_APPS", "")
+    if not re.fullmatch(r"[0-9a-f]{32}", token):
+        return []
+    marker = "CLOUDWORKSPACE_VERIFY_ID=" + token
+    if enabled != "1":
+        return [marker]  # The existing Nautilus verifier needs only the compositor marker.
+    if not nested_x11_46(version, backend) or mode != "ubuntu":
+        raise LaunchError("应用窗口验收需要 Ubuntu 的 GNOME Shell 46 嵌套会话。")
+    search = env.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+    sources = (Path(p) / "gnome-shell/modes/ubuntu.json" for p in search.split(os.pathsep) if p)
+    source = next((path for path in sources if path.is_file()), None)
+    if not source:
+        raise LaunchError("无法找到 Ubuntu 的 GNOME 会话模式。")
+    try:
+        base = json.loads(source.read_text(encoding="utf-8"))
+        extensions = base.get("enabledExtensions", [])
+        if not isinstance(extensions, list) or not all(isinstance(s, str) for s in extensions):
+            raise ValueError
+    except (ValueError, AttributeError, OSError) as exc:
+        raise LaunchError("无法读取 Ubuntu 的 GNOME 会话模式，应用窗口验收未启动。") from exc
+
+    data = Path(directory) / "verification-data"
+    uuid = f"app-focus-{token}@cloudworkspace.local"
+    mode_dir = data / "gnome-shell/modes"
+    ext_dir = data / "gnome-shell/extensions" / uuid
+    mode_dir.mkdir(parents=True)
+    ext_dir.mkdir(parents=True)
+    base["enabledExtensions"] = [*extensions, uuid]
+    (mode_dir / "ubuntu.json").write_text(json.dumps(base), encoding="utf-8")
+    metadata = {"uuid": uuid, "name": "Workspace application verification", "shell-version": ["46"],
+                "workspace-display": str(Path(directory) / "wayland-0"),
+                "description": "Read the focused vendor window identity during a marked verification session."}
+    (ext_dir / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+    shutil.copyfile(Path(__file__).with_name("verify_app_focus.js"), ext_dir / "extension.js")
+    return [marker, "CLOUDWORKSPACE_VERIFY_APPS=1", f"XDG_DATA_DIRS={data}:{search}"]
+
+
 def main():
     parser = argparse.ArgumentParser(description="在当前 WSLg 或 Linux 图形显示中打开本机 GNOME Shell。")
     parser.add_argument("--check", action="store_true", help="检查依赖和父显示后退出")
@@ -229,6 +270,7 @@ def main():
         parent_env = ["WAYLAND_DISPLAY=" + str(wayland)] if wayland else ["-u", "WAYLAND_DISPLAY"]
         if os.environ.get("DISPLAY"):
             parent_env.append("DISPLAY=" + os.environ["DISPLAY"])
+        parent_env.extend(app_observer_env(env, private_dir, version, backend, mode))
         initial_mode = nested_mode(version, backend)
         if initial_mode:
             parent_env.append("MUTTER_DEBUG_DUMMY_MODE_SPECS=" + initial_mode)

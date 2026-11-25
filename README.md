@@ -10,7 +10,7 @@ Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面�
 
 在 Ubuntu 24.04.5 上，已核对两款程序与厂商安装包，并用窗口管理器确认窗口归属。最小化整个工作区时，两款应用都随之隐藏。ChatGPT 在断网的全新用户目录里也能打开登录方式面板。Claude 在相同条件下会显示连接错误页，仍能展开 File 菜单。[两款应用的 GNOME 桌面实拍](docs/native-ubuntu-official-apps.png) · [断网后点击 ChatGPT 登录选项](docs/native-ubuntu-chatgpt-offline-options.png) · [Claude 原版窗口](docs/native-ubuntu-claude-menu.png)
 
-Ubuntu 24.04 上的桌面窗口现在显示为 **Cloud Linux Workspace**。在 Windows 11 上可运行 `powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1`，从同一入口打开桌面，在 Ubuntu 文件管理器中按提示创建文件夹，核对宿主窗口、Linux 进程和磁盘结果。当前公开的实拍来自 Linux。Windows 11 上的 WSLg 宿主窗口、Microsoft Store 应用及两款应用登录后的对话仍待实机验收。[带窗口标题的离线 Claude 实拍](docs/native-ubuntu-branded-claude.png) · [Windows 操作步骤](docs/native-windows.md#在-windows-上验证桌面窗口) · [实测记录](docs/measurements/native-windows-verifier.json)
+Ubuntu 24.04 上的桌面窗口现在显示为 **Cloud Linux Workspace**。在 Windows 11 安装两款 Ubuntu 客户端后，可运行 `powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1 -VerifyApps`。它通过日常入口打开桌面，先验证文件管理器，再记录每款应用在整个工作区最小化、还原前后的窗口和进程。当前公开的实拍来自 Linux。Windows 11 上的 WSLg 宿主窗口、Microsoft Store 应用及两款应用登录后的对话仍待实机验收。[带窗口标题的离线 Claude 实拍](docs/native-ubuntu-branded-claude.png) · [Windows 操作步骤](docs/native-windows.md#在-windows-上验证桌面窗口) · [实测记录](docs/measurements/native-windows-verifier.json)
 
 ## 工作区连接
 

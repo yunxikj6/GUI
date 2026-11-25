@@ -14,6 +14,7 @@ namespace CloudWorkspace {
             foreach (string bad in new string[] {null,"","abc",nonce+"a",nonce.ToUpperInvariant(),nonce+"\n","01234567-89ab-cdef-0123-456789abcdef",nonce.Substring(1)+"g","１２３４５６７８９０１２３４５６７８９０１２３４５６７８９０１２"}) {
                 Assert(!DesktopWindow.ValidNonce(bad));
                 try { DesktopWindow.Find(bad, "Ubuntu-24.04"); Assert(false); } catch (System.ArgumentException) { Assert(true); }
+                try { DesktopWindow.FindIncludingMinimized(bad, "Ubuntu-24.04"); Assert(false); } catch (System.ArgumentException) { Assert(true); }
             }
             Assert(DesktopWindow.MatchesCaption(marker,marker,"Ubuntu"));
             foreach(string distro in new string[]{"Ubuntu","Ubuntu-24.04","Ubuntu 24.04-LTS","Linux","Team_日本","Ubuntu (Dev) [local]",new string('a',255)})
@@ -36,12 +37,22 @@ namespace CloudWorkspace {
             Assert(!DesktopWindow.VisibleState(true, false, 0, 2, 128, 100));
             Assert(!DesktopWindow.VisibleState(true, false, 0, 0, 0, 100));
             Assert(!DesktopWindow.VisibleState(true, false, 0, 0, 128, -1));
-            string[] expected={"Foreground","Height","Hwnd","ProcessId","ProcessImage","ProcessStartTime","Width"};
+            Assert(DesktopWindow.MatchesPresentation(true, true, 0, 0, true));
+            Assert(!DesktopWindow.MatchesPresentation(false, true, 0, 0, true));
+            Assert(!DesktopWindow.MatchesPresentation(true, false, 0, 0, true));
+            Assert(!DesktopWindow.MatchesPresentation(true, true, -1, 0, true));
+            foreach (uint flag in new uint[]{1,2,4,7}) Assert(!DesktopWindow.MatchesPresentation(true, true, 0, flag, true));
+            Assert(!DesktopWindow.MatchesPresentation(true, true, 0, 0, false));
+            Assert(DesktopWindow.MatchesPresentation(true, false, 0, 0, false));
+            string[] expected={"Foreground","Height","Hwnd","Minimized","ProcessId","ProcessImage","ProcessStartTime","Width"};
             var props=typeof(DesktopWindow).GetProperties();
             string[] actual=new string[props.Length];for(int i=0;i<props.Length;i++)actual[i]=props[i].Name;
             System.Array.Sort(actual,System.StringComparer.Ordinal);
             Assert(System.String.Join(",",expected)==System.String.Join(",",actual));
             Assert(typeof(DesktopWindow).GetMethod("Find",new System.Type[]{typeof(string),typeof(string)}).ReturnType==typeof(DesktopWindow[]));
+            Assert(typeof(DesktopWindow).GetMethod("FindIncludingMinimized",new System.Type[]{typeof(string),typeof(string)}).ReturnType==typeof(DesktopWindow[]));
+            var minimized=typeof(DesktopWindow).GetProperty("Minimized");
+            Assert(minimized.PropertyType==typeof(bool) && minimized.GetGetMethod()!=null && minimized.GetSetMethod(true).IsPrivate);
             return count;
         }
     }

@@ -1,4 +1,6 @@
 import importlib.util
+import hashlib
+import os
 from pathlib import Path
 import secrets
 import shutil
@@ -106,6 +108,47 @@ class BoundDesktop(unittest.TestCase):
         self.assertEqual(self.calls.call_count, 1)
         self.assertEqual(helper.execute('cleanup', self.nonce), {'status': 'preserved'})
         self.assertTrue(self.expected.is_dir())
+
+    def test_app_requires_same_focused_wayland_window_on_both_sides_of_the_image_read(self):
+        helper.execute('attach', self.nonce)
+        self.file_owner.side_effect = helper.Failure('bus_unavailable')  # The operator closed Files.
+        pid = os.getpid()
+        executable = Path('/proc/self/exe').resolve()
+        with patch.dict(helper.APP_IMAGES, {'chatgpt': ('chatgpt.desktop', str(executable))}):
+            report = f"('chatgpt.desktop', uint32 {pid}, uint32 199, uint32 61)"
+            self.calls.return_value = report
+            result = helper.execute('app-chatgpt', self.nonce)
+            self.assertEqual(result['executableSha256'], hashlib.sha256(executable.read_bytes()).hexdigest())
+            self.assertEqual((result['status'], result['appPid'], result['windowId'], result['shellPid']),
+                             ('observed', pid, '199', 61))
+            self.assertEqual(result['appStartTicks'], helper.process_state(Path('/proc/self')))
+            self.assertEqual(self.calls.call_args.args[:4], ('private-address', ':1.3', '/org/cloudworkspace/AppFocus1',
+                                                            'org.cloudworkspace.AppFocus1.Read'))
+            for other in ("('', uint32 0, uint32 0, uint32 61)",
+                          report.replace('chatgpt.desktop', 'com.anthropic.Claude.desktop'),
+                          report.replace('uint32 199', 'uint32 200')):
+                self.calls.side_effect = [report, other]
+                self.assertEqual(helper.execute('app-chatgpt', self.nonce), {'status': 'pending'})
+            self.calls.side_effect = None
+            for invalid in (report.replace('uint32 61)', 'uint32 62)'), report.replace('uint32 199', 'uint32 0'),
+                            report.replace('chatgpt.desktop', 'unrecognized.desktop')):
+                self.calls.return_value = invalid
+                with self.assertRaisesRegex(helper.Failure, 'invalid_app_observation'):
+                    helper.execute('app-chatgpt', self.nonce)
+            self.calls.return_value = report
+            with patch.dict(helper.APP_IMAGES, {'chatgpt': ('chatgpt.desktop', '/bin/false')}):
+                with self.assertRaisesRegex(helper.Failure, 'app_image_mismatch'):
+                    helper.execute('app-chatgpt', self.nonce)
+
+    def test_locked_shell_is_pending_but_an_unavailable_observer_is_an_error(self):
+        helper.execute('attach', self.nonce)
+        with patch.dict(helper.APP_IMAGES, {'claude': ('com.anthropic.Claude.desktop', '/usr/bin/true')}):
+            self.calls.side_effect = [helper.Failure('bus_unavailable'), '(true,)']
+            self.assertEqual(helper.execute('app-claude', self.nonce), {'status': 'pending'})
+            self.assertEqual(self.calls.call_args.args[1:4], (':1.3', '/org/gnome/ScreenSaver', 'org.gnome.ScreenSaver.GetActive'))
+            self.calls.side_effect = [helper.Failure('bus_unavailable'), '(false,)']
+            with self.assertRaisesRegex(helper.Failure, 'app_observer_unavailable'):
+                helper.execute('app-claude', self.nonce)
 
     def test_failed_notification_can_be_retried_without_reopening_files(self):
         self.calls.side_effect = ['()', helper.Failure('bus_unavailable'), '(uint32 3,)']

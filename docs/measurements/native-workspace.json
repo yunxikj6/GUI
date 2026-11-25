@@ -147,13 +147,14 @@
       "x64": "1f55dcfc8d8f8015104c26a4ec10913534088a26e641aa71cb22ccd6fbac1af9",
       "arm64": "f814906903b02321e27727aa58ef270a5b2f67c7ad0c33b6f496024878ffb016"
     },
-    "workspaceWindowVerifierRecord": "native-windows-verifier.json"
+    "workspaceWindowVerifierRecord": "native-windows-verifier.json",
+    "applicationWindowVerifierRecord": "native-app-window-verifier.json"
   },
   "pythonRegression": {
-    "archiveRevision": "5b479ccce52cab21517f93ba9414839af086873a",
-    "passed": 277,
+    "archiveRevision": "5f0d6633541d9fb07883687a9aff170d943a1acd",
+    "passed": 308,
     "skipped": 0,
-    "snapshotFiles": 207,
+    "snapshotFiles": 217,
     "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }
