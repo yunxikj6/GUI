@@ -136,5 +136,42 @@
       "windows/VerifyWorkspaceApps.ps1": "2132d0ef5897d2d8bbe052bd80b4663d671d387082837300142a7d28dd152faa",
       "windows/WorkspaceWindowProbe.cs": "9265bcdf0909b8f3face3e6a92601f2d4a4d20360045ed8ecd3f1d43e0f4521d"
     }
+  },
+  "publicWelcomeWindows": {
+    "ubuntu": "24.04.5 amd64",
+    "shell": "GNOME Shell 46",
+    "capture": "one unmodified X11 root screenshot; side-by-side native GNOME windows",
+    "windows": [
+      {
+        "id": "com.anthropic.Claude.desktop",
+        "type": "Wayland",
+        "pid": 333,
+        "stableId": 2,
+        "rect": [
+          1023,
+          32,
+          957,
+          1008
+        ],
+        "executableSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c"
+      },
+      {
+        "id": "chatgpt.desktop",
+        "type": "Wayland",
+        "pid": 336,
+        "stableId": 3,
+        "rect": [
+          66,
+          32,
+          957,
+          1008
+        ],
+        "executableSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7"
+      }
+    ],
+    "screenshot": "../native-ubuntu-official-welcome.png",
+    "screenshotSha256": "fed75ec76b6a2489b7eb5c0af004fec2064c7d6830d233fb61739253e80a2163",
+    "vendorSignedIn": false,
+    "modelCalls": false
   }
 }

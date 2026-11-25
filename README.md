@@ -6,7 +6,7 @@ Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面�
 
 在 GNOME 的“活动”里搜索 **安装官方客户端**（英文为 **Install official desktop apps**），选择 ChatGPT、Claude 或两者，在 Ubuntu 终端确认 APT 安装。随后从“活动”或桌面图标打开应用。两个 Linux 客户端都使用厂商提供的桌面程序和图标，窗口由同一个本机 GNOME 桌面管理。各自的账户负责聊天和登录。InstaBox 提供授权项目的文件和计算。[Ubuntu 安装与启动](docs/native-windows.md#打开原版应用) · [官方客户端的项目连接](docs/official-client-workspace.md)
 
-![从 Ubuntu 桌面双击打开的 OpenAI 官方 ChatGPT Linux 桌面预览版，显示原厂登录界面](docs/native-ubuntu-chatgpt.png)
+![同一 Ubuntu GNOME 桌面实拍，左侧为 ChatGPT 原厂登录页，右侧为 Claude for Linux 原厂欢迎页](docs/native-ubuntu-official-welcome.png)
 
 在 Ubuntu 24.04.5 上，已核对两款程序与厂商安装包，并用窗口管理器确认窗口归属。最小化整个工作区时，两款应用都随之隐藏。ChatGPT 在断网的全新用户目录里也能打开登录方式面板。Claude 在相同条件下会显示连接错误页，仍能展开 File 菜单。[两款应用的 GNOME 桌面实拍](docs/native-ubuntu-official-apps.png) · [断网后点击 ChatGPT 登录选项](docs/native-ubuntu-chatgpt-offline-options.png) · [Claude 原版窗口](docs/native-ubuntu-claude-menu.png)
 
