@@ -71,6 +71,6 @@ Git 差异可按 `staged` 和 `unstaged` 分开读取。状态中的 `diffScopes
 
 ## 接下来的验收
 
-1. 在真实 Windows 11、Ubuntu WSL 2 和 WSLg 组合上双击原生入口，用 GNOME 活动概览启动程序。记录真实窗口所属进程、Ubuntu 会话模式、Ubuntu Dock 及 Windows 图形后端；保留未验证平台的标记。
+1. 在真实 Windows 11、Ubuntu WSL 2 和 WSLg 上运行 `powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1`。脚本通过日常入口启动桌面，按提示用 Nautilus 创建文件夹并保存 JSON 验收记录。Ubuntu 侧已有窗口和磁盘回读实测，Windows 宿主待验。[操作步骤](docs/native-windows.md#在-windows-上验证桌面窗口)
 2. 在已授权的厂商账户中核对 Claude 的会话与 Artifacts、ChatGPT 的侧栏与输入框。验证官方应用通过已配置连接访问指定 InstaBox 项目，独立在云端复核数据。分别记录官方客户端自身的会话归属及工作区文件版本。
 3. 保持 `--cloud-desktop` 和 `--workbench` 的既有回归。远端帧只用于用户明确选择的兼容模式。[远端整屏验收](docs/validation-desktop-entry.md)

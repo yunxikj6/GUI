@@ -143,7 +143,8 @@
     "launcherSha256": {
       "x64": "1bbfcb7c6ae1d89df8c52cea002f23a2565d76ad339f301ebf70e513c7c6e117",
       "arm64": "8df426624425ea00dbfdf5967b6fc09863f3e017872a951c69baf302c813ed19"
-    }
+    },
+    "workspaceWindowVerifierRecord": "native-windows-verifier.json"
   },
   "pythonRegression": {
     "passed": 241,

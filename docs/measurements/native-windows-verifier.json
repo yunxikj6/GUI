@@ -1,0 +1,197 @@
+{
+  "interactiveWindowsAndWslgTested": false,
+  "guestFiles": {
+    "scope": "Linux guest acceptance only. Isolated Ubuntu 24.04.5 LTS amd64 on a private Xvfb display. No Windows, WSL2, WSLg, RAIL or host foreground-window test.",
+    "entry": "linux/start-gnome.sh using its standard nested GNOME path",
+    "launcherSha256": {
+      "start-gnome.sh": "75a2632573d0d425032bbc2ee64803cc856b352b2e5515054def77814b11c6a6",
+      "gnome_session.py": "b53299bb8c90432e90ef302883b01e6879d54a541ad57dfbf22b14958abe112a",
+      "nested_window.py": "8484afa560bf3537e588f94a38bf6b0b543ae396605f688a77ad41bb05519ee6"
+    },
+    "guestHelperSha256": "5c5fb453c755c9ae63cd46ec14fe5ed61b83c4f3b4dd0d171431f106aac2feb0",
+    "desktop": "GNOME Shell 46.0",
+    "fileManager": "GNOME nautilus 46.4",
+    "entryNetwork": "Separate network namespace with loopback only",
+    "windowTitle": "Cloud Linux Workspace [cb39b0b8b8f58b7845fad87f79542e8a]",
+    "outerX11WindowPidProperty": 30,
+    "xresWindowConnectionPid": 30,
+    "shell": {
+      "pid": 30,
+      "executable": "/usr/bin/gnome-shell",
+      "sha256": "afb135d53dd2ee5483bf03d0e60895f8d04d48be897827012f4e473e608002eb"
+    },
+    "files": {
+      "pid": 124,
+      "executable": "/usr/bin/nautilus",
+      "sha256": "76bd46906e2d29ec3b3c0f9139db07a39fbeaf00437845bd61533923803871d7"
+    },
+    "filesOnBoundWayland": true,
+    "input": "In Nautilus, Ctrl+Shift+N, typed the folder name, pressed Enter.",
+    "directory": "Verified-cb39b0b8",
+    "directoryVerifiedOnDisk": true,
+    "directoryOwnedByTestUser": true,
+    "actions": [
+      {
+        "component": "correct",
+        "action": "prepare",
+        "exitCode": 0,
+        "status": "prepared"
+      },
+      {
+        "component": "different",
+        "action": "prepare",
+        "exitCode": 0,
+        "status": "prepared"
+      },
+      {
+        "component": "different",
+        "action": "attach",
+        "exitCode": 0,
+        "status": "not_ready"
+      },
+      {
+        "component": "correct",
+        "action": "attach",
+        "exitCode": 0,
+        "status": "attached",
+        "backend": "nested",
+        "ubuntuVersion": "24.04",
+        "wslgPresent": false,
+        "shellPid": 30,
+        "filesPid": 124
+      },
+      {
+        "component": "correct",
+        "action": "check",
+        "exitCode": 0,
+        "status": "pending"
+      },
+      {
+        "component": "correct",
+        "action": "prompt",
+        "exitCode": 0,
+        "status": "prompted",
+        "shellPid": 30,
+        "filesPid": 124
+      },
+      {
+        "component": "correct",
+        "action": "check",
+        "exitCode": 0,
+        "status": "pending"
+      },
+      {
+        "component": "correct",
+        "action": "check",
+        "exitCode": 0,
+        "status": "verified",
+        "shellPid": 30,
+        "filesPid": 124
+      },
+      {
+        "component": "correct",
+        "action": "check",
+        "exitCode": 1,
+        "status": "error",
+        "code": "session_changed"
+      },
+      {
+        "component": "correct",
+        "action": "cleanup",
+        "exitCode": 0,
+        "status": "cleaned"
+      },
+      {
+        "component": "different",
+        "action": "cleanup",
+        "exitCode": 0,
+        "status": "cleaned"
+      }
+    ],
+    "staleCheck": "Terminated the bound GNOME shell after verification, kept the directory, and checked again. The helper rejected the session.",
+    "verifiedFixtureRemoved": true,
+    "screenshot": "../native-ubuntu-files-verification.png",
+    "screenshotSha256": "d53770cea50165f3c520948014075b7960d64c80b505e4d3dd715f03e7288b53"
+  },
+  "officialClaude": {
+    "tested": "GNOME desktop icon double-click on Ubuntu 24.04.5 LTS with GNOME Shell 46.0; cold start in a new test profile",
+    "normalLauncherSha256": {
+      "start-gnome.sh": "75a2632573d0d425032bbc2ee64803cc856b352b2e5515054def77814b11c6a6",
+      "gnome_session.py": "b53299bb8c90432e90ef302883b01e6879d54a541ad57dfbf22b14958abe112a",
+      "nested_window.py": "8484afa560bf3537e588f94a38bf6b0b543ae396605f688a77ad41bb05519ee6"
+    },
+    "windowManager": "Xfwm4 on a private Xvfb display",
+    "outerTitle": "Cloud Linux Workspace",
+    "outerPid": 58,
+    "outerFrameExtents": {
+      "left": 5,
+      "right": 5,
+      "top": 29,
+      "bottom": 5
+    },
+    "package": {
+      "Version": "6.28899.6",
+      "Filename": "pool/main/c/claude-desktop/claude-desktop_6.28899.6_amd64.deb",
+      "Size": "191718584",
+      "SHA256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+      "Package": "claude-desktop",
+      "Architecture": "amd64"
+    },
+    "claudeMainPid": 293,
+    "claudeMainExecutable": "/usr/lib/claude-desktop/claude-desktop",
+    "claudeRunningExecutableSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "renderers": [
+      {
+        "pid": 417,
+        "parent": 302,
+        "type": "renderer",
+        "uid": 1000,
+        "noSandboxFlag": false,
+        "noNewPrivileges": 1,
+        "seccomp": 2,
+        "seccompFilters": 2
+      },
+      {
+        "pid": 438,
+        "parent": 302,
+        "type": "renderer",
+        "uid": 1000,
+        "noSandboxFlag": false,
+        "noNewPrivileges": 1,
+        "seccomp": 2,
+        "seccompFilters": 2
+      }
+    ],
+    "interfaces": [
+      "lo"
+    ],
+    "mainRoutes": {
+      "IPv4": [],
+      "IPv6": []
+    },
+    "networkRouteLookups": [
+      {
+        "documentationAddress": "192.0.2.1",
+        "errno": 101
+      },
+      {
+        "documentationAddress": "2001:db8::1",
+        "errno": 101
+      }
+    ],
+    "offlineUi": "Couldn’t connect to Claude / ERR_INTERNET_DISCONNECTED",
+    "interactions": [
+      "Double-clicked the GNOME Desktop Icons NG Claude icon",
+      "Clicked Claude’s own menu button",
+      "Opened its File submenu and saw Settings, Close Window and Quit"
+    ],
+    "accountSignInTested": false,
+    "modelRequestTested": false,
+    "windowsOrWslgTested": false,
+    "screenshot": {
+      "type": "original whole private X screen, including the real window manager title bar",
+      "name": "../native-ubuntu-branded-claude.png",
+      "sha256": "e47cb49bda1f86db9a9ca702f1dfd47350f79533c29937bf9580475842ac00d8"
+    }
+  }
+}

@@ -110,9 +110,13 @@ def parent_workarea():
     return None
 
 
+def nested_x11_46(version, backend):
+    return backend == "--nested" and bool(re.match(r"^GNOME Shell 46(?:\.|$)", version))
+
+
 def nested_mode(version, backend):
     # GNOME 46's X11 nesting backend defaults to a fixed 800x600 fake monitor.
-    if backend != "--nested" or not re.match(r"^GNOME Shell 46(?:\.|$)", version):
+    if not nested_x11_46(version, backend):
         return None
     if any(key.startswith(("MUTTER_DEBUG_DUMMY_", "MUTTER_DEBUG_NUM_DUMMY_", "MUTTER_DEBUG_TILED_DUMMY_"))
            for key in os.environ):
@@ -206,7 +210,10 @@ def main():
         initial_mode = nested_mode(version, backend)
         if initial_mode:
             parent_env.append("MUTTER_DEBUG_DUMMY_MODE_SPECS=" + initial_mode)
-        cmd = ["env", *parent_env, shell, backend, "--wayland", "--wayland-display=" + child_display]
+        compositor = [shell]
+        if nested_x11_46(version, backend):
+            compositor = [sys.executable, str(Path(__file__).with_name("nested_window.py")), private_dir, shell]
+        cmd = ["env", *parent_env, *compositor, backend, "--wayland", "--wayland-display=" + child_display]
         if backend == "--nested" and "--sm-disable" in flags:
             cmd.append("--sm-disable")
         # WSLg can mount the outer X11 socket directory read-only. Native Wayland applications

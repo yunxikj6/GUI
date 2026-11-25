@@ -10,7 +10,7 @@ Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面�
 
 在 Ubuntu 24.04.5 上，从 GNOME 的“活动”启动 Claude 后，已核对运行中的程序与厂商软件包的 SHA-256。上图是退出后双击桌面图标重新打开程序，展开官方菜单时的登录前画面。另一次在全新用户目录里断网后双击启动，Claude 显示了自己的连接错误页，同一窗口仍能展开 File 子菜单。[断网冷启动原图](docs/native-ubuntu-claude-offline-menu.png)
 
-Windows 上的 WSLg、ChatGPT 实际窗口和已登录对话仍待实机验收。[Ubuntu 桌面原图](docs/native-ubuntu-desktop.png) · [验收记录](docs/measurements/native-workspace.json)
+Ubuntu 24.04 上的桌面窗口现在显示为 **Cloud Linux Workspace**。在 Windows 11 上可运行 `powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1`，从同一入口打开桌面，在 Ubuntu 文件管理器中按提示创建文件夹，核对宿主窗口、Linux 进程和磁盘结果。当前公开的实拍来自 Linux。Windows 上的 WSLg、ChatGPT 实际窗口和已登录对话仍待实机验收。[带窗口标题的离线 Claude 实拍](docs/native-ubuntu-branded-claude.png) · [Windows 操作步骤](docs/native-windows.md#在-windows-上验证桌面窗口) · [实测记录](docs/measurements/native-windows-verifier.json)
 
 ## 工作区连接
 

@@ -32,11 +32,25 @@ Ubuntu 24.04 的 GNOME Shell 46 启动时读取父显示的可用区域，给桌
 
 当 WSLg 把父 X11 套接字目录挂为只读时，工作区使用 Wayland 运行 Ubuntu 内的应用。已在该条件下打开 Nautilus 和官方 Claude。仅支持 X11 的 Linux 程序需要可用的嵌套 Xwayland。
 
-## 验收范围
+## 在 Windows 上验证桌面窗口
+
+完成首次准备后，在 Windows 11 的解压目录打开 PowerShell，运行以下命令。有多个 Ubuntu 时，在末尾加上 `-Distro Ubuntu-24.04` 或你注册的完整名称。
+
+```powershell
+powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1
+```
+
+1. 脚本通过 `Start.cmd` 启动新桌面。Ubuntu 24.04 日常窗口的标题是 **Cloud Linux Workspace**。这次验收的窗口标题另带一串方括号标识，用来区分已打开的其他桌面。
+2. 等 Ubuntu 文件管理器打开名为 **Files** 的目录，点击窗口使它位于前台。看到 Ubuntu 桌面通知后，按 **Ctrl+Shift+N**，输入通知中的 `Verified-xxxxxxxx` 名称，按 Enter。让工作区保持在前台，直到验证结束。默认操作时间为 180 秒，可用 `-TimeoutSeconds` 调整。
+3. PowerShell 最后一行是 JSON。`status` 为 `verified` 且退出码为 0，表示本次运行观测到同一个 Windows 前台窗口、对应的 Ubuntu GNOME 和 Nautilus 进程，以及刚创建的空目录。报告有窗口句柄、宿主进程、Ubuntu 版本和两个 Linux 进程号，可留作该机器的验收记录。若失败，退出码为 1，查看 `phase` 和 `errorCode`。例如 `foreground-not-observed` 表示创建前后的前台窗口采样不完整。
+
+命令使用本机临时目录，无需登录厂商账户或连接 InstaBox。验收结束后桌面继续运行，脚本清理它识别的临时目录。若向目录里添加了其他文件，`cleanup` 会显示 `preserved` 并保留内容。验收仅采样前台和文件系统结果，操作仍需由人在文件管理器内完成。[宿主验收脚本](../windows/Test-NativeWorkspace.ps1) · [Ubuntu 实测原图](native-ubuntu-files-verification.png) · [进程与文件记录](measurements/native-windows-verifier.json)
+
+## 官方客户端验收
 
 - 在 Ubuntu 24.04.5 的 GNOME Shell 46.0 上，使用 Dock 中的原版文件管理器新建了目录并核对了磁盘结果。随后通过“活动”启动了 Anthropic 官方签名的 Claude Desktop 6.28899.6。程序映像与签名软件包中的文件摘要相同。[Ubuntu 桌面截图](native-ubuntu-desktop.png) · [Claude 窗口截图](native-ubuntu-claude.png)
 - 退出 Claude 后，双击桌面图标会重新打开客户端。登录前就可以展开原厂菜单，实测包含 File、Edit、View、Go、Help。[桌面图标打开的 Claude 菜单](native-ubuntu-claude-menu.png)
-- 在只有回环接口、没有对外 IP 路由的 Ubuntu 环境中，用全新用户配置双击启动官方 Claude。窗口显示 `ERR_INTERNET_DISCONNECTED`，本机仍可展开 File 菜单和子菜单。[离线原始截图](native-ubuntu-claude-offline-menu.png)
+- 在只有回环接口的 Ubuntu 环境中，用全新用户配置双击启动官方 Claude。窗口显示 `ERR_INTERNET_DISCONNECTED`，可以展开 File 菜单，看到 Settings、Close Window、Quit。完整实拍含 Linux 窗口管理器绘制的 Cloud Linux Workspace 标题栏。[离线整屏原图](native-ubuntu-branded-claude.png) · [运行中程序摘要](measurements/native-windows-verifier.json)
 - 客户端保持沙盒与 TLS 校验，验收到公开欢迎页。登录后的侧栏、聊天记录及 Artifacts 仍需获授权账户验收。
 - Windows 启动程序已按 x64、ARM64 构建并检查 PE 的 GUI 子系统。当前测试机是 Linux。Windows 11 上的实际 WSLg 窗口、真实 ChatGPT 窗口及端到端焦点切换尚待真机验证。
 
