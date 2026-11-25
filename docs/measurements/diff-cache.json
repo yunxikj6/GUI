@@ -1,0 +1,138 @@
+{
+  "instaboxOldAndNew": {
+    "mode": "instabox",
+    "fixtureRemoved": true,
+    "previousRevision": "76907b8c22737c61a9ad066d199715de5f445b59",
+    "chromium": "156.0.8078.79",
+    "previous": {
+      "appJS": "1e9194a15b85d19e",
+      "patches": {
+        "firstRead": {
+          "staged": {
+            "bytes": 139,
+            "workerSha256": "bf0b72e6b459bd98793ef3624200b8b46b16b935ecfdd285f6627418883fc199",
+            "nativeGitSha256": "bf0b72e6b459bd98793ef3624200b8b46b16b935ecfdd285f6627418883fc199"
+          },
+          "unstaged": {
+            "bytes": 135,
+            "workerSha256": "61e1d92d3840b94fa5934254d725a94dd07aa97762dc76b00ef1beab0f6c6021",
+            "nativeGitSha256": "61e1d92d3840b94fa5934254d725a94dd07aa97762dc76b00ef1beab0f6c6021"
+          }
+        },
+        "afterRemoteEdit": {
+          "staged": {
+            "bytes": 139,
+            "workerSha256": "25fa92b17dd97887ab65fc4aeb1ae844166cc1b3792c064e3acd440e287d63a5",
+            "nativeGitSha256": "25fa92b17dd97887ab65fc4aeb1ae844166cc1b3792c064e3acd440e287d63a5"
+          },
+          "unstaged": {
+            "bytes": 135,
+            "workerSha256": "c3d74cc21f57b93702ffe4953ef311dc5c2e0276ec0b5a86b1ab1b5b59d950ed",
+            "nativeGitSha256": "c3d74cc21f57b93702ffe4953ef311dc5c2e0276ec0b5a86b1ab1b5b59d950ed"
+          }
+        }
+      },
+      "warmPatchesMatchNative": true,
+      "offline": {
+        "discardedBothPatches": true,
+        "aborted": [
+          "staged",
+          "unstaged"
+        ]
+      },
+      "retry": {
+        "scopes": [
+          "staged",
+          "unstaged"
+        ],
+        "requestsPerClick": 1,
+        "bothUpdatedPatchesMatchNative": true
+      },
+      "draft": {
+        "preserved": true,
+        "saveRequests": 0,
+        "guestFileUnchanged": true
+      }
+    },
+    "candidate": {
+      "appJS": "e653c5628c671dcb",
+      "patches": {
+        "firstRead": {
+          "staged": {
+            "bytes": 139,
+            "workerSha256": "bf0b72e6b459bd98793ef3624200b8b46b16b935ecfdd285f6627418883fc199",
+            "nativeGitSha256": "bf0b72e6b459bd98793ef3624200b8b46b16b935ecfdd285f6627418883fc199"
+          },
+          "unstaged": {
+            "bytes": 135,
+            "workerSha256": "61e1d92d3840b94fa5934254d725a94dd07aa97762dc76b00ef1beab0f6c6021",
+            "nativeGitSha256": "61e1d92d3840b94fa5934254d725a94dd07aa97762dc76b00ef1beab0f6c6021"
+          }
+        },
+        "afterRemoteEdit": {
+          "staged": {
+            "bytes": 139,
+            "workerSha256": "25fa92b17dd97887ab65fc4aeb1ae844166cc1b3792c064e3acd440e287d63a5",
+            "nativeGitSha256": "25fa92b17dd97887ab65fc4aeb1ae844166cc1b3792c064e3acd440e287d63a5"
+          },
+          "unstaged": {
+            "bytes": 135,
+            "workerSha256": "c3d74cc21f57b93702ffe4953ef311dc5c2e0276ec0b5a86b1ab1b5b59d950ed",
+            "nativeGitSha256": "c3d74cc21f57b93702ffe4953ef311dc5c2e0276ec0b5a86b1ab1b5b59d950ed"
+          }
+        }
+      },
+      "warmPatchesMatchNative": true,
+      "offline": {
+        "cachedScopes": [
+          "staged",
+          "unstaged"
+        ],
+        "labels": {
+          "staged": "缓存未校验",
+          "unstaged": "缓存未校验"
+        },
+        "aborted": [
+          "staged",
+          "unstaged"
+        ]
+      },
+      "retry": {
+        "scopes": [
+          "staged",
+          "unstaged"
+        ],
+        "requestsPerClick": 1,
+        "bothUpdatedPatchesMatchNative": true,
+        "stagedRecoveryPreservedStaleUnstaged": true
+      },
+      "draft": {
+        "preserved": true,
+        "saveRequests": 0,
+        "guestFileUnchanged": true
+      }
+    }
+  },
+  "instaboxRepositoryRemovalAndRepair": {
+    "mode": "instabox",
+    "fixtureRemoved": true,
+    "confirmedWhileFileOpen": "none",
+    "expiredBothPatches": true,
+    "missingCacheAfterFailurePresentedAsClean": false,
+    "repairedPatchesSurvivedDelayedNone": true,
+    "repairedNativePatchSha256": {
+      "staged": "25fa92b17dd97887ab65fc4aeb1ae844166cc1b3792c064e3acd440e287d63a5",
+      "unstaged": "c3d74cc21f57b93702ffe4953ef311dc5c2e0276ec0b5a86b1ab1b5b59d950ed"
+    }
+  },
+  "localGlobalRefresh": {
+    "realLocalWorkspace": true,
+    "bothPatchesRetainedAfterGlobalRefreshWhileOffline": true,
+    "refreshedToNewIndex": true,
+    "failedOperations": [
+      "status",
+      "diff",
+      "diff"
+    ]
+  }
+}
