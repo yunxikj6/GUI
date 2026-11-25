@@ -1,14 +1,17 @@
 """Install GNOME desktop shortcuts with a temporary XDG home and open them with real GIO."""
+import configparser
 import os
 from pathlib import Path
 import platform
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 SHORTCUTS = ROOT / "linux/desktop-shortcuts.py"
@@ -177,3 +180,135 @@ class DesktopShortcuts(unittest.TestCase):
         self.offer()
         self.assertEqual([p.name for p in desktop.iterdir()], ["Claude.desktop"])
         self.launch(desktop / "Claude.desktop", "linux-claude")
+
+    @staticmethod
+    def desktop_icon(path):
+        entry = configparser.ConfigParser(interpolation=None)
+        entry.read(path, encoding="utf-8")
+        return entry["Desktop Entry"]["Icon"]
+
+    def change_icon(self, source, icon):
+        old = self.desktop_icon(source)
+        source.write_text(source.read_text().replace(f"Icon={old}\n", f"Icon={icon}\n"))
+
+    @staticmethod
+    def png(color):
+        def chunk(kind, data):
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+        size = 512
+        header = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
+        pixels = zlib.compress((b"\0" + color * size) * size)
+        return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", pixels) + chunk(b"IEND", b"")
+
+    def test_new_shortcut_tracks_real_images_without_editing_desktop_or_trust(self):
+        self.release("one")
+        self.offer()
+        file = self.home / "Desktop/Claude.desktop"
+        original = file.read_bytes(), file.stat().st_ino
+        trust = self.trust.read_bytes()
+        cached = Path(self.desktop_icon(file))
+        self.assertTrue(cached.is_absolute() and cached.is_file())
+        fallback = cached.read_bytes()
+        vendor = self.base / "new artwork.png"
+        artwork = self.png(b"\xff\x00\x00")
+        vendor.write_bytes(artwork)
+        self.change_icon(self.data / "applications/cloudworkspace-windows-claude.desktop", vendor)
+        self.offer()
+        self.assertEqual(cached.read_bytes(), artwork)
+        same_image = cached.stat().st_ino
+        self.offer()
+        self.assertEqual(cached.stat().st_ino, same_image)
+        self.launch(file, "one|--open-app|Claude")
+        vendor_native = self.native_claude()
+        native_image = self.base / "linux image.png"
+        native_image.write_bytes(self.png(b"\x00\xff\x00"))
+        self.change_icon(vendor_native, native_image)
+        self.offer()
+        self.assertEqual(cached.read_bytes(), native_image.read_bytes())
+        self.assertNotEqual(cached.read_bytes(), fallback)
+        self.assertEqual((file.read_bytes(), file.stat().st_ino), original)
+        self.assertEqual(self.trust.read_bytes(), trust)
+        self.launch(file, "linux-claude")
+
+    def test_legacy_literal_icon_is_preserved_and_its_target_still_updates(self):
+        self.release("one")
+        self.offer()
+        file = self.home / "Desktop/Claude.desktop"
+        cached = Path(self.desktop_icon(file))
+        self.change_icon(file, "application-x-executable")
+        cached.unlink()  # The previous format had only an installed marker and a literal Icon.
+        original = file.read_bytes(), file.stat().st_ino
+        trust = self.trust.read_bytes()
+        self.native_claude()
+        self.offer()
+        self.assertEqual((file.read_bytes(), file.stat().st_ino), original)
+        self.assertFalse(cached.exists())
+        self.assertEqual(self.trust.read_bytes(), trust)
+        self.launch(file, "linux-claude")
+
+    def test_foreign_cache_and_user_custom_icon_are_preserved(self):
+        self.release("one")
+        self.offer()
+        desktop = self.home / "Desktop/Claude.desktop"
+        cached = Path(self.desktop_icon(desktop))
+        self.change_icon(desktop, "personal-icon")
+        native = self.native_claude()
+        picture = self.base / "different.svg"
+        picture.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+        self.change_icon(native, picture)
+        cached.write_bytes(b"my image")
+        self.offer()
+        self.assertEqual(cached.read_bytes(), b"my image")
+        self.assertEqual(self.desktop_icon(desktop), "personal-icon")
+        cached.unlink()
+        cached.symlink_to(picture)
+        self.offer()
+        self.assertTrue(cached.is_symlink())
+        self.assertEqual(cached.readlink(), picture)
+        other = self.home / "Desktop/ChatGPT.desktop"
+        artwork = Path(self.desktop_icon(other))
+        replacement = artwork.with_name("kept backup")
+        shutil.copy2(artwork, replacement)  # Copy mode and xattrs, but this is a new inode.
+        original = replacement.read_bytes()
+        replacement.replace(artwork)
+        self.change_icon(self.data / "applications/cloudworkspace-windows-chatgpt.desktop", picture)
+        self.offer()
+        self.assertEqual(artwork.read_bytes(), original)
+
+    def test_gnome_loads_named_vendor_art_at_hidpi_without_a_parent_display(self):
+        python = "/usr/bin/python3"
+        probe = subprocess.run([python, "-c", "import gi; gi.require_version('Gtk', '3.0')"],
+                               env=self.env, capture_output=True)
+        if probe.returncode:
+            self.skipTest("requires GNOME Gtk introspection")
+        self.env["XDG_DATA_DIRS"] += ":/usr/share"  # distro GIO MIME registry and pixbuf loaders
+        self.native_claude()
+        icon = self.system / "pixmaps/claude-desktop.svg"
+        icon.parent.mkdir()
+        icon.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">'
+                        '<rect width="512" height="512" fill="blue"/></svg>')
+        self.run_ok(python, self.shortcut_script)
+        desktop = self.home / "Desktop/Claude.desktop"
+        cached = Path(self.desktop_icon(desktop))
+        self.assertEqual(cached.suffix, ".png")
+        self.assertEqual(struct.unpack(">II", cached.read_bytes()[16:24]), (512, 512))
+        # Use the GIO/Gtk loading path used by DING, including a 2x monitor.
+        self.run_ok(python, "-c", """import sys, gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gio, Gtk
+icon = Gio.DesktopAppInfo.new_from_filename(sys.argv[1]).get_icon()
+pixbuf = Gtk.IconTheme.new().lookup_by_gicon_for_scale(icon, 128, 2, Gtk.IconLookupFlags.FORCE_SIZE).load_icon()
+assert (pixbuf.get_width(), pixbuf.get_height()) == (256, 256)
+assert bytes(pixbuf.get_pixels()[:3]) == bytes((0, 0, 255))
+""", str(desktop))
+
+    def test_official_package_png_used_even_without_python_gi(self):
+        self.native_claude()
+        icon = self.system / "icons/hicolor/256x256/apps/claude-desktop.png"
+        icon.parent.mkdir(parents=True)
+        icon.write_bytes(self.png(b"\x00\xa3\x78"))
+        self.run_ok(sys.executable, "-S", self.shortcut_script)
+        desktop = self.home / "Desktop/Claude.desktop"
+        cached = Path(self.desktop_icon(desktop))
+        self.assertEqual(cached.read_bytes(), icon.read_bytes())
+        self.launch(desktop, "linux-claude")

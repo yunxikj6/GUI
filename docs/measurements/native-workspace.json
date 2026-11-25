@@ -39,7 +39,8 @@
       "windowsAppsInstalledInFixture": false
     },
     "initialWindowSizeRecord": "native-gnome-window-size.json",
-    "projectFilesRecord": "native-project-files.json"
+    "projectFilesRecord": "native-project-files.json",
+    "desktopShortcutIconsRecord": "native-shortcut-icons.json"
   },
   "claudeDesktop": {
     "debianPackage": "claude-desktop",
@@ -147,11 +148,10 @@
     "workspaceWindowVerifierRecord": "native-windows-verifier.json"
   },
   "pythonRegression": {
-    "passed": 241,
+    "archiveRevision": "fbb517a4204dd47ae4141e95982182afa20ccc7d",
+    "passed": 259,
     "skipped": 0,
-    "snapshotFiles": 183,
-    "affectedModuleRerunPassed": 57,
-    "affectedModuleRerunSkipped": 0,
-    "verification": "Linux regression followed by targeted checks of working-tree updates. Windows interactive coverage is recorded separately."
+    "snapshotFiles": 198,
+    "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }

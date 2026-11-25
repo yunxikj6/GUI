@@ -1,0 +1,78 @@
+{
+  "scenario": "A newly managed desktop shortcut initially uses the generic icon. The official Claude Linux app becomes available before the next desktop session.",
+  "environment": "Ubuntu 24.04.5 LTS amd64, GNOME Shell 46.0 and Ubuntu Desktop Icons NG on a private X display.",
+  "entry": "linux/start-workspace.sh with no arguments twice, same private HOME. Xfwm4 drew the Cloud Linux Workspace title bar.",
+  "sourceSha256": {
+    "linux/start-workspace.sh": "112ca4857023cfc14f9f62888842bb17669dd28e2827fd0056e137cb16fac79d",
+    "linux/desktop-shortcuts.py": "3fa2f3fcd43a6aa62a0ffdcbf90b775c6a79a57a338069ba846b32586cbf0fd3"
+  },
+  "fixture": "The product installer generated the initial Windows app entries in the private profile. With no Windows host or Windows app icon service, it used the real system fallback. For the second launch, unmodified files from the signed Claude Debian package were exposed in the same Ubuntu root filesystem. No apt installation transaction was exercised.",
+  "before": {
+    "managedAliasTarget": "cloudworkspace-windows-claude.desktop",
+    "imageSha256": "e115046ebb9212bfb6fea63d1764429dfb0ab2e96d61d24bd6ffc9d42e60ce69",
+    "screenshotSha256": "1751a5bc0a0a16fcbd973ed986bc227c5ae2b0999859f26f25bfb1aa7f98207a",
+    "renderedIconComparison": {
+      "meanAbsoluteRgbError": 1.445,
+      "matchedCenterAndSize": [
+        1212,
+        543,
+        64
+      ]
+    }
+  },
+  "after": {
+    "managedAliasTarget": "com.anthropic.Claude.desktop",
+    "imageSha256": "2188ade70c113978dbcc349468054dd948344a7b4497e2edac355b1b903c422d",
+    "packageIcon": "usr/share/icons/hicolor/256x256/apps/claude-desktop.png",
+    "packageImageSha256": "2188ade70c113978dbcc349468054dd948344a7b4497e2edac355b1b903c422d",
+    "renderedPackageIconComparison": {
+      "meanAbsoluteRgbError": 2.417,
+      "matchedCenterAndSize": [
+        1212,
+        543,
+        64
+      ]
+    },
+    "previousGenericIconComparedAgainstAfterScreen": {
+      "meanAbsoluteRgbError": 59.369,
+      "matchedCenterAndSize": [
+        1216,
+        547,
+        43
+      ]
+    },
+    "screenshotSha256": "7b5642c45ca52e48dadd4eaec3a18be45050c2d2811b477cc2d39fe5cd0faa46"
+  },
+  "comparisonMethod": "Compared opaque RGB pixels in the original DING desktop cell with the reference artwork scaled to its on-screen size. Each channel ranges from 0 to 255.",
+  "shortcutInodePreserved": true,
+  "shortcutContentsPreserved": true,
+  "renderedIconPositionAndSizePreserved": true,
+  "gioTrustedBeforeAndAfter": true,
+  "originalPackage": {
+    "Version": "6.28899.6",
+    "Filename": "pool/main/c/claude-desktop/claude-desktop_6.28899.6_amd64.deb",
+    "Size": "191718584",
+    "SHA256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8",
+    "Package": "claude-desktop",
+    "Architecture": "amd64"
+  },
+  "afterDoubleClick": {
+    "source": "GNOME DING double-click",
+    "processId": 294,
+    "runningImage": "/usr/lib/claude-desktop/claude-desktop",
+    "imageSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+    "matchedSignedPackageBinary": true,
+    "offlineUi": "ERR_INTERNET_DISCONNECTED; the local File submenu opened."
+  },
+  "priorReleaseControl": {
+    "entryIconBefore": "application-x-executable",
+    "entryIconAfter": "application-x-executable",
+    "aliasAfter": "com.anthropic.Claude.desktop"
+  },
+  "testedWindowsHost": false,
+  "testedVendorAccount": false,
+  "network": "Loopback only; no IPv4 or IPv6 uplink.",
+  "screenshots": {
+    "after": "../native-ubuntu-workspace.png"
+  }
+}

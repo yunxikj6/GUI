@@ -6,7 +6,7 @@
 
 1. 在 Windows 11 上运行 `wsl --version` 和 `wsl --list --verbose`，确认有 WSLg，并且要用的 Ubuntu 是版本 2。还没有 Ubuntu 时，可按微软说明安装，例如 `wsl --install -d Ubuntu-24.04`。首次启动发行版时完成 Linux 用户设置。[微软 WSLg 文档](https://learn.microsoft.com/windows/wsl/tutorials/gui-apps)
 2. 双击 `Setup.cmd`。安装程序在交互终端列出所选 Ubuntu 24.04 LTS 缺少的桌面组件，通过该发行版已有的 APT 源安装。Ubuntu 的提权提示也在这个终端输入。有多个 Ubuntu 时可运行 `Setup.cmd --distro Ubuntu-24.04`。已具备依赖的机器可以直接打开工作区。
-3. 在 Windows 解压目录运行 `Start.cmd --check-native` 检查依赖，再双击 `Start.cmd`。存在多个 Ubuntu 时可指定 `Start.cmd --distro Ubuntu-24.04`。启动时会在当前 Ubuntu 用户的“活动”中注册应用入口，并在启用了桌面图标时首次建立快捷方式。可以移动或删除图标。以后解压到新目录并运行新版启动器，现有快捷方式仍可使用。
+3. 在 Windows 解压目录运行 `Start.cmd --check-native` 检查依赖，再双击 `Start.cmd`。存在多个 Ubuntu 时可指定 `Start.cmd --distro Ubuntu-24.04`。启动时会在当前 Ubuntu 用户的“活动”中注册应用入口，并在启用了桌面图标时首次建立快捷方式。可以移动或删除图标。以后解压到新目录并运行新版启动器，现有快捷方式仍可使用。新版创建的快捷方式会在下次启动工作区时更新应用图标。旧版创建的桌面文件保留原有图标和启动权限，切换到 Linux 版 Claude 后仍会打开新客户端。
 
 若想从 Ubuntu 终端自行安装，同一套软件包如下。
 
@@ -26,7 +26,7 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
 - **项目数据**。需要使用 InstaBox 时，为对应的官方客户端配置工作区连接。云端文件路径、Git 状态和保存结果来自所选云机。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
 - **在 Ubuntu 直接编辑项目文件**。完成绑定后，在“活动”打开 InstaBox 项目文件，从云端选一个文件，双击本地工作副本即可用系统编辑器修改。客户端会话和文件管理器可以独立使用。[原生文件操作](native-project-files.md)
 
-在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py` 启动本地会话。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。
+在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py` 启动本地会话。Ubuntu 桌面会为已安装的官方 Claude 提供快捷方式。Windows 应用入口在 WSL 中注册。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。
 
 Ubuntu 24.04 的 GNOME Shell 46 启动时读取父显示的可用区域，给桌面边框和任务栏留出空间。Linux 嵌套窗口实测在 1920×1080 显示上得到 1888×1016 的桌面，在 1280×720 上得到 1248×656。这个版本的 Mutter 在运行中固定嵌套窗口大小，更换显示后可关闭再打开。Windows 的显示缩放仍需实机验证。[逐项测量](measurements/native-gnome-window-size.json)
 
@@ -50,6 +50,7 @@ powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1
 
 - 在 Ubuntu 24.04.5 的 GNOME Shell 46.0 上，使用 Dock 中的原版文件管理器新建了目录并核对了磁盘结果。随后通过“活动”启动了 Anthropic 官方签名的 Claude Desktop 6.28899.6。程序映像与签名软件包中的文件摘要相同。[Ubuntu 桌面截图](native-ubuntu-desktop.png) · [Claude 窗口截图](native-ubuntu-claude.png)
 - 退出 Claude 后，双击桌面图标会重新打开客户端。登录前就可以展开原厂菜单，实测包含 File、Edit、View、Go、Help。[桌面图标打开的 Claude 菜单](native-ubuntu-claude-menu.png)
+- 在同一个 Ubuntu 用户目录中连续两次启动工作区。第二次启动前挂载 Claude 官方 Debian 包的原始文件，GNOME 随即在原位置显示包里的 256 像素图标，双击启动的程序也与该包一致。截图中的 ChatGPT 使用系统通用图标，这台 Linux 测试机没有 Windows 应用注册服务。[真实桌面截图](native-ubuntu-workspace.png) · [图标、进程与运行记录](measurements/native-shortcut-icons.json)
 - 在只有回环接口的 Ubuntu 环境中，用全新用户配置双击启动官方 Claude。窗口显示 `ERR_INTERNET_DISCONNECTED`，可以展开 File 菜单，看到 Settings、Close Window、Quit。完整实拍含 Linux 窗口管理器绘制的 Cloud Linux Workspace 标题栏。[离线整屏原图](native-ubuntu-branded-claude.png) · [运行中程序摘要](measurements/native-windows-verifier.json)
 - 客户端保持沙盒与 TLS 校验，验收到公开欢迎页。登录后的侧栏、聊天记录及 Artifacts 仍需获授权账户验收。
 - Windows 启动程序已按 x64、ARM64 构建并检查 PE 的 GUI 子系统。当前测试机是 Linux。Windows 11 上的实际 WSLg 窗口、真实 ChatGPT 窗口及端到端焦点切换尚待真机验证。

@@ -30,6 +30,5 @@ elif [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/cloudworkspace/native-files.json" 
 fi
 if "$wsl"; then
     python3 ./install-app-launchers.py
-    exec /bin/bash ./start-gnome.sh --desktop-shortcuts
 fi
-exec /bin/bash ./start-gnome.sh
+exec /bin/bash ./start-gnome.sh --desktop-shortcuts

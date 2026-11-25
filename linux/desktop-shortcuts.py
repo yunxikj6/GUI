@@ -3,6 +3,7 @@
 import configparser
 import ctypes
 import fcntl
+import hashlib
 import importlib
 import os
 from pathlib import Path
@@ -29,9 +30,13 @@ def desktop_dir():
     return Path(os.fsdecode(path)) if path else None
 
 
+def data_roots():
+    dirs = os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+    return [launchers.data_home(), *(Path(p) for p in dirs.split(":") if p.startswith("/"))]
+
+
 def entry_for(app):
-    roots = [launchers.data_home(), *(Path(p) for p in
-             (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":") if p.startswith("/"))]
+    roots = data_roots()
     ids = [launchers.APP_IDS[app]]
     if app == "Claude":
         ids.insert(0, launchers.NATIVE_CLAUDE_ID)
@@ -82,6 +87,108 @@ def stable_entry(app, source, marker):
     return alias
 
 
+ICON_LIMIT = 4 * 1024 * 1024
+ICON_OWNER = "user.cloudworkspace.shortcut-icon"
+
+
+def icon_sources(icon):
+    if os.path.isabs(icon):
+        yield Path(icon.replace("\\\\", "\\"))
+    # The private compositor has not started, so query the configured theme headlessly.
+    theme = None
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gio, Gtk
+        theme = Gtk.IconTheme.new()
+        schemas = Gio.SettingsSchemaSource.get_default()
+        if schemas and (schema := schemas.lookup("org.gnome.desktop.interface", True)):
+            theme.set_custom_theme(Gio.Settings.new_full(schema, None, None).get_string("icon-theme"))
+    except (ImportError, ValueError, RuntimeError):
+        pass
+    for name in dict.fromkeys((icon, launchers.GENERIC_ICON)):
+        if theme and "/" not in name:
+            match = theme.lookup_icon(name, 512, 0)
+            if match and match.get_filename():
+                yield Path(match.get_filename())
+        if name == "claude-desktop":
+            for base in data_roots():
+                yield base / "icons/hicolor/256x256/apps/claude-desktop.png"
+                yield base / "pixmaps/claude-desktop.png"
+    # Noble ships these fallback images even when the calling Python lacks GI.
+    for theme_dir in ("Yaru/256x256@2x", "Yaru/256x256", "Adwaita/16x16"):
+        yield Path("/usr/share/icons") / theme_dir / "mimetypes/application-x-executable.png"
+
+
+def png_artwork(icon):
+    for source in icon_sources(icon):
+        try:
+            if not source.is_file() or source.stat().st_size > ICON_LIMIT:
+                continue
+            if source.suffix.lower() == ".png":
+                if launchers.valid_png(source.resolve()):
+                    with source.open("rb") as stream:
+                        data = stream.read(ICON_LIMIT + 1)
+                    if len(data) <= ICON_LIMIT:
+                        return data  # Preserve the original raster size, alpha and bytes.
+            elif source.suffix.lower() in (".svg", ".xpm"):
+                from gi.repository import GdkPixbuf, GLib
+                try:
+                    image = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(source), 512, 512, True)
+                    ok, data = image.save_to_bufferv("png", [], [])
+                    if ok:
+                        return data
+                except GLib.Error:
+                    pass
+        except (OSError, ImportError, ValueError):
+            continue
+    return None
+
+
+def icon_identity(info, data):
+    # An ordinary copy, including one made with cp -a, is a different file.
+    return f"{info.st_ino}:{hashlib.sha256(data).hexdigest()}".encode("ascii")
+
+
+def shortcut_icon(alias, icon, *, create=False):
+    path = alias.with_suffix(".png")
+    try:
+        try:
+            opened = open(path, "rb", opener=lambda name, flags: os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK))
+        except FileNotFoundError:
+            if not create:
+                return icon  # Older releases made one-time desktop entries with a literal Icon.
+            previous, old = None, None
+        else:
+            with opened as existing:
+                fd = existing.fileno()
+                previous = os.fstat(fd)
+                if not stat.S_ISREG(previous.st_mode) or previous.st_size > ICON_LIMIT:
+                    return icon
+                old = existing.read(ICON_LIMIT + 1)
+                if os.getxattr(fd, ICON_OWNER) != icon_identity(previous, old):
+                    return icon
+        data = png_artwork(icon)
+        if data and data != old:
+            with tempfile.TemporaryDirectory(dir=path.parent) as work:
+                staged = Path(work) / "icon"
+                staged.write_bytes(data)
+                staged.chmod(0o600)
+                os.setxattr(staged, ICON_OWNER, icon_identity(staged.stat(), data))
+                if previous is None:
+                    os.link(staged, path)
+                elif os.path.samestat(previous, path.lstat()):
+                    staged.replace(path)
+                else:
+                    return icon
+            old = data
+        if old:
+            return str(path).replace("\\", "\\\\")
+    except OSError:
+        pass  # Missing artwork, unsupported xattrs or a foreign file must not prevent launching.
+    return icon
+
+
 def writable_desktop(state):
     desktop = desktop_dir()
     if desktop is None or not desktop.is_absolute() or desktop.resolve() == Path.home().resolve():
@@ -115,7 +222,8 @@ def ensure_shortcuts():
             marker = state / app
             if marker.exists():
                 if marker.read_text(encoding="utf-8") == "installed\n":
-                    stable_entry(app, source, marker)
+                    alias = stable_entry(app, source, marker)
+                    shortcut_icon(alias, icon)
                 continue
             if desktop is None:
                 continue
@@ -124,6 +232,7 @@ def ensure_shortcuts():
             installed = False
             if not any(os.path.lexists(path) for path in (desktop / source.name, target)):
                 alias = stable_entry(app, source, marker)
+                icon = shortcut_icon(alias, icon, create=True)
                 argument = launchers.exec_path_argument(alias)
                 data = (f"[Desktop Entry]\nType=Application\nName={app}\nIcon={icon}\n"
                         f"Exec=/usr/bin/gio launch {argument}\nTerminal=false\n")

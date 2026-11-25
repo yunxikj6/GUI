@@ -47,3 +47,6 @@ class NativeEntry(unittest.TestCase):
                 result = subprocess.run(['/bin/bash', str(script), *args], env=dict(os.environ, TEST_CHECK_RESULT='0' if success else '3'))
                 self.assertEqual(result.returncode, 0 if success else 3)
             self.assertEqual((base / 'calls').read_text().splitlines(), ['--check', '--check'])
+            env = dict(os.environ, TEST_CHECK_RESULT='0', XDG_CONFIG_HOME=str(base / 'config'))
+            subprocess.run(['/bin/bash', str(script)], env=env, check=True)
+            self.assertEqual((base / 'calls').read_text().splitlines()[-2:], ['--check', '--desktop-shortcuts'])
