@@ -165,10 +165,12 @@ print(json.dumps({'type':'turn.completed'}))
         task = tasks.start_task(self.root, "model", "codex", "read project")
         result = self.terminal(task["id"])
         self.assertEqual(result["task"]["status"], "succeeded")
+        self.assertFalse(result["task"]["canContinue"])
         self.assertIn("sample answer", [event["text"] for event in result["events"]])
         self.executable("codex", """
 import sys
 print('HTTP 401 Authorization: secret-example', file=sys.stderr)
+print('websocket connection failed', file=sys.stderr)
 sys.exit(1)
 """)
         task = tasks.start_task(self.root, "model-error", "codex", "read project")
@@ -176,6 +178,84 @@ sys.exit(1)
         self.assertEqual(result["task"]["status"], "failed")
         self.assertIn("认证", result["events"][-1]["text"])
         self.assertNotIn("secret-example", json.dumps(result))
+
+    def test_codex_continuation_is_scoped_serial_and_idempotent(self):
+        thread_id = "11111111-2222-4333-8444-555555555555"
+        self.executable("codex", f"""
+import json, sys
+prompt = sys.stdin.read().strip()
+args = sys.argv[1:]
+assert args[:6] == ['-a', 'never', 'exec', '--sandbox', 'read-only', '--json']
+assert args[6:] == (['-'] if prompt == 'first' else ['resume', {thread_id!r}, '-'])
+print(json.dumps({{'type': 'thread.started', 'thread_id': {thread_id!r}}}))
+print(json.dumps({{'type': 'item.completed', 'item': {{'type':'agent_message', 'text': prompt}}}}))
+print(json.dumps({{'type': 'turn.completed'}}))
+""")
+        first = self.terminal(tasks.start_task(self.root, "a", "codex", "first")["id"])["task"]
+        self.assertIs(first["canContinue"], True)
+        self.assertIsNone(first["parentTaskId"])
+        other_root = self.base / "other"
+        other_root.mkdir()
+        with self.assertRaisesRegex(ValueError, "会话"):
+            tasks.start_task(other_root, "b", "codex", "second", first["id"])
+        with self.assertRaises(ValueError):
+            tasks.start_task(self.root, "b", "codex", "second", thread_id)
+        with self.assertRaises(ValueError):
+            tasks.start_task(self.root, "b", "claude", "second", first["id"])
+        def create(request):
+            try:
+                return tasks.start_task(self.root, request, "codex", "second", first["id"])
+            except ValueError as error:
+                self.assertIn("已经有追问", str(error))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(create, ["b1", "b2"] * 3))
+        winners = [result for result in results if result]
+        self.assertEqual(len(winners), 3)
+        self.assertEqual(len({task["id"] for task in winners}), 1)
+        second = self.terminal(winners[0]["id"])["task"]
+        self.assertIs(second["canContinue"], True)
+        self.assertEqual(second["parentTaskId"], first["id"])
+        self.assertNotIn(thread_id, json.dumps(second))
+        with self.assertRaisesRegex(ValueError, "requestId"):
+            tasks.start_task(self.root, second["requestId"], "codex", "second")
+        third = tasks.start_task(self.root, "c", "codex", "third", second["id"])
+        self.assertIs(self.terminal(third["id"])["task"]["canContinue"], True)
+        history = tasks.list_tasks(self.root)
+        self.assertEqual([row["nextTaskId"] for row in history], [None, third["id"], second["id"]])
+        self.assertEqual([row["canContinue"] for row in history], [True, False, False])
+
+    def test_unconfirmed_or_failed_codex_resume_keeps_its_transcript(self):
+        thread_id = "11111111-2222-4333-8444-555555555555"
+        # Simulate persisted successful tasks, including one from before native sessions.
+        with tasks._database(self.root) as db, db:
+            for key in ("legacy", "missing", "mismatch"):
+                db.execute("""
+                    INSERT INTO task (id, requestId, provider, prompt, status, createdAt)
+                    VALUES (?, ?, 'codex', 'first', 'succeeded', ?)
+                """, (key, key, key))
+            db.executemany("INSERT INTO codex_turn (taskId, threadId) VALUES (?, ?)",
+                           [(key, thread_id) for key in ("missing", "mismatch")])
+        self.assertIs(tasks.events(self.root, "legacy", 0)["task"]["canContinue"], False)
+        with self.assertRaises(ValueError):
+            tasks.start_task(self.root, "b", "codex", "follow", "legacy")
+        self.executable("codex", """
+import json, sys
+if sys.stdin.read().strip() == 'missing':
+    sys.exit('thread/resume failed: no rollout found for thread id (private detail)')
+print(json.dumps({'type': 'thread.started', 'thread_id': 'aaaaaaaa-2222-4333-8444-555555555555'}))
+print(json.dumps({'type': 'turn.completed'}))
+""")
+        for key, hint in (("missing", "未找到"), ("mismatch", "未确认")):
+            task = tasks.start_task(self.root, "resume-" + key, "codex", key, key)
+            result = self.terminal(task["id"])
+            self.assertEqual(result["task"]["status"], "failed")
+            self.assertIs(result["task"]["canContinue"], False)
+            self.assertIn(hint, result["events"][-1]["text"])
+            self.assertNotIn("private detail", json.dumps(result))
+            self.assertEqual(tasks.events(self.root, key, 0)["task"]["nextTaskId"], task["id"])
+            self.assertEqual(tasks.start_task(self.root, "resume-" + key, "codex", key, key)["id"],
+                             task["id"])
 
     def test_claude_stream_does_not_repeat_messages(self):
         responses = [

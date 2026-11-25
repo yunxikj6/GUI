@@ -362,9 +362,15 @@ def dispatch(request, root):
     if op == "tasks":
         return {"tasks": tasks.list_tasks(root)}
     if op == "start":
-        return tasks.start_task(root, request.get("requestId"), request.get("provider"), request.get("prompt"))
+        return tasks.start_task(root, request.get("requestId"), request.get("provider"),
+                                request.get("prompt"), request.get("parentTaskId"),
+                                request.get("path"), request.get("revision"))
     if op == "events":
         return tasks.events(root, request.get("taskId"), request.get("after", 0))
+    if op == "proposal":
+        return tasks.get_proposal(root, request.get("taskId"))
+    if op == "decideProposal":
+        return tasks.decide_proposal(root, request.get("taskId"), request.get("decision"))
     raise WorkspaceError("invalid_request", "未知的工作区操作。")
 
 

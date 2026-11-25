@@ -25,7 +25,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 # Install an immutable worker directory in one rename. Another client may
 # install the same version while this one is connecting.
-_INSTALL = """
+WORKER_FILES = ('tasks.py', 'workspace.py', 'proposals.py')
+_INSTALL = f"""
 import gzip, json, os, pathlib, shutil, sys, tempfile
 dest = pathlib.Path(sys.argv[1])
 dest.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -33,7 +34,7 @@ if not dest.exists():
     stage = pathlib.Path(tempfile.mkdtemp(dir=dest.parent))
     try:
         for name, source in json.loads(gzip.decompress(bytes.fromhex(input()))).items():
-            if name not in ('tasks.py', 'workspace.py'):
+            if name not in {WORKER_FILES!r}:
                 raise ValueError('unexpected release file')
             (stage / name).write_text(source, encoding='utf-8')
         try:
@@ -120,7 +121,7 @@ class InstaBox:
 
     def setup(self, source: Path):
         self.ensure_running()
-        bundle = {n: (source / n).read_text(encoding='utf-8') for n in ('tasks.py', 'workspace.py')}
+        bundle = {n: (source / n).read_text(encoding='utf-8') for n in WORKER_FILES}
         raw = json.dumps(bundle, ensure_ascii=False, sort_keys=True).encode()
         release = hashlib.sha256(raw).hexdigest()[:20]
         directory = '/data/cloud-workspace/runtime/' + release

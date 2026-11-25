@@ -1,10 +1,80 @@
 'use strict';
 
 const $ = id => document.getElementById(id);
-const names = { check: '项目检查', codex: 'Codex', claude: 'Claude Code' };
+const names = { check: '项目检查', codex: 'Codex', claude: 'Claude Code', proposal: 'Codex · 修改建议' };
 const labels = { queued: '排队中', running: '运行中', succeeded: '已完成', failed: '失败' };
 const isActive = task => ['queued', 'running'].includes(task?.status);
 const drafts = new Map();
+const unbackedDrafts = new Map();
+// sessionStorage belongs to this tab. A launcher can serve different projects
+// at the same origin over its lifetime, so also scope every entry by workspace.
+function draftPrefix() { return 'cloudwork.fileDraft.v1.' + JSON.stringify(state.fileScope) + '.'; }
+function workspaceScope(status) {
+  return [location.pathname,status.mode || '',status.workspaceId || status.machineId || '',status.project || '项目'].join('/');
+}
+function persistDraft(path, edit) {
+  try {
+    const key = draftPrefix() + path;
+    if (!edit || (edit.content === edit.base && edit.submitted === undefined)) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, JSON.stringify({
+      base:edit.base, revision:edit.revision, content:edit.content,
+      conflict:Boolean(edit.conflict), submitted:edit.submitted,
+    }));
+    if (edit) edit.storageFailed = false;
+  } catch {
+    if (edit) edit.storageFailed = true;
+  }
+}
+function restoreFileScope(scope) {
+  if (state.fileScope === scope) return;
+  for (const [path, edit] of drafts) {
+    if (edit.storageFailed && (edit.content !== edit.base || edit.submitted !== undefined)) {
+      if (!unbackedDrafts.has(state.fileScope)) unbackedDrafts.set(state.fileScope,new Map());
+      unbackedDrafts.get(state.fileScope).set(path,edit);
+    }
+  }
+  ++state.fileVersion; ++state.treeVersion;
+  drafts.clear(); fileCache.clear(); cachedBytes = 0;
+  state.fileScope = scope;
+  state.selection = stored(scope + '.path') || null;
+  viewButtons('files'); resetPreview(); $('tree').replaceChildren();
+  $('fileEditArea').value = ''; fileHeading('文件预览','项目文件');
+  const prefix = draftPrefix();
+  try {
+    state.selection = sessionStorage.getItem('cloudwork.selectedFile.' + scope) || state.selection;
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith(prefix)) continue;
+      const path = key.slice(prefix.length);
+      let item;
+      try { item = JSON.parse(sessionStorage.getItem(key)); } catch { continue; }
+      if (!path || !item || typeof item.content !== 'string' || typeof item.base !== 'string' || typeof item.revision !== 'string' ||
+          (item.content === item.base && typeof item.submitted !== 'string') || !/^[0-9a-f]{64}$/.test(item.revision)) continue;
+      const original = {path,kind:'text',revision:item.revision,content:item.base,size:new Blob([item.base]).size};
+      drafts.set(path, {original, base:item.base, content:item.content, revision:item.revision,
+        submitted:typeof item.submitted === 'string' ? item.submitted : undefined,
+        conflict:item.conflict === true, message:item.conflict === true ? conflictMessage : '已恢复此标签页的未保存草稿。'});
+    }
+  } catch { /* Typing and saving still work when tab storage is disabled. */ }
+  for (const [path, edit] of unbackedDrafts.get(scope) || []) drafts.set(path,edit);
+  unbackedDrafts.delete(scope);
+  drawDraftMenu();
+}
+function drawDraftMenu() {
+  const menu = $('fileDrafts');
+  const options = [];
+  for (const [path, edit] of drafts) {
+    if ((edit.content !== edit.base || edit.submitted !== undefined) && (state.view !== 'files' || state.selection !== path)) {
+      const option = el('option','',path);
+      option.value = path;
+      options.push(option);
+    }
+  }
+  menu.hidden = !options.length;
+  const label = el('option','','打开其他未保存草稿');
+  label.value = '';
+  menu.replaceChildren(label, ...options);
+}
 // Only fetched files live here. Edited documents retain their own base revision.
 const fileCache = new Map();
 const CACHE_ENTRIES = 24;
@@ -31,12 +101,13 @@ function cachedFile(path) {
 }
 function fileSync(message = '', stale = false) {
   $('fileSync').textContent = message; $('fileSync').dataset.stale = String(stale); $('fileSync').removeAttribute('title');
+  taskControls();
 }
 const state = {
-  project: null, providers: {}, ready: false, view: 'files', file: null,
-  fileVersion: 0, treeVersion: 0, refreshVersion: 0, taskListVersion: 0, taskVersion: 0,
+  project: null, workspaceId: null, providers: {}, ready: false, view: 'files', file: null,
+  fileScope: null, fileVersion: 0, treeVersion: 0, refreshVersion: 0, taskListVersion: 0, taskVersion: 0,
   tasks: [], selectedTask: null, cursor: 0, timer: null, eventsSize: 0,
-  selection: null, sending: false, pending: null, retryCount: 0, loadedKey: null,
+  selection: null, sending: false, pending: null, feedbackParent: null, taskNavigation: 0, retryCount: 0, loadedKey: null, workspaceVersion: 0,
 };
 function el(tag, cls, content) {
   const node = document.createElement(tag);
@@ -44,14 +115,14 @@ function el(tag, cls, content) {
   if (content !== undefined) node.textContent = content;
   return node;
 }
-function stored(key, fallback = '') {
-  try { return localStorage.getItem('cloudwork.' + key) ?? fallback; }
+function stored(key, fallback = '', storage = 'localStorage') {
+  try { return window[storage].getItem('cloudwork.' + key) ?? fallback; }
   catch { return fallback; }
 }
-function remember(key, value) {
+function remember(key, value, storage = 'localStorage') {
   try {
-    if (value === null) localStorage.removeItem('cloudwork.' + key);
-    else localStorage.setItem('cloudwork.' + key, value);
+    if (value === null) window[storage].removeItem('cloudwork.' + key);
+    else window[storage].setItem('cloudwork.' + key, value);
   } catch { /* Storage can be unavailable in private browsing. */ }
 }
 function key(suffix) { return state.loadedKey + '.' + suffix; }
@@ -61,15 +132,18 @@ function connection(mode) {
 }
 async function rpc(op, fields = {}) {
   let res, envelope;
+  const workspace = state.workspaceId;
+  const headers = {'Content-Type':'application/json'};
+  if (op !== 'status' && state.workspaceId) headers['X-Workspace-Id'] = state.workspaceId;
   try {
     res = await fetch('/api/rpc', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers,
       credentials:'same-origin', cache:'no-store', body:JSON.stringify({op, ...fields}),
       signal:AbortSignal.timeout(90000),
     });
     envelope = await res.json();
   } catch {
-    connection('error');
+    if (op !== 'status' && workspace === state.workspaceId) connection('error');
     const err = new Error('与工作区的连接中断。恢复网络后可重试。');
     err.code = 'transport';
     throw err;
@@ -77,10 +151,16 @@ async function rpc(op, fields = {}) {
   if (!res.ok || !envelope.ok) {
     const err = new Error(envelope.error?.message || '工作区请求失败');
     err.code = envelope.error?.code || 'transport';
-    if (res.status >= 500 || err.code === 'transport') connection('error');
+    if (workspace === state.workspaceId && err.code === 'workspace_changed') {
+      state.ready = false;
+      taskControls();
+      connection('error');
+      $('connectionLabel').textContent = '项目已切换，请刷新';
+    }
+    if (op !== 'status' && workspace === state.workspaceId && (res.status >= 500 || err.code === 'transport')) connection('error');
     throw err;
   }
-  connection('online');
+  if (op !== 'status' && workspace === state.workspaceId && state.ready) connection('online');
   return envelope.data;
 }
 function asError(err) { return String(err?.message || '操作失败').slice(0, 1200); }
@@ -91,6 +171,7 @@ function mobilePage(page) {
 }
 function viewButtons(view) {
   state.view = view;
+  drawDraftMenu();
   for (const [id, name] of [['showFiles','files'],['showDiff','diff']]) {
     $(id).classList.toggle('selected', name === view);
     $(id).setAttribute('aria-pressed', String(name === view));
@@ -138,7 +219,60 @@ function drawLines(value, diff) {
     $('fileNotice').textContent = '预览已限制显示长度。';
   }
 }
+function textareaText(raw) { return raw.replace(/\r\n?/g,'\n'); }
+function editedFileText(edit, value, caret) {
+  const raw = edit.content;
+  if (edit.lineEnding === undefined) {
+    const first = raw.match(/\r\n|\r|\n/)?.[0] || edit.base.match(/\r\n|\r|\n/)?.[0] || '\n';
+    edit.lineEnding = /[\r\n]/.test(raw.replaceAll(first,'')) ? null : first;
+  }
+  if (edit.lineEnding) return edit.lineEnding === '\n' ? value : value.replaceAll('\n',edit.lineEnding);
+  const previous = textareaText(raw);
+  if (value === previous) return raw;
+  if (value === textareaText(edit.base)) return edit.base;
+
+  // Native textarea offsets count UTF-16 units and treat every line break as one.
+  // Match the suffix after the caret first so edits beside repeated empty lines
+  // keep the original endings on the correct side of the insertion/deletion.
+  let oldEnd = previous.length, newEnd = value.length;
+  while (oldEnd > 0 && newEnd > caret && previous[oldEnd - 1] === value[newEnd - 1]) {
+    oldEnd--; newEnd--;
+  }
+  let start = 0;
+  while (start < oldEnd && start < newEnd && previous[start] === value[start]) start++;
+  while (oldEnd > start && newEnd > start && previous[oldEnd - 1] === value[newEnd - 1]) {
+    oldEnd--; newEnd--;
+  }
+
+  let rawStart = start, rawEnd = oldEnd, extra = 0, preceding = '', following = '';
+  const replacedBreaks = [];
+  for (const match of raw.matchAll(/\r\n|\r|\n/g)) {
+    const ending = match[0], offset = match.index - extra;
+    if (offset >= oldEnd) { following = ending; break; }
+    extra += ending.length - 1;
+    rawEnd += ending.length - 1;
+    if (offset < start) { rawStart += ending.length - 1; preceding = ending; }
+    else replacedBreaks.push(ending);
+  }
+  const convention = replacedBreaks.at(-1) || following || preceding || edit.base.match(/\r\n|\r|\n/)?.[0] || '\n';
+  const parts = [];
+  function append(part) {
+    if (!part) return;
+    // A CR and LF that were separate breaks before the edit may now touch.
+    if (parts.at(-1)?.endsWith('\r') && part.startsWith('\n')) parts.push('\r');
+    parts.push(part);
+  }
+  append(raw.slice(0,rawStart));
+  const lines = value.slice(start,newEnd).split('\n');
+  for (const [i, line] of lines.entries()) {
+    if (i) append(replacedBreaks[i - 1] || convention);
+    append(line);
+  }
+  append(raw.slice(rawEnd));
+  return parts.join('');
+}
 function drawEdit() {
+  taskControls();
   const f = state.file;
   if (!f || state.view !== 'files' || f.kind !== 'text' || !f.revision) return;
   $('editBar').hidden = false;
@@ -148,10 +282,14 @@ function drawEdit() {
   $('saveFile').hidden = !edit;
   $('fileEditArea').hidden = !edit;
   $('preview').hidden = Boolean(edit);
-  $('editState').textContent = edit?.message || (edit && edit.content !== edit.base ? '有未保存的更改' : '');
-  $('saveFile').disabled = !edit || edit.saving || edit.conflict || edit.content === edit.base;
+  const message = edit?.message || (edit && edit.content !== edit.base ? '有未保存的更改' : '');
+  $('editState').textContent = edit?.storageFailed ? message + ' 浏览器无法备份最新草稿，请在关闭或刷新前保存。' : message;
+  $('saveFile').disabled = !edit || !state.ready || edit.saving || edit.conflict || edit.content === edit.base;
   $('cancelEdit').disabled = Boolean(edit?.saving);
-  if (edit && $('fileEditArea').value !== edit.content) $('fileEditArea').value = edit.content;
+  if (edit) {
+    const value = textareaText(edit.content);
+    if ($('fileEditArea').value !== value) $('fileEditArea').value = value;
+  }
 }
 function renderFile(f) {
   state.file = f;
@@ -167,7 +305,7 @@ function renderFile(f) {
     image.addEventListener('error', () => { $('fileNotice').textContent = '图片解码失败。'; }, {once:true});
     $('preview').replaceChildren(image);
   } else {
-    drawLines(f.content, false); drawEdit();
+    drawLines(textareaText(f.content), false); drawEdit();
   }
 }
 function sameFile(a,b) {
@@ -180,7 +318,8 @@ async function openFile(path) {
   const cache = cachedFile(path);
   const edit = drafts.get(path);
   const known = edit?.original || cache || current;
-  state.selection = path; viewButtons('files'); remember(key('path'), path);
+  state.selection = path; viewButtons('files'); remember(state.fileScope + '.path', path);
+  try { sessionStorage.setItem('cloudwork.selectedFile.' + state.fileScope, path); } catch { /* optional */ }
   if (!current) { resetPreview(); $('preview').hidden = false; }
   if (known) {
     if (!current || !sameFile(current,known)) renderFile(known);
@@ -188,6 +327,11 @@ async function openFile(path) {
     fileSync('显示本地副本 · 正在校验');
   } else {
     fileHeading('文件预览', path.split('/').pop(), path); $('fileNotice').textContent = '正在读取文件…';
+  }
+  if (!state.ready) {
+    if (known) fileSync('使用本地副本 · 云端未校验',true);
+    else $('fileNotice').textContent = '重新连接后可读取此文件。';
+    return;
   }
   try {
     const reference = cache || known;
@@ -207,14 +351,33 @@ async function openFile(path) {
     // Someone may have started editing while the network read was in flight.
     const liveEdit = drafts.get(path);
     if (liveEdit && fresh.revision !== liveEdit.revision) {
-      if (!liveEdit.saving) { liveEdit.conflict = true; liveEdit.message = conflictMessage; drawEdit(); }
+      if (!liveEdit.saving && fresh.kind === 'text' && fresh.content === liveEdit.content) {
+        // A save may have reached the workspace just before a reload or a lost acknowledgement.
+        drafts.delete(path); persistDraft(path,null); drawDraftMenu(); renderFile(fresh);
+        $('editState').textContent = '草稿与云端内容一致。';
+      } else if (!liveEdit.saving && fresh.kind === 'text' && fresh.content === liveEdit.submitted) {
+        // Recover the confirmed base of an interrupted save without losing subsequent typing.
+        Object.assign(liveEdit, {original:fresh,base:fresh.content,revision:fresh.revision,
+          submitted:undefined,conflict:false,message:'上次保存已确认，之后的编辑尚未保存。'});
+        persistDraft(path,liveEdit); renderFile(fresh);
+      } else if (!liveEdit.saving) {
+        liveEdit.conflict = true; liveEdit.message = conflictMessage; persistDraft(path,liveEdit); drawEdit();
+      }
       return;
+    }
+    if (liveEdit?.conflict) {
+      liveEdit.conflict = false; liveEdit.message = ''; persistDraft(path,liveEdit); drawEdit();
     }
     // Keep the actual DOM alive so text selection, scroll, and IME composition survive validation.
     if (!state.file || !sameFile(state.file,fresh)) renderFile(fresh);
   } catch(err) {
     if (ticket !== state.fileVersion) return;
     if (state.file?.path === path) {
+      const edit = drafts.get(path);
+      if (edit && ['not_found','invalid_path','unsupported_file','too_large'].includes(err.code)) {
+        edit.conflict = true; edit.message = asError(err) + ' 可复制本地草稿。';
+        persistDraft(path,edit); drawEdit();
+      }
       fileSync('使用缓存 · 云端未校验',true);
       $('fileSync').title = asError(err);
     } else $('fileNotice').textContent = asError(err);
@@ -245,33 +408,35 @@ function cancelEdit() {
   const f = state.file, edit = drafts.get(f?.path);
   if (!edit || edit.saving) return;
   if (edit.content !== edit.base && !window.confirm('放弃此文件尚未保存的编辑，并重新读取云端内容？')) return;
-  drafts.delete(f.path); openFile(f.path);
+  drafts.delete(f.path); persistDraft(f.path,null); openFile(f.path);
 }
 async function saveEdit() {
   const f = state.file, edit = drafts.get(f?.path);
-  if (!edit || edit.saving || edit.conflict || edit.content === edit.base) return;
-  const snapshot = edit.content, scope = state.loadedKey;
+  if (!edit || !state.ready || edit.saving || edit.conflict || edit.content === edit.base) return;
+  const snapshot = edit.content, scope = state.fileScope;
+  edit.submitted = snapshot; persistDraft(f.path,edit);
   edit.saving = true; edit.message = '正在保存…'; drawEdit();
   try {
     const saved = await rpc('save',{path:f.path,content:snapshot,revision:edit.revision});
-    if (scope !== state.loadedKey) return;
+    if (scope !== state.fileScope || drafts.get(f.path) !== edit) return;
     const latest = {...f, ...saved, content:snapshot, size:saved.size ?? new Blob([snapshot]).size};
     edit.revision = latest.revision; edit.base = snapshot; edit.original = latest; edit.message = '';
+    edit.submitted = undefined;
     cacheFile(latest);
     if (state.file?.path === f.path) {
       // Discard reads initiated before this acknowledged write.
       ++state.fileVersion; state.file = latest; fileSync();
     }
     if (edit.content === snapshot) {
-      drafts.delete(f.path);
+      drafts.delete(f.path); persistDraft(f.path,null); drawDraftMenu();
       if (state.file?.path === f.path) { renderFile(latest); $('editState').textContent = '已保存'; }
-    }
+    } else persistDraft(f.path,edit);
   } catch (err) {
-    if (scope !== state.loadedKey) return;
+    if (scope !== state.fileScope || drafts.get(f.path) !== edit) return;
     edit.conflict = err.code === 'conflict';
     edit.message = edit.conflict ? conflictMessage : asError(err);
     if (edit.conflict) {
-      forgetFile(f.path);
+      persistDraft(f.path,edit); forgetFile(f.path);
       if (state.file?.path === f.path) openFile(f.path);
     }
   } finally {
@@ -335,16 +500,30 @@ async function loadTree(autoOpen = false) {
   }
 }
 
+function selectedTurn() { return state.tasks.find(task => task.id === state.selectedTask); }
 function taskControls() {
   const provider = $('provider').value;
   const caps = state.providers;
   const blocked = !state.ready || state.sending || Boolean(state.pending);
-  $('runAgent').disabled = blocked || !caps[provider]?.available || !$('prompt').value.trim();
+  $('provider').disabled = $('prompt').disabled = !state.loadedKey;
+  const proposalTarget = drawProposalTarget();
+  updateProposalButtons();
+  $('runAgent').disabled = blocked || !caps[provider]?.available || !$('prompt').value.trim() ||
+    (provider === 'proposal' && !proposalTarget);
   $('runCheck').disabled = blocked || !caps.check?.available;
   $('providerHint').textContent = !state.ready ? '等待连接' :
     caps[provider]?.available ? 'Ctrl / ⌘ + Enter' : '云机未提供此助手';
   $('pendingWrap').hidden = !state.pending || state.sending;
   $('retryStart').disabled = state.sending || !state.ready;
+  const task = selectedTurn();
+  const reply = $('replyPrompt').value;
+  $('followUp').hidden = !task || (!task.canContinue && !reply);
+  $('replyPrompt').readOnly = !task?.canContinue || state.pending?.parentTaskId === task?.id;
+  $('sendReply').disabled = blocked || !task?.canContinue || !caps[task.provider]?.available || !reply.trim();
+  $('replyHint').textContent = task?.canContinue ? (caps[task.provider]?.available ? 'Ctrl / ⌘ + Enter' : '云机未提供此助手') :
+    (task?.nextTaskId ? '已有下一轮，可复制此草稿。' : '此回合无法续聊，可复制此草稿。');
+  const target = state.feedbackParent && state.feedbackParent === state.selectedTask ? $('replyFeedback') : $('newTaskFeedback');
+  if ($('submissionFeedback').parentElement !== target) target.append($('submissionFeedback'));
 }
 function taskLabel(task) {
   const label = names[task.provider] || task.provider;
@@ -371,10 +550,15 @@ function drawHistory() {
   menu.value = state.selectedTask || '';
   menu.disabled = !state.tasks.length;
 }
-function drawTaskTitle(task) {
+function drawTaskTitle(task, reloadProposal = false) {
+  showProposalReview(task, reloadProposal);
   $('eventHeading').hidden = !task;
   $('taskRequest').hidden = !task?.prompt;
   $('taskRequestText').textContent = task?.prompt || '';
+  $('turnNav').hidden = !task?.parentTaskId && !task?.nextTaskId;
+  $('previousTurn').hidden = !task?.parentTaskId;
+  $('nextTurn').hidden = !task?.nextTaskId;
+  taskControls();
   if (!task) return;
   $('eventProvider').textContent = names[task.provider] || task.provider;
   $('taskStatus').textContent = labels[task.status] || task.status;
@@ -421,7 +605,8 @@ async function pollEvents(ticket) {
   } catch(err) {
     if (ticket !== state.taskVersion) return;
     state.retryCount++;
-    if (['not_found','task_not_found','invalid_request'].includes(err.code)) {
+    if (['not_found','task_not_found','invalid_request','workspace_changed'].includes(err.code)) {
+      if (err.code !== 'workspace_changed' && !selectedTurn()) selectTask('');
       $('taskNotice').textContent = asError(err);
     } else {
       $('taskNotice').textContent = asError(err) + ' 正在重连…';
@@ -429,12 +614,16 @@ async function pollEvents(ticket) {
     }
   }
 }
-function selectTask(id) {
+function selectTask(id, userNavigation = false) {
+  if (userNavigation) ++state.taskNavigation;
   const next = ++state.taskVersion;
   clearTimeout(state.timer);
   state.selectedTask = id || null; state.cursor = 0; state.eventsSize = 0; state.retryCount = 0;
   remember(key('task'),state.selectedTask);
+  remember(key('task'),state.selectedTask,'sessionStorage');
   $('eventLog').replaceChildren(); $('taskRequest').open = false;
+  $('replyPrompt').value = id ? stored(key('reply.' + id),'','sessionStorage') : '';
+  $('followUp').open = Boolean($('replyPrompt').value);
   const item = state.tasks.find(t => t.id === id);
   drawTaskTitle(item); drawHistory();
   $('taskNotice').textContent = id ? '正在读取任务输出…' : '运行一次项目检查或编码任务后，可在这里查看输出。';
@@ -446,90 +635,183 @@ async function loadTasks() {
   try {
     const data = await rpc('tasks');
     if (ticket !== state.taskListVersion || selectionVersion !== state.taskVersion) return;
+    const previous = selectedTurn();
     state.tasks = data.tasks.slice(0,150);
-    const id = state.selectedTask || stored(key('task'));
-    const selected = state.tasks.find(t => t.id === id);
-    if (selected && state.selectedTask === id) { drawHistory(); drawTaskTitle(selected); return; }
-    selectTask(selected?.id || state.tasks[0]?.id || '');
+    const id = state.selectedTask || stored(key('task'),stored(key('task')),'sessionStorage');
+    if (previous && id === previous.id) {
+      const fresh = selectedTurn();
+      // A list refresh only carries an abbreviated prompt and can omit older turns.
+      upsertTask(fresh ? {...fresh, prompt:previous.prompt} : previous);
+      drawHistory(); drawTaskTitle(selectedTurn(),true);
+      if (!fresh && !isActive(previous)) pollEvents(state.taskVersion);
+      return;
+    }
+    selectTask(id || state.tasks[0]?.id || '');
   } catch(err) {
     if (ticket === state.taskListVersion && selectionVersion === state.taskVersion) $('taskNotice').textContent = asError(err);
   }
 }
 function rememberPending(value) {
+  const request = value || state.pending;
   state.pending = value;
-  remember(key('pending'),value ? JSON.stringify(value) : null);
+  const serialized = value ? JSON.stringify(value) : null;
+  // Each acknowledged request removes only its own record, even across tabs.
+  remember(key('pending.' + request.requestId),serialized);
+  remember(key('pending'),serialized,'sessionStorage');
+}
+function restorePending() {
+  const parse = raw => {
+    try {
+      const request = JSON.parse(raw);
+      if (request && typeof request.requestId === 'string' && typeof request.prompt === 'string' &&
+          Object.hasOwn(names,request.provider) && (!request.parentTaskId || typeof request.parentTaskId === 'string')) return request;
+    } catch { /* Ignore incomplete records. */ }
+    return null;
+  };
+  const legacy = parse(stored(key('pending')));
+  if (legacy) {
+    remember(key('pending.' + legacy.requestId),JSON.stringify(legacy));
+    if (stored(key('pending.' + legacy.requestId))) remember(key('pending'),null);
+  }
+  const current = parse(stored(key('pending'),'','sessionStorage'));
+  if (current) return current;
+  // A reopened tab can also recover submissions left by a closed browser.
+  try {
+    const prefix = 'cloudwork.' + key('pending.');
+    for (let i = 0; i < localStorage.length; ++i) {
+      const entry = localStorage.key(i);
+      if (!entry?.startsWith(prefix)) continue;
+      const request = parse(localStorage.getItem(entry));
+      if (request) return request;
+    }
+  } catch { /* Local storage may be unavailable. */ }
+  return legacy;
 }
 async function submitStart(request) {
   if (state.sending || !request) return;
-  const scope = state.loadedKey;
+  const version = state.workspaceVersion;
+  const navigation = state.taskNavigation;
+  state.feedbackParent = request.parentTaskId || null;
   state.sending = true; rememberPending(request); taskControls();
   $('startNotice').textContent = '正在提交到云端…';
   try {
     const item = await rpc('start',request);
-    if (state.loadedKey !== scope) return;
+    if (state.workspaceVersion !== version) return;
     ++state.taskListVersion;
     upsertTask(item); rememberPending(null);
-    if (request.provider !== 'check' && $('prompt').value.trim() === request.prompt) {
+    if (request.parentTaskId) {
+      const parent = state.tasks.find(task => task.id === request.parentTaskId);
+      if (parent) { parent.canContinue = false; parent.nextTaskId = item.id; }
+      const draftKey = key('reply.' + request.parentTaskId);
+      if (stored(draftKey,'','sessionStorage').trim() === request.prompt) remember(draftKey,null,'sessionStorage');
+      if (state.selectedTask === request.parentTaskId && $('replyPrompt').value.trim() === request.prompt) $('replyPrompt').value = '';
+    } else if (request.provider === 'proposal') {
+      acknowledgeProposalDraft(request);
+    } else if (request.provider !== 'check' && $('provider').value !== 'proposal' && $('prompt').value.trim() === request.prompt) {
       $('prompt').value = ''; remember(key('prompt'),null);
     }
     $('startNotice').textContent = '';
-    selectTask(item.id);
+    if (state.taskNavigation === navigation) selectTask(item.id);
+    else { drawHistory(); drawTaskTitle(selectedTurn()); }
   } catch(err) {
-    if (state.loadedKey !== scope) return;
-    if (['invalid_request','invalid_argument','bad_request','unknown_provider','unavailable','provider_unavailable','invalid_prompt'].includes(err.code)) {
+    if (state.workspaceVersion !== version) return;
+    if (['invalid_request','invalid_argument','bad_request','unknown_provider','unavailable','provider_unavailable','invalid_prompt',
+         'conflict','not_found','invalid_path','unsupported_file','too_large'].includes(err.code)) {
       rememberPending(null); $('startNotice').textContent = asError(err);
+      if (request.provider === 'proposal' && err.code === 'conflict' && state.selection === request.path && state.view === 'files') openFile(request.path);
+      if (request.parentTaskId) loadTasks();
     } else {
-      $('pendingMessage').textContent = asError(err) + ' 重试将沿用此次请求编号。';
+      $('pendingMessage').textContent = pendingLabel(request) + asError(err) + ' 重试将沿用此次请求编号。';
       $('startNotice').textContent = '';
     }
   } finally {
-    if (state.loadedKey === scope) { state.sending = false; taskControls(); }
+    if (state.workspaceVersion === version) { state.sending = false; taskControls(); }
   }
+}
+function pendingLabel(request) {
+  if (request.provider === 'proposal') return '为 ' + request.path + ' 生成修改建议的请求尚未确认。';
+  return request.parentTaskId ? '追问「' + request.prompt.slice(0,40) + '」尚未确认。' : '';
+}
+function sendReply() {
+  const task = selectedTurn(), prompt = $('replyPrompt').value.trim();
+  if (state.pending || state.sending || !state.ready || !task?.canContinue || !state.providers[task.provider]?.available || !prompt) return;
+  submitStart({requestId:crypto.randomUUID(),provider:task.provider,prompt,parentTaskId:task.id});
 }
 function run(provider) {
   if (state.pending || state.sending || !state.ready || !state.providers[provider]?.available) return;
   const prompt = provider === 'check' ? '' : $('prompt').value.trim();
   if (provider !== 'check' && !prompt) return;
-  submitStart({requestId:crypto.randomUUID(),provider,prompt});
+  const target = provider === 'proposal' ? drawProposalTarget() : {};
+  if (!target) return;
+  submitStart({requestId:crypto.randomUUID(),provider,prompt,...target});
 }
 function restore(status) {
+  state.workspaceId = status.workspaceId;
   const projectName = String(status.project || '项目');
-  const scope = [location.pathname,status.mode || '',status.workspaceId || status.machineId || '',projectName].join('/');
-  state.mode = status.mode; connection('online');
+  const scope = workspaceScope(status);
+  restoreFileScope(scope);
+  state.mode = status.mode;
+  const firstCapabilities = !state.providers.codex && Boolean(status.providers?.codex);
   state.project = projectName; state.providers = status.providers || {};
   $('topProject').textContent = projectName; $('branch').textContent = status.branch || '未获取分支';
-  if (state.loadedKey === scope) return;
+  if (state.loadedKey === scope) {
+    if (!stored(scope + '.provider') && $('provider').value === 'codex' &&
+        !state.providers.codex?.available && state.providers.claude?.available) $('provider').value = 'claude';
+    return;
+  }
+  const provider = stored(scope + '.provider',stored(scope + '.provider'),'sessionStorage');
+  if (state.loadedKey !== scope || (firstCapabilities && !provider)) {
+    $('provider').value = ['codex','claude','proposal'].includes(provider) ? provider :
+      (!state.providers.codex?.available && state.providers.claude?.available ? 'claude' : 'codex');
+  }
+  ++state.workspaceVersion;
   if (state.loadedKey) {
     ++state.taskVersion; ++state.fileVersion; ++state.taskListVersion;
     clearTimeout(state.timer); state.tasks = []; state.selectedTask = null;
-    state.pending = null; state.sending = false; drafts.clear(); fileCache.clear(); cachedBytes = 0;
-    state.view = 'files'; state.file = null; $('eventLog').replaceChildren();
+    state.pending = null; state.sending = false; $('eventLog').replaceChildren();
     $('fileNotice').textContent = ''; $('startNotice').textContent = '';
+    $('replyPrompt').value = ''; $('followUp').open = false; $('taskRequest').open = false;
+    $('pendingMessage').textContent = '';
   }
-  state.loadedKey = scope; state.selection = stored(key('path')) || null;
-  const provider = stored(key('provider'));
-  if (provider === 'codex' || provider === 'claude') $('provider').value = provider;
-  else if (!state.providers.codex?.available && state.providers.claude?.available) $('provider').value = 'claude';
-  $('prompt').value = stored(key('prompt'));
+  state.loadedKey = scope;
+  restoreComposerDraft();
+  state.pending = restorePending();
+  state.feedbackParent = state.pending?.parentTaskId || null;
+  if (state.pending) $('pendingMessage').textContent = (pendingLabel(state.pending) || '上次提交尚未确认。') + '可以用原请求编号再次提交。';
+  drawHistory(); drawTaskTitle(null);
+}
+async function recoverFromLauncher(version) {
   try {
-    const pending = JSON.parse(stored(key('pending'),'null'));
-    state.pending = pending && typeof pending.requestId === 'string' && Object.hasOwn(names,pending.provider) ? pending : null;
-  } catch { state.pending = null; }
-  if (state.pending) $('pendingMessage').textContent = '上次提交尚未确认。可以用原请求编号再次提交。';
+    const response = await fetch('/api/workspace',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+    if (!response.ok) return;
+    const identity = await response.json();
+    if (version !== state.refreshVersion || state.ready || !identity.ok || !identity.data?.workspaceId) return;
+    restore(identity.data);
+    taskControls();
+    const path = drafts.has(state.selection) ? state.selection : drafts.keys().next().value;
+    if (path && (!state.file || state.file.path === path)) await openFile(path);
+    else if (!state.file) $('fileNotice').textContent = '连接云端后可读取项目文件。';
+  } catch { /* Only restore after the launcher has confirmed the workspace identity. */ }
 }
 async function refresh() {
   const version = ++state.refreshVersion;
   connection('loading');
+  // A slow cloud status request must not block editing a draft in the local launcher.
+  const recovery = !state.fileScope ? recoverFromLauncher(version) : null;
   try {
     const status = await rpc('status');
     if (version !== state.refreshVersion) return;
-    restore(status); state.ready = true; taskControls();
-    await Promise.all([loadTree(state.view === 'files'),loadTasks(),state.view === 'diff' ? openDiff() : Promise.resolve()]);
+    restore(status); state.ready = true; connection('online'); taskControls(); drawEdit();
+    const openDraft = state.view === 'files' && drafts.has(state.selection);
+    await Promise.all([loadTree(state.view === 'files' && !openDraft),loadTasks(),
+      openDraft ? openFile(state.selection) : state.view === 'diff' ? openDiff() : Promise.resolve()]);
   } catch(err) {
     if (version !== state.refreshVersion) return;
     connection('error'); state.ready = false; taskControls();
     $('treeNotice').textContent = asError(err); $('taskNotice').textContent = '刷新工作区可重新连接。';
     if (!state.file) $('fileNotice').textContent = asError(err);
+    drawEdit();
+    await (recovery || recoverFromLauncher(version));
   }
 }
 
@@ -543,19 +825,42 @@ $('showFiles').addEventListener('click',() => { viewButtons('files'); if (state.
 $('editFile').addEventListener('click',beginEdit);
 $('cancelEdit').addEventListener('click',cancelEdit);
 $('saveFile').addEventListener('click',saveEdit);
+$('fileDrafts').addEventListener('change',() => { if ($('fileDrafts').value) openFile($('fileDrafts').value); });
 $('fileEditArea').addEventListener('input',() => {
   const edit = drafts.get(state.file?.path);
   if (!edit) return;
-  edit.content = $('fileEditArea').value;
+  const area = $('fileEditArea');
+  edit.content = editedFileText(edit,area.value,area.selectionEnd);
   if (!edit.conflict && !edit.saving) edit.message = '';
+  persistDraft(state.file.path,edit);
   drawEdit();
 });
 $('fileEditArea').addEventListener('keydown',event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveEdit(); }
+  if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveEdit(); }
 });
-$('taskHistory').addEventListener('change',() => selectTask($('taskHistory').value));
-$('provider').addEventListener('change',() => { remember(key('provider'),$('provider').value); taskControls(); });
-$('prompt').addEventListener('input',() => { if (state.loadedKey) remember(key('prompt'),$('prompt').value); taskControls(); });
+$('taskHistory').addEventListener('change',() => selectTask($('taskHistory').value,true));
+$('previousTurn').addEventListener('click',() => selectTask(selectedTurn().parentTaskId,true));
+$('nextTurn').addEventListener('click',() => selectTask(selectedTurn().nextTaskId,true));
+$('replyPrompt').addEventListener('input',() => {
+  if (state.selectedTask) remember(key('reply.' + state.selectedTask),$('replyPrompt').value || null,'sessionStorage');
+  taskControls();
+});
+$('replyPrompt').addEventListener('keydown',event => {
+  if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); sendReply(); }
+});
+$('sendReply').addEventListener('click',sendReply);
+$('provider').addEventListener('change',() => {
+  remember(key('provider'),$('provider').value);
+  remember(key('provider'),$('provider').value,'sessionStorage');
+  restoreComposerDraft(); taskControls();
+});
+$('prompt').addEventListener('input',() => {
+  if (state.loadedKey) {
+    if ($('provider').value === 'proposal') saveProposalDraft();
+    else remember(key('prompt'),$('prompt').value);
+  }
+  taskControls();
+});
 $('prompt').addEventListener('keydown',event => {
   if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run($('provider').value); }
 });
@@ -570,6 +875,8 @@ $('dismissPending').addEventListener('click',() => {
 window.addEventListener('offline',() => connection('error'));
 window.addEventListener('online',refresh);
 window.addEventListener('beforeunload',event => {
-  for (const draft of drafts.values()) if (draft.content !== draft.base) { event.preventDefault(); event.returnValue = ''; break; }
+  if (unbackedDrafts.size || [...drafts.values()].some(draft => draft.content !== draft.base || draft.submitted !== undefined)) {
+    event.preventDefault(); event.returnValue = '';
+  }
 });
 refresh();

@@ -8,6 +8,7 @@
   <title>云端工作台</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/style.css">
+  <script src="/proposals.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -35,7 +36,9 @@
     </aside>
     <main class="editor" aria-label="文件与差异预览">
       <div class="editor-top"><span class="mini-tab"><i class="icon doc-icon" aria-hidden="true"></i><span id="editorTab">文件预览</span></span></div>
-      <div class="editor-head"><div class="title-line"><span class="eyebrow" id="viewLabel">文件预览</span><span class="file-info"><span class="file-sync" id="fileSync" role="status"></span><span class="file-size" id="fileSize"></span></span></div><h2 id="fileTitle">项目文件</h2><div class="file-path" id="filePath"></div></div>
+      <div class="editor-head"><div class="title-line"><span class="eyebrow" id="viewLabel">文件预览</span><span class="file-info"><span class="file-sync" id="fileSync" role="status"></span><span class="file-size" id="fileSize"></span></span></div><h2 id="fileTitle">项目文件</h2><div class="file-path" id="filePath"></div>
+        <select id="fileDrafts" aria-label="打开未保存的文件草稿" hidden></select>
+      </div>
       <div class="edit-bar" id="editBar" hidden><span id="editState" role="status"></span><button id="editFile" class="subtle-button">编辑文件</button><button id="cancelEdit" class="subtle-button" hidden>放弃编辑</button><button id="saveFile" class="primary" hidden>保存</button></div>
       <textarea id="fileEditArea" aria-label="编辑文件内容" wrap="off" spellcheck="false" hidden></textarea>
       <p class="preview-note" id="fileNotice" role="status">正在连接云端工作区…</p>
@@ -44,20 +47,37 @@
     <aside class="task-pane" aria-label="云端任务">
       <div class="task-top"><span class="terminal-mark" aria-hidden="true">&gt;_</span><h2>云端任务</h2></div>
       <section class="compose">
-        <div class="control-line"><label for="provider">编码助手 · 只读</label><select id="provider"><option value="codex">Codex</option><option value="claude">Claude Code</option></select></div>
-        <textarea id="prompt" maxlength="8000" aria-label="任务要求" placeholder="询问项目代码，或请助手审阅改动…" rows="4"></textarea>
+        <div class="control-line"><label for="provider">编码任务</label><select id="provider" disabled><option value="codex">Codex · 只读</option><option value="claude">Claude Code · 只读</option><option value="proposal">Codex · 修改建议</option></select></div>
+        <div id="proposalTarget" class="proposal-target" hidden><p id="proposalTargetText" class="inline-note"></p><button id="useProposalFile" class="subtle-button" hidden>使用当前文件版本</button></div>
+        <textarea id="prompt" maxlength="8000" aria-label="任务要求" placeholder="询问项目代码，或请助手审阅改动…" rows="4" disabled></textarea>
         <div class="compose-actions"><span class="hint" id="providerHint"></span><button id="runAgent" class="primary" disabled>运行任务 <span aria-hidden="true">↗</span></button></div>
-        <div id="pendingWrap" class="pending" hidden><p id="pendingMessage"></p><button id="retryStart" class="subtle-button">重试提交</button> <button id="dismissPending" class="subtle-button">清除重试</button></div>
-        <p id="startNotice" class="action-note" role="status"></p>
+        <div id="newTaskFeedback"><div id="submissionFeedback">
+          <div id="pendingWrap" class="pending" hidden><p id="pendingMessage"></p><button id="retryStart" class="subtle-button">重试提交</button> <button id="dismissPending" class="subtle-button">清除重试</button></div>
+          <p id="startNotice" class="action-note" role="status"></p>
+        </div></div>
         <button class="check-button" id="runCheck" disabled><i class="check-icon" aria-hidden="true">✓</i>项目检查<span class="check-end" aria-hidden="true">→</span></button>
       </section>
       <section class="activity">
         <div class="activity-heading"><h3>任务记录</h3><button class="square small" id="reloadTasks" aria-label="刷新任务记录" title="刷新任务记录">↻</button></div>
         <label class="sr-only" for="taskHistory">选择任务</label><select id="taskHistory" disabled><option value="">暂无任务</option></select>
         <div class="event-heading" id="eventHeading" hidden><span id="eventProvider"></span><span id="taskStatus" class="status-tag"></span></div>
+        <nav class="turn-nav" id="turnNav" aria-label="对话回合" hidden><button id="previousTurn" hidden>← 上一轮</button><button id="nextTurn" hidden>下一轮 →</button></nav>
         <details id="taskRequest" class="task-request" hidden><summary>任务要求</summary><div id="taskRequestText"></div></details>
         <div class="event-log" id="eventLog" tabindex="0" aria-label="任务输出"></div>
         <p class="inline-note activity-note" id="taskNotice" role="status">加载任务记录…</p>
+        <section class="proposal-review" id="proposalReview" aria-label="审核文件修改" hidden>
+          <h3 id="proposalPath"></h3>
+          <p id="proposalStatus" class="inline-note" role="status"></p>
+          <pre id="proposalDiff" tabindex="0" aria-label="完整修改差异" hidden></pre>
+          <div class="proposal-actions"><button id="applyProposal" class="primary" hidden>应用修改</button><button id="rejectProposal" class="subtle-button" hidden>拒绝修改</button><button id="reloadProposal" class="subtle-button" hidden>重新读取</button></div>
+        </section>
+        <details class="follow-up" id="followUp" hidden>
+          <summary>继续此对话</summary>
+          <label class="sr-only" for="replyPrompt">追问内容</label>
+          <textarea id="replyPrompt" maxlength="8000" placeholder="继续询问这次回答…" rows="2"></textarea>
+          <div class="compose-actions"><span class="hint" id="replyHint"></span><button class="primary" id="sendReply" disabled>发送追问</button></div>
+        </details>
+        <div id="replyFeedback"></div>
       </section>
     </aside>
   </div>

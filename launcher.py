@@ -12,15 +12,17 @@ import threading
 import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from instabox import BridgeError, InstaBox
 
 APP = Path(__file__).resolve().parent
-PUBLIC_OPS = {'status', 'tree', 'file', 'diff', 'tasks', 'start', 'events', 'save'}
+PUBLIC_OPS = {'status', 'tree', 'file', 'diff', 'tasks', 'start', 'events', 'save',
+              'proposal', 'decideProposal'}
 STATIC = {'/': ('index.html', 'text/html; charset=utf-8'),
           '/index.html': ('index.html', 'text/html; charset=utf-8'),
           '/app.js': ('app.js', 'text/javascript; charset=utf-8'),
+          '/proposals.js': ('proposals.js', 'text/javascript; charset=utf-8'),
           '/style.css': ('style.css', 'text/css; charset=utf-8')}
 
 
@@ -46,6 +48,20 @@ class LocalWorkspace:
 
 class LocalServer(ThreadingHTTPServer):
     daemon_threads = True
+
+
+def workspace_identity(workspace):
+    """The launcher knows which project it serves even between cloud connections."""
+    if isinstance(workspace, LocalWorkspace):
+        mode = 'local'
+        project = workspace.root.name
+        identity = str(workspace.root)
+    else:
+        mode = 'instabox'
+        project = PurePosixPath(workspace.project).name
+        identity = workspace.machine_id + ':' + workspace.project
+    return {'project': project, 'mode': mode,
+            'workspaceId': hashlib.sha256((mode + ':' + identity).encode()).hexdigest()[:20]}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -98,6 +114,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         if path.startswith('/desktop/'):
             self.desktop()
+        elif path == '/api/workspace':
+            self.send_json(200, {'ok': True, 'data': workspace_identity(self.server.workspace)})
         elif path in STATIC:
             name, mime = STATIC[path]
             self.send_bytes(200, (APP / 'web' / name).read_bytes(), mime)
@@ -128,12 +146,14 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(req, dict) or req.get('op') not in PUBLIC_OPS:
                 self.error(400, 'invalid_request', '未知的工作区操作。')
                 return
-            result = self.server.workspace.rpc(req)
+            workspace = self.server.workspace
+            expected = self.headers.get('X-Workspace-Id')
+            if expected is not None and expected != workspace_identity(workspace)['workspaceId']:
+                self.error(409, 'workspace_changed', '启动器已切换项目，请刷新工作区。')
+                return
+            result = workspace.rpc(req)
             if req['op'] == 'status' and result.get('ok'):
-                local = isinstance(self.server.workspace, LocalWorkspace)
-                mode = 'local' if local else 'instabox'
-                identity = str(self.server.workspace.root) if local else self.server.workspace.machine_id + ':' + self.server.workspace.project
-                result['data'].update(mode=mode, workspaceId=hashlib.sha256((mode + ':' + identity).encode()).hexdigest()[:20])
+                result['data'].update(workspace_identity(workspace))
             self.send_json(200, result)
         except (ValueError, TypeError, UnicodeError):
             self.error(400, 'invalid_json', '请求格式无效。')

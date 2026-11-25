@@ -13,6 +13,11 @@ import tempfile
 import threading
 import uuid
 
+if __package__:
+    from . import proposals
+else:
+    import proposals
+
 
 _PAGE_BYTES = 256 * 1024
 _CHUNK_CHARS = 8192
@@ -26,12 +31,15 @@ _LEGACY_STRIDE = 1 << 20
 
 def capabilities(root: Path) -> dict:
     result = {}
-    for provider, binary in (("check", "git"), ("codex", "codex"), ("claude", "claude")):
+    for provider, binary in (("check", "git"), ("codex", "codex"), ("claude", "claude"),
+                             ("proposal", "codex")):
         available = shutil.which(binary) is not None
         if not available:
             detail = f"请在云服务器安装 {binary} 并确认已加入 PATH。"
         elif provider == "check":
             detail = "用 Git 检查项目，无需模型账户。"
+        elif provider == "proposal":
+            detail = "用 Codex 为单个文本文件生成提案，审核后应用。"
         else:
             detail = f"已发现 {binary}，任务使用云服务器已有的登录配置。"
         result[provider] = {"available": available, "detail": detail}
@@ -62,6 +70,20 @@ def _database(root):
             );
             CREATE INDEX IF NOT EXISTS task_created ON task(createdAt);
             CREATE INDEX IF NOT EXISTS task_active ON task(status) WHERE status IN ('queued', 'running');
+            CREATE TABLE IF NOT EXISTS codex_turn (
+                taskId TEXT PRIMARY KEY, parentTaskId TEXT UNIQUE, threadId TEXT
+            );
+            CREATE TABLE IF NOT EXISTS proposal (
+                taskId TEXT PRIMARY KEY, path TEXT NOT NULL, revision TEXT NOT NULL,
+                original TEXT NOT NULL, candidate TEXT, decision TEXT NOT NULL DEFAULT 'generating',
+                applyIntent INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE VIEW IF NOT EXISTS task_history AS
+                SELECT t.*, t.rowid AS taskRowId, turn.parentTaskId, child.taskId AS nextTaskId,
+                       (t.status = 'succeeded' AND turn.threadId IS NOT NULL
+                        AND child.taskId IS NULL) AS canContinue
+                FROM task t LEFT JOIN codex_turn turn ON turn.taskId = t.id
+                            LEFT JOIN codex_turn child ON child.parentTaskId = t.id;
         """)
         yield db
 
@@ -79,9 +101,12 @@ def _process_key(pid):
 
 
 def _public(row):
-    return {key: row[key] for key in (
-        "id", "requestId", "provider", "prompt", "status", "createdAt", "finishedAt"
+    result = {key: row[key] for key in (
+        "id", "requestId", "provider", "prompt", "status", "createdAt", "finishedAt",
+        "parentTaskId", "nextTaskId"
     )}
+    result["canContinue"] = bool(row["canContinue"])
+    return result
 
 
 def _chunks(text):
@@ -119,28 +144,53 @@ def _recover(db):
             _finish(db, row["id"], False, "云端任务进程已退出。已保留输出，可创建新任务重试。")
 
 
-def start_task(root: Path, request_id: str, provider: str, prompt: str) -> dict:
+def start_task(root: Path, request_id: str, provider: str, prompt: str,
+               parent_task_id: str | None = None, path: str | None = None,
+               revision: str | None = None) -> dict:
     if not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128:
         raise ValueError("requestId 长度应为 1 至 128 个字符。")
-    if provider not in ("codex", "claude", "check"):
+    if provider not in ("codex", "claude", "check", "proposal"):
         raise ValueError("不支持的任务类型。")
     if not isinstance(prompt, str) or len(prompt) > 32000 or (provider != "check" and not prompt.strip()):
         raise ValueError("请输入任务内容，最多 32000 个字符。")
+    if parent_task_id is not None and (provider != "codex" or not isinstance(parent_task_id, str)
+                                       or not 1 <= len(parent_task_id) <= 128):
+        raise ValueError("追问需要指定当前工作区的 Codex 任务。")
+    if provider != "proposal" and (path is not None or revision is not None):
+        raise ValueError("仅文件提案接受目标文件和版本。")
 
     root = Path(root).resolve(strict=True)
     with _database(root) as db, db:
         db.execute("BEGIN IMMEDIATE")
         _recover(db)
-        existing = db.execute("SELECT * FROM task WHERE requestId=?", (request_id,)).fetchone()
+        existing = db.execute("SELECT * FROM task_history WHERE requestId=?", (request_id,)).fetchone()
         if existing:
-            if existing["provider"] != provider or existing["prompt"] != prompt:
+            if (existing["provider"] != provider or existing["prompt"] != prompt
+                    or existing["parentTaskId"] != parent_task_id):
                 raise ValueError("此 requestId 已用于其他任务内容。")
+            if provider == "proposal":
+                target = db.execute("SELECT path, revision FROM proposal WHERE taskId=?",
+                                    (existing["id"],)).fetchone()
+                if not target or tuple(target) != (path, revision):
+                    raise ValueError("此 requestId 已用于其他文件或版本。")
             return _public(existing)
+        if parent_task_id is not None:
+            parent = db.execute("SELECT canContinue, nextTaskId FROM task_history WHERE id=?",
+                                (parent_task_id,)).fetchone()
+            if parent and parent["nextTaskId"]:
+                raise ValueError("这一轮已经有追问，请刷新并查看下一轮。")
+            if not parent or not parent["canContinue"]:
+                raise ValueError("这一轮没有可继续的 Codex 会话，请新建任务。")
         task_id = uuid.uuid4().hex
         db.execute("""
             INSERT INTO task (id, requestId, provider, prompt, status, createdAt)
             VALUES (?, ?, ?, ?, 'queued', ?)
         """, (task_id, request_id, provider, prompt, _now()))
+        if provider == "codex":
+            db.execute("INSERT INTO codex_turn (taskId, parentTaskId) VALUES (?, ?)",
+                       (task_id, parent_task_id))
+        elif provider == "proposal":
+            proposals.create(db, root, task_id, path, revision)
         _append(db, task_id, "status", "任务已排队。")
         try:
             # The child also takes BEGIN IMMEDIATE before reading its record.
@@ -156,17 +206,17 @@ def start_task(root: Path, request_id: str, provider: str, prompt: str) -> dict:
             db.execute("UPDATE task SET pid=?, processKey=? WHERE id=?",
                        (worker.pid, _process_key(worker.pid), task_id))
             threading.Thread(target=worker.wait, daemon=True).start()
-        return _public(db.execute("SELECT * FROM task WHERE id=?", (task_id,)).fetchone())
+        return _public(db.execute("SELECT * FROM task_history WHERE id=?", (task_id,)).fetchone())
 
 
 def list_tasks(root: Path) -> list[dict]:
     with _database(root) as db, db:
         db.execute("BEGIN IMMEDIATE")
         _recover(db)
-        return [dict(row) for row in db.execute("""
-            SELECT id, requestId, provider, substr(prompt, 1, 160) AS prompt,
-                   status, createdAt, finishedAt
-            FROM task ORDER BY createdAt DESC, rowid DESC LIMIT ?
+        return [_public(row) for row in db.execute("""
+            SELECT id, requestId, provider, substr(prompt, 1, 160) AS prompt, status,
+                   createdAt, finishedAt, parentTaskId, nextTaskId, canContinue
+            FROM task_history ORDER BY createdAt DESC, taskRowId DESC LIMIT ?
         """, (_TASK_LIMIT,))]
 
 
@@ -194,7 +244,7 @@ def events(root: Path, task_id: str, after: int) -> dict:
     with _database(root) as db, db:
         db.execute("BEGIN IMMEDIATE")
         _recover(db)
-        row = db.execute("SELECT * FROM task WHERE id=?", (task_id,)).fetchone()
+        row = db.execute("SELECT * FROM task_history WHERE id=?", (task_id,)).fetchone()
         if not row:
             raise ValueError("找不到该任务。")
         result = {"task": _public(row), "events": [], "cursor": after, "hasMore": False}
@@ -208,6 +258,18 @@ def events(root: Path, task_id: str, after: int) -> dict:
             result["cursor"] = item["seq"]
             remaining -= size
         return result
+
+
+def get_proposal(root: Path, task_id: str) -> dict:
+    with _database(root) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        _recover(db)
+        return proposals.inspect(db, root, task_id)
+
+
+def decide_proposal(root: Path, task_id: str, decision: str) -> dict:
+    with _database(root) as db:
+        return proposals.decide(db, root, task_id, decision)
 
 
 def _git_check(root, emit):
@@ -234,30 +296,37 @@ def _git_check(root, emit):
 
 def _error_hint(message, provider):
     # CLI diagnostics can include request headers, paths and provider response bodies.
-    # Keep only known error categories in the replay log.
+    # A transport retry can follow a more specific authentication/quota failure.
     lower = message.lower()
+    if "no rollout found for thread" in lower:
+        return 4, "云端 Codex 未找到这段会话的历史，请新建任务。"
     if any(term in lower for term in ("rate_limit", "rate limit", "quota", "429", "usage limit", "out of credits")):
-        return "云端模型账户达到额度或速率限制，请检查账户后重试。"
+        return 3, "云端模型账户达到额度或速率限制，请检查账户后重试。"
     if any(term in lower for term in ("auth", "401", "403", "login", "log in", "not logged", "api key", "api_key", "unauthorized")):
-        return f"云端 {provider} 认证失败，请在服务器检查 CLI 登录或密钥配置。"
+        return 3, f"云端 {provider} 认证失败，请在服务器检查 CLI 登录或密钥配置。"
     if any(term in lower for term in ("timed out", "timeout", "network", "connect", "resolve host")):
-        return "云端 CLI 连接模型服务失败，请检查服务器网络后重试。"
-    if any(term in lower for term in ("unknown option", "unexpected argument", "unrecognized", "unknown flag")):
-        return f"云端 {provider} 版本不支持所需选项，请更新 CLI 后重试。"
-    return None
+        return 1, "云端 CLI 连接模型服务失败，请检查服务器网络后重试。"
+    if any(term in lower for term in ("unknown option", "unexpected argument", "unrecognized",
+                                      "unknown flag", "unknown feature")):
+        return 2, f"云端 {provider} 版本不支持所需选项，请更新 CLI 后重试。"
+    return 0, ""
 
 
-def _agent(root, provider, prompt, emit):
+def _agent(root, provider, prompt, emit, resume_thread):
     if provider == "codex":
-        command = ["codex", "-a", "never", "exec", "--sandbox", "read-only", "--ephemeral", "--json", "-"]
+        command = ["codex", "-a", "never", "exec", "--sandbox", "read-only", "--json"]
+        if resume_thread:
+            command.extend(["resume", resume_thread])
+        command.append("-")
     else:
         command = ["claude", "-p", "--verbose", "--output-format", "stream-json",
                    "--include-partial-messages", "--no-session-persistence",
                    "--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep",
                    "--allowedTools", "Read,Glob,Grep", "--strict-mcp-config",
                    "--mcp-config", '{"mcpServers":{}}']
-    hint = None
+    hint = (0, "")
     completed = False
+    thread_id = None
     saw_partial = False
     saw_text = False
     # Read the prompt on stdin, so it cannot appear in a process listing.
@@ -271,16 +340,21 @@ def _agent(root, provider, prompt, emit):
             try:
                 event = json.loads(line)
             except ValueError:
-                hint = _error_hint(line, provider) or hint
+                hint = max(hint, _error_hint(line, provider))
                 continue
             if not isinstance(event, dict):
                 continue
             kind = event.get("type")
             if kind in ("error", "turn.failed") or event.get("error"):
-                hint = _error_hint(line, provider) or hint
+                hint = max(hint, _error_hint(line, provider))
             if provider == "codex":
                 item = event.get("item") or {}
-                if kind == "item.completed" and item.get("type") == "agent_message" and item.get("text"):
+                if kind == "thread.started" and isinstance(event.get("thread_id"), str):
+                    try:
+                        thread_id = str(uuid.UUID(event["thread_id"]))
+                    except ValueError:
+                        thread_id = None
+                elif kind == "item.completed" and item.get("type") == "agent_message" and item.get("text"):
                     emit(item["text"])
                 elif kind == "item.started" and item.get("type") == "command_execution":
                     emit("Codex 正在运行只读命令。")
@@ -301,13 +375,15 @@ def _agent(root, provider, prompt, emit):
             elif kind == "result":
                 completed = event.get("subtype") == "success" and not event.get("is_error")
                 if not completed:
-                    hint = _error_hint(line, provider) or hint
+                    hint = max(hint, _error_hint(line, provider))
                 elif not saw_text and isinstance(event.get("result"), str):
                     emit(event["result"])
         success = proc.wait() == 0 and completed
+    if success and resume_thread and thread_id != resume_thread:
+        return False, "Codex 未确认已恢复指定会话，请新建任务。", None
     if success:
-        return True, "模型任务已完成。"
-    return False, hint or f"云端 {provider} 未正常完成，请在服务器检查 CLI 版本、登录和模型配置。"
+        return True, "模型任务已完成。", thread_id
+    return False, hint[1] or f"云端 {provider} 未正常完成，请在服务器检查 CLI 版本、登录和模型配置。", None
 
 
 def _worker(root, task_id):
@@ -328,10 +404,21 @@ def _worker(root, task_id):
         try:
             if provider == "check":
                 success, message = _git_check(root, emit)
+            elif provider == "proposal":
+                success, message = proposals.generate(db, task_id, row["prompt"], _error_hint)
             else:
-                success, message = _agent(root, provider, row["prompt"], emit)
+                parent = db.execute("""
+                    SELECT parent.threadId FROM codex_turn turn
+                    JOIN codex_turn parent ON parent.taskId = turn.parentTaskId
+                    WHERE turn.taskId = ?
+                """, (task_id,)).fetchone()
+                success, message, thread_id = _agent(root, provider, row["prompt"], emit,
+                                                     parent["threadId"] if parent else None)
+                if thread_id:
+                    db.execute("UPDATE codex_turn SET threadId=? WHERE taskId=?", (thread_id, task_id))
         except FileNotFoundError:
-            success, message = False, f"云端缺少 {'git' if provider == 'check' else provider}，请先安装并加入 PATH。"
+            binary = {"check": "git", "proposal": "codex"}.get(provider, provider)
+            success, message = False, f"云端缺少 {binary}，请先安装并加入 PATH。"
         except Exception:
             success, message = False, "任务执行中断，请查看远端 CLI 安装和项目权限。"
         with db:
