@@ -21,6 +21,54 @@ PROJECT = "/data/团队 项目"
 KEY = "synthetic-test-key"
 
 
+class ConnectionTemplates(unittest.TestCase):
+    def test_unknown_cli_option_and_abbreviated_permission_are_rejected(self):
+        for option in ("--allow-di", "--ref"):
+            result = subprocess.run([sys.executable, str(ROOT / "workspace_mcp.py"), "--machine", MACHINE,
+                                     "--project", PROJECT, "--print-config", option], capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertFalse(result.stdout)
+            self.assertIn(option.encode(), result.stderr)
+
+    def test_readonly_profiles_recognize_only_exact_base_or_diff_templates(self):
+        import workspace_mcp
+        for host in ("claude", "codex"):
+            def config(project, **options):
+                return workspace_mcp.client_server_config(sys.executable, MACHINE, project, host=host, **options)
+
+            before = config("/data/before")
+            before_diff = config("/data/before", allow_diff=True)
+            relative = dict(before_diff, command="python3")
+            self.assertFalse(workspace_mcp.is_previous_readonly_server(relative, relative, host=host))
+            self.assertFalse(workspace_mcp.is_previous_readonly_server(before, before, host="other"))
+            for new in (config("/data/new"), config("/data/new", allow_diff=True)):
+                for prior in (before, before_diff):
+                    self.assertTrue(workspace_mcp.is_previous_readonly_server(prior, new, host=host))
+                for prior in (config("/data/before", allow_save=True, allow_diff=True),
+                              config("/data/before", allow_diff=True, credential_source="environment"),
+                              dict(before_diff, env={"EXTRA": "value"}),
+                              dict(before, args=[*before["args"], "--allow-save"]),
+                              dict(before_diff, args=[*before_diff["args"], "--allow-diff"]),
+                              dict(before_diff, args=["/other/adapter", *before_diff["args"][1:]])):
+                    with self.subTest(host=host, prior=prior):
+                        self.assertFalse(workspace_mcp.is_previous_readonly_server(prior, new, host=host))
+
+            for flags in ([], ["--allow-diff"], ["--allow-save", "--allow-diff"]):
+                printed = subprocess.check_output([sys.executable, str(ROOT / "workspace_mcp.py"),
+                                                   "--machine", MACHINE, "--project", PROJECT, "--host", host,
+                                                   *flags, "--print-config"], text=True)
+                if host == "claude":
+                    recovered = json.loads(printed)["mcpServers"]["instabox-workspace"]
+                    self.assertEqual(set(recovered), {"command", "args"})
+                    actual = recovered["args"]
+                else:
+                    actual = json.loads(next(line.partition(" = ")[2] for line in printed.splitlines()
+                                             if line.startswith("args = ")))
+                    self.assertEqual("tools.save_workspace_text.approval_mode" in printed, "--allow-save" in flags)
+                self.assertEqual(actual, [str(ROOT / "workspace_mcp.py"), "--machine", MACHINE, "--project", PROJECT,
+                                          "--credential-source", "system", *flags])
+
+
 @unittest.skipUnless(sys.platform.startswith("linux"), "requires a Linux user bus")
 class LinuxCredentials(unittest.TestCase):
     def test_filtered_bus_requires_a_private_owned_runtime_and_no_plaintext_fallback(self):
@@ -49,6 +97,7 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(directory.cleanup)
         self.project = Path(directory.name)
         self.seen = []
+        self.get_count = 0
         self.suspended = False
         case = self
 
@@ -64,6 +113,7 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
                 self.wfile.write(data)
 
             def do_GET(self):
+                case.get_count += 1
                 if self.headers.get("X-API-Key") != KEY or self.path != "/v1/machines":
                     return self.reply(403, {})
                 self.reply(200, {"machines": [{"id": MACHINE}]})
@@ -93,7 +143,7 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
         self.provider = "http://127.0.0.1:" + str(server.server_port)
 
     @asynccontextmanager
-    async def client(self, key=KEY, *, allow_save=False):
+    async def client(self, key=KEY, *, allow_save=False, allow_diff=False):
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
         # Replace only the official API origin in this test child. The adapter has no URL flag.
@@ -103,6 +153,8 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
                 "--credential-source", "environment"]
         if allow_save:
             args.append("--allow-save")
+        if allow_diff:
+            args.append("--allow-diff")
         params = StdioServerParameters(command=sys.executable, args=args, cwd=ROOT,
                                        env={"INSTABOX_API_KEY": key, "NO_PROXY": "127.0.0.1"})
         async with stdio_client(params) as pipes:
@@ -128,6 +180,9 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
             self.assertEqual({t.name for t in tools}, {"list_workspace_directory", "read_workspace_text", "get_workspace_git_status"})
             self.assertTrue(all(t.annotations.readOnlyHint for t in tools))
             self.assertEqual(self.seen, [])
+            self.assertTrue((await session.call_tool("get_workspace_git_diff", {"scope": "unstaged"})).isError)
+            self.assertEqual(self.seen, [])
+            self.assertEqual(self.get_count, 0)
             repo_status = await session.call_tool("get_workspace_git_status", {})
             self.assertEqual(json.loads(repo_status.content[0].text)["gitState"], "error")
             self.assertTrue((await session.call_tool("save_workspace_text", {"path": target.name, "revision": "0"*64, "content": "x"})).isError)
@@ -172,6 +227,7 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
         async with self.client(allow_save=True) as session:
             await session.initialize()
             actions = {tool.name: tool for tool in (await session.list_tools()).tools}
+            self.assertNotIn("get_workspace_git_diff", actions)
             self.assertFalse(actions["save_workspace_text"].annotations.readOnlyHint)
             self.assertTrue(actions["save_workspace_text"].annotations.destructiveHint)
             status = await session.call_tool("get_workspace_git_status", {})
@@ -195,6 +251,97 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(path.read_bytes(), args["content"].encode())
             self.assertTrue((await session.call_tool("save_workspace_text", {**args,"path":"missing"})).isError)
             self.assertFalse((self.project / "missing").exists())
+
+    async def test_only_explicit_diff_and_fixed_scopes_reach_the_real_git_worker(self):
+        def git(*args):
+            subprocess.run(["git", "-C", self.project, "-c", "user.name=Fixture",
+                            "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgSign=false",
+                            "-c", "core.hooksPath=/dev/null", *args], check=True)
+
+        async with self.client(allow_diff=True) as session:
+            await session.initialize()
+            actions = {tool.name: tool for tool in (await session.list_tools()).tools}
+            self.assertNotIn("save_workspace_text", actions)
+            tool = actions["get_workspace_git_diff"]
+            self.assertTrue(tool.annotations.readOnlyHint and tool.annotations.idempotentHint)
+            self.assertFalse(tool.annotations.destructiveHint or tool.annotations.openWorldHint)
+            self.assertEqual(tool.inputSchema["required"], ["scope"])
+            self.assertEqual(tool.inputSchema["properties"]["scope"]["enum"], ["staged", "unstaged", "last_commit"])
+            for args in ({}, {"scope": None}, {"scope": ["staged"]}, {"scope": "HEAD"},
+                         {"scope": "staged", "path": "other"}, {"scope": "last_commit", "ref": "HEAD~9"},
+                         {"scope": "unstaged", "command": "git status"}):
+                with self.subTest(args=args):
+                    self.assertTrue((await session.call_tool(tool.name, args)).isError)
+            self.assertEqual(self.seen, [])
+            self.assertEqual(self.get_count, 0)
+
+            async def diff(scope):
+                result = await session.call_tool(tool.name, {"scope": scope})
+                self.assertFalse(result.isError, result.content)
+                data = json.loads(result.content[0].text)
+                request = {"op": "commit_diff"} if scope == "last_commit" else {"op": "diff", "scope": scope}
+                self.assertEqual(self.seen[-1], request)
+                self.assertEqual(data["scope"], scope)
+                return data
+
+            self.assertEqual((await diff("staged"))["gitState"], "none")
+            self.assertEqual((await diff("last_commit"))["gitState"], "none")
+            git("init", "-q")
+            self.assertEqual((await diff("last_commit"))["gitState"], "unborn")
+            target = self.project / "tracked.txt"
+            target.write_text("原始正文\n")
+            git("add", target.name)
+            git("commit", "-qm", "first")
+            target.write_text("仅暂存内容\n")
+            git("add", target.name)
+            target.write_text("原始正文\n")
+            (self.project / "untracked.txt").touch()
+            staged = await diff("staged")
+            unstaged = await diff("unstaged")
+            commit = await diff("last_commit")
+            for layer in (staged, unstaged, commit):
+                self.assertFalse(layer["truncated"])
+            self.assertIn("+仅暂存内容", staged["diff"])
+            self.assertNotIn("untracked.txt", staged["diff"])
+            self.assertIn("-仅暂存内容", unstaged["diff"])
+            self.assertIn("untracked.txt", unstaged["diff"])
+            self.assertIn("+原始正文", commit["diff"])
+            self.assertNotIn("仅暂存内容", commit["diff"])
+            self.assertNotIn("untracked.txt", commit["diff"])
+            head = subprocess.check_output(["git", "-C", self.project, "rev-parse", "HEAD"], text=True).strip()
+            self.assertEqual(commit["commit"], head)
+            self.assertIsNone(commit["parent"])
+            target.write_text("层内大行🙂" * 20000 + "\n")
+            large = await diff("unstaged")
+            self.assertTrue(large["truncated"])
+            self.assertLessEqual(len(large["diff"].encode("utf-8")), 64 * 1024)
+            self.assertNotIn("\uFFFD", large["diff"])
+            git("commit", "-qm", "second")
+            tip = await diff("last_commit")
+            self.assertEqual(tip["parent"], head)
+            self.assertIn("+仅暂存内容", tip["diff"])
+            # A shallow checkout can name a parent whose object is absent locally.
+            (self.project / ".git/objects" / head[:2] / head[2:]).unlink()
+            self.assertEqual(await diff("last_commit"),
+                             {"scope": "last_commit", "gitState": "parent_unavailable", "diff": "",
+                              "truncated": False, "commit": tip["commit"], "parent": head})
+            (self.project / ".git/HEAD").write_text("broken\n")
+            failed = await session.call_tool(tool.name, {"scope": "staged"})
+            self.assertTrue(failed.isError)
+            self.assertEqual(failed.structuredContent, {"code": "git_error"})
+            self.suspended = True
+            failed = await session.call_tool(tool.name, {"scope": "last_commit"})
+            self.assertTrue(failed.isError)
+            self.assertEqual(failed.structuredContent, {"code": "machine_suspended"})
+            self.assertNotIn("provider detail", failed.content[0].text)
+
+    async def test_diff_and_save_can_be_enabled_together_without_contacting_provider(self):
+        async with self.client(allow_diff=True, allow_save=True) as session:
+            await session.initialize()
+            tools = {tool.name: tool.annotations for tool in (await session.list_tools()).tools}
+            self.assertTrue(tools["get_workspace_git_diff"].readOnlyHint)
+            self.assertFalse(tools["save_workspace_text"].readOnlyHint)
+            self.assertEqual(self.seen, [])
 
     async def test_empty_credential_and_generated_config(self):
         flags = ["--machine", MACHINE, "--project", PROJECT, "--credential-source", "environment"]

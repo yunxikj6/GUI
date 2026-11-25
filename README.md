@@ -6,7 +6,9 @@ Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面�
 
 在 GNOME 的“活动”里搜索 **安装官方客户端**（英文为 **Install official desktop apps**），选择 ChatGPT、Claude 或两者，在 Ubuntu 终端确认 APT 安装。随后从“活动”或桌面图标打开应用。两个 Linux 客户端都使用厂商提供的桌面程序和图标，窗口由同一个本机 GNOME 桌面管理。各自的账户负责聊天和登录。InstaBox 提供授权项目的文件和计算。[Ubuntu 安装与启动](docs/native-windows.md#打开原版应用) · [官方客户端的项目连接](docs/official-client-workspace.md)
 
-![同一 Ubuntu GNOME 桌面实拍，左侧为 ChatGPT 原厂登录页，右侧为 Claude for Linux 原厂欢迎页](docs/native-ubuntu-official-welcome.png)
+![Ubuntu GNOME 桌面实拍，Claude for Linux 的官方欢迎窗口已打开，旁边可见桌面图标和 Dock](docs/native-floating-claude.png)
+
+上图实拍自 Linux 上的本机 GNOME，Claude 以普通窗口打开。ChatGPT 也可从同一桌面打开，窗口归属已用 Mutter 和原厂安装包的程序摘要核对。[ChatGPT 浮窗实拍](docs/native-floating-chatgpt.png) · [两个原厂窗口同屏](docs/native-ubuntu-official-welcome.png) · [进程与截图记录](docs/measurements/native-floating-clients.json)
 
 在 Ubuntu 24.04.5 上，已核对两款程序与厂商安装包，并用窗口管理器确认窗口归属。最小化整个工作区时，两款应用都随之隐藏。ChatGPT 在断网的全新用户目录里也能打开登录方式面板。Claude 在相同条件下会显示连接错误页，仍能展开 File 菜单。[两款应用的 GNOME 桌面实拍](docs/native-ubuntu-official-apps.png) · [断网后点击 ChatGPT 登录选项](docs/native-ubuntu-chatgpt-offline-options.png) · [Claude 原版窗口](docs/native-ubuntu-claude-menu.png)
 
@@ -16,7 +18,7 @@ Ubuntu 24.04 上的桌面窗口现在显示为 **Cloud Linux Workspace**。在 W
 
 在“活动”里打开 **InstaBox 项目文件**，首次使用时选择云机和项目目录。选中的云端文本会出现在 Ubuntu 文件管理器里。双击即可用本机编辑器打开。Ctrl+S 保存到本机，在文件上右键选 **脚本 → 保存到 InstaBox** 才会更新云端。实际云机已独立核对编辑后的字节。[首次连接与使用方法](docs/native-project-files.md) · [编辑器实拍](docs/native-cloud-file-edit.png)
 
-在 GNOME 的“活动”里搜索 **连接 InstaBox 到官方客户端**，选择 Claude 或 ChatGPT 的本地 Codex 项目，再确认云机与项目目录。首次使用会引导你选择项目，并按需准备连接组件。重新打开所选客户端后，请从其 MCP 设置查看 `instabox-workspace`。该入口授予列目录、读文本和查询 Git 状态的权限。账户、聊天记录和工具授权仍由厂商管理。[连接步骤与权限](docs/official-client-workspace.md)
+在 GNOME 的“活动”里搜索 **连接 InstaBox 到官方客户端**，选择 Claude 或 ChatGPT 的本地 Codex 项目，再确认云机与项目目录。首次使用会引导你选择项目，并按需准备连接组件。重新打开所选客户端后，请从其 MCP 设置查看 `instabox-workspace`。默认可以列目录、读文本和查询 Git 状态。选择“包含 Git 差异”后，也可以在原厂客户端里问“这个云项目最近一次提交改了什么”，或查看尚未提交的代码。账户、聊天记录和工具授权仍由厂商管理。[连接步骤与权限](docs/official-client-workspace.md)
 
 ## 开发与验收
 

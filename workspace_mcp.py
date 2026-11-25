@@ -21,6 +21,8 @@ VAULT_SERVICE = "InstaBox Workspace MCP"
 LIST = "list_workspace_directory"
 READ = "read_workspace_text"
 GIT_STATUS = "get_workspace_git_status"
+GIT_DIFF = "get_workspace_git_diff"
+DIFF_SCOPES = ("staged", "unstaged", "last_commit")
 SAVE = "save_workspace_text"
 
 
@@ -121,11 +123,12 @@ def read_secret(machine, source):
 
 
 class CloudFiles:
-    def __init__(self, machine, project, source, *, allow_save=False):
+    def __init__(self, machine, project, source, *, allow_save=False, allow_diff=False):
         self.machine = machine
         self.project = project
         self.source = source
         self.allow_save = allow_save
+        self.allow_diff = allow_diff
         self.read_revisions = OrderedDict()
         self.transport = None
         self.lock = asyncio.Lock()
@@ -139,6 +142,11 @@ class CloudFiles:
             request = {"op": "file", "path": arguments["path"]}
         elif name == GIT_STATUS:
             request = {"op": "status", "scope": "git"}
+        elif name == GIT_DIFF and self.allow_diff:
+            if not isinstance(arguments, dict) or set(arguments) != {"scope"} or arguments["scope"] not in DIFF_SCOPES:
+                raise ValueError("Git 差异仅接受 scope 参数，值为 staged、unstaged 或 last_commit。")
+            scope = arguments["scope"]
+            request = {"op": "commit_diff"} if scope == "last_commit" else {"op": "diff", "scope": scope}
         elif name == SAVE and self.allow_save:
             path, revision = arguments["path"], arguments["revision"]
             if path not in self.read_revisions:
@@ -153,6 +161,14 @@ class CloudFiles:
                 key = await asyncio.to_thread(read_secret, self.machine, self.source)
                 self.transport = await asyncio.to_thread(InstaBox, key, self.machine, self.project)
         data = await asyncio.to_thread(self.transport.file_request, request)
+        if name == GIT_DIFF:
+            if (data.get("scope") != scope or not isinstance(data.get("diff"), str) or
+                    not isinstance(data.get("truncated"), bool)):
+                raise BridgeError("invalid_response", "未取得所请求范围的 Git 差异。")
+            fields = ("scope", "diff", "truncated", "gitState")
+            if scope == "last_commit":
+                fields += ("commit", "parent")
+            return {key: data[key] for key in fields if key in data}
         if name == READ and data.get("kind") != "text":
             raise BridgeError("unsupported_file", "此工具仅读取 UTF-8 文本。")
         if name == READ and self.allow_save:
@@ -185,6 +201,13 @@ async def serve(files):
 
     tools.append(types.Tool(name=GIT_STATUS, description="查看项目的 Git 分支和文件状态。entries 中的两位状态分别对应暂存区和工作树，?? 表示未跟踪。",
                             annotations=hints, inputSchema={"type": "object", "properties": {}, "additionalProperties": False}))
+    if files.allow_diff:
+        tools.append(types.Tool(
+            name=GIT_DIFF, description=("读取指定范围的 Git 补丁。staged 比较 HEAD 与暂存区，unstaged 比较暂存区与工作文件并包含未跟踪文件，"
+                                        "last_commit 比较 HEAD 与第一父提交（首个提交与空树比较），有提交时返回 commit 和 parent。"
+                                        "gitState 为 parent_unavailable 表示缺少父提交，truncated 表示补丁已截断。"),
+            annotations=hints, inputSchema={"type": "object", "additionalProperties": False, "required": ["scope"],
+                                           "properties": {"scope": {"type": "string", "enum": list(DIFF_SCOPES)}}}))
     if files.allow_save:
         tools.append(types.Tool(name=SAVE, description="用完整 UTF-8 文本替换已读取的现有文件。必须使用 read_workspace_text 返回的 revision，过期时重新读取。",
                                 annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False),
@@ -222,11 +245,13 @@ async def serve(files):
         await server.run(reader, writer, server.create_initialization_options())
 
 
-def client_server_config(python, machine, project, *, host, credential_source="system", allow_save=False):
+def client_server_config(python, machine, project, *, host, credential_source="system", allow_save=False, allow_diff=False):
     args = [str(Path(__file__).resolve()), "--machine", machine, "--project", str(project),
             "--credential-source", credential_source]
     if allow_save:
         args.append("--allow-save")
+    if allow_diff:
+        args.append("--allow-diff")
     server = {"command": str(python), "args": args}
     if host == "codex":
         # Codex filters its stdio environment. Inherit names so private proxy settings
@@ -244,25 +269,29 @@ def client_server_config(python, machine, project, *, host, credential_source="s
 
 def is_previous_readonly_server(current, server, *, host):
     """Recognize the exact manual configuration for this adapter when rebinding a project."""
-    if not isinstance(current, dict) or current.get("command") != server["command"]:
+    if host not in ("claude", "codex") or not isinstance(current, dict) or not isinstance(server, dict):
+        return False
+    command = server.get("command")
+    if not isinstance(command, str) or not os.path.isabs(command) or current.get("command") != command:
         return False
     args = current.get("args")
-    if not isinstance(args, list) or len(args) != 7 or not all(isinstance(value, str) for value in args):
+    if not isinstance(args, list) or len(args) not in (7, 8) or not all(isinstance(value, str) for value in args):
         return False
     machine, project = args[2], args[4]
     path = PurePosixPath(project)
     if (not re.fullmatch(r"m_[A-Za-z0-9_]+", machine) or path.anchor != "/"
             or path.parent == path or ".." in path.parts or "\x00" in project):
         return False
-    return current == client_server_config(server["command"], machine, path, host=host)
+    return current == client_server_config(command, machine, path, host=host, allow_diff=len(args) == 8)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="InstaBox 项目 MCP 接口（默认只读）")
+    parser = argparse.ArgumentParser(description="InstaBox 项目 MCP 接口（默认只读）", allow_abbrev=False)
     parser.add_argument("--machine", required=True, help="已有 Linux 云机的标识")
     parser.add_argument("--project", required=True, help="云机上已有项目的绝对目录")
     parser.add_argument("--credential-source", choices=("system", "environment"), default="system")
     parser.add_argument("--allow-save", action="store_true", help="允许保存本会话已读取的现有文本文件")
+    parser.add_argument("--allow-diff", action="store_true", help="允许读取指定项目的暂存、未暂存及最近一次提交的 Git 差异")
     parser.add_argument("--host", choices=("claude", "codex"), default="claude", help="选择配置片段格式")
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--store-key", action="store_true", help="交互式将密钥保存到当前用户的系统凭据库")
@@ -275,7 +304,7 @@ def main():
         parser.error("请指定已有项目的绝对目录。")
     if args.print_config:
         config = client_server_config(sys.executable, args.machine, project, host=args.host,
-                                      credential_source=args.credential_source, allow_save=args.allow_save)
+                                      credential_source=args.credential_source, allow_save=args.allow_save, allow_diff=args.allow_diff)
         if args.host == "codex":
             print("[mcp_servers.instabox-workspace]")
             for name in ("command", "args", "env_vars"):
@@ -301,7 +330,8 @@ def main():
             parser.exit(1, vault_help() + "\n")
         return 0
     try:
-        asyncio.run(serve(CloudFiles(args.machine, str(project), args.credential_source, allow_save=args.allow_save)))
+        asyncio.run(serve(CloudFiles(args.machine, str(project), args.credential_source,
+                                     allow_save=args.allow_save, allow_diff=args.allow_diff)))
     except ImportError:
         parser.exit(1, "缺少 MCP 组件，请用此 Python 安装 requirements-mcp.txt。\n")
     except KeyboardInterrupt:

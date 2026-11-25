@@ -12,6 +12,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import resource
 import secrets
 import shutil
@@ -374,11 +375,16 @@ def _linked_git_dir(root, marker):
 
 def repository_dir(root):
     """Return the selected root's Git directory, including registered linked worktrees."""
+    return _repository_head(root)[0]
+
+
+def _repository_head(root):
+    """Resolve the selected repository and snapshot its HEAD, allowing an unborn branch."""
     marker = root / ".git"
     try:
         mode = marker.lstat().st_mode
     except FileNotFoundError:
-        return None
+        return None, None
     if stat.S_ISDIR(mode):
         git_dir = marker
     elif stat.S_ISREG(mode):
@@ -386,7 +392,7 @@ def repository_dir(root):
     else:
         raise WorkspaceError("git_error", "无法识别此项目的 .git 登记信息。")
 
-    _, _, code = git(root, "rev-parse", "--verify", "--quiet", "HEAD^{commit}", git_dir=git_dir, check=False)
+    raw, _, code = git(root, "rev-parse", "--verify", "--quiet", "HEAD^{commit}", git_dir=git_dir, check=False)
     if code:
         # An unborn branch has no exact ref yet. A ref pointing at a lost object
         # is different: Git diff --check can succeed even with that broken HEAD.
@@ -395,7 +401,8 @@ def repository_dir(root):
                            git_dir=git_dir, check=False)
         if exists != 1:
             raise WorkspaceError("git_error", "Git 无法读取当前提交，请检查仓库的引用和对象。")
-    return git_dir
+        return git_dir, None
+    return git_dir, raw.rstrip(b"\n").decode("ascii")
 
 
 def status(root, *, git_only=False):
@@ -513,11 +520,56 @@ def diff(root, scope=_NO_DIFF_SCOPE):
         base, _, code = git(root, "rev-parse", "--verify", "HEAD", git_dir=git_dir, check=False)
         if code:
             git(root, "symbolic-ref", "--quiet", "HEAD", git_dir=git_dir)
-            base, _, _ = git(root, "hash-object", "-t", "tree", "--stdin", git_dir=git_dir)
+            base = _empty_tree(root, git_dir)
         comparison = [base.decode("ascii").strip()]
     elif scope == "staged":
         # With no explicit base, --cached also handles a branch with no commits.
         comparison = ["--cached"]
+    return {**result, **_read_diff(root, git_dir, comparison, include_untracked=scope != "staged", legacy=legacy)}
+
+
+def commit_diff(root):
+    result = {"scope": "last_commit", "diff": "", "truncated": False}
+    git_dir, head = _repository_head(root)
+    if git_dir is None:
+        return {**result, "gitState": "none"}
+    if head is None:
+        return {**result, "gitState": "unborn"}
+
+    # Shallow boundaries suppress parent IDs in rev-list and HEAD^, even when the
+    # underlying commit names a parent. The tree and first parent fit in 160 bytes
+    # for both SHA-1 and SHA-256; never buffer a long commit message or signature.
+    header, _, _ = git(root, "cat-file", "commit", head, git_dir=git_dir, limit=160)
+    lines = header.split(b"\n", 2)
+    oid = rb"[0-9a-f]{%d}" % len(head)
+    if len(lines) < 2 or not re.fullmatch(b"tree " + oid, lines[0]):
+        raise WorkspaceError("git_error", "Git 无法读取当前提交的树。")
+    parent = None
+    if lines[1].startswith(b"parent "):
+        raw_parent = lines[1][7:]
+        if not re.fullmatch(oid, raw_parent):
+            raise WorkspaceError("git_error", "Git 无法识别当前提交的第一父提交。")
+        parent = raw_parent.decode("ascii")
+    result.update(commit=head, parent=parent)
+    if parent is None:
+        base = _empty_tree(root, git_dir).decode("ascii").strip()
+    else:
+        kind, _, code = git(root, "cat-file", "-t", parent, git_dir=git_dir, check=False)
+        if code:
+            return {**result, "gitState": "parent_unavailable"}
+        if kind != b"commit\n":
+            raise WorkspaceError("git_error", "Git 的第一父对象不是提交，请检查仓库。")
+        base = parent
+    return {**result, **_read_diff(root, git_dir, [base, head])}
+
+
+def _empty_tree(root, git_dir):
+    # hash-object without -w computes the repository-format ID and does not write a Git object.
+    value, _, _ = git(root, "hash-object", "-t", "tree", "--stdin", git_dir=git_dir)
+    return value
+
+
+def _read_diff(root, git_dir, comparison, *, include_untracked=False, legacy=False):
     arguments = ("diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames",
                  "--ignore-submodules=all", *comparison, "--", *VISIBLE_PATHS)
     overrides = disabled_filters(root, git_dir=git_dir)
@@ -526,7 +578,7 @@ def diff(root, scope=_NO_DIFF_SCOPE):
         # Git can quote original path bytes without changing the patch body.
         raw, truncated, _ = git(root, *arguments, git_dir=git_dir, overrides=[*overrides, "-c", "core.quotePath=true"])
     content = bytearray(raw)
-    if not truncated and scope != "staged":
+    if not truncated and include_untracked:
         paths, names_cut, _ = git(root, "ls-files", "--others", "--exclude-standard", "-z", "--", *VISIBLE_PATHS,
                                   git_dir=git_dir)
         for name in paths.split(b"\x00")[:-1]:
@@ -552,8 +604,7 @@ def diff(root, scope=_NO_DIFF_SCOPE):
         if len(encoded) > MAX_DIFF:
             text = encoded[:MAX_DIFF].decode("utf-8", "ignore")
             truncated = True
-    result.update(diff=text, truncated=truncated)
-    return result
+    return {"diff": text, "truncated": truncated}
 
 
 SEED = {
@@ -626,6 +677,10 @@ def dispatch(request, root):
         return save(root, request.get("path"), request.get("content"), request.get("revision"))
     if op == "diff":
         return diff(root, request.get("scope", _NO_DIFF_SCOPE))
+    if op == "commit_diff":
+        if set(request) != {"op"}:
+            raise WorkspaceError("invalid_request", "最近一次提交的差异不接受额外参数。")
+        return commit_diff(root)
     import tasks
     if op == "tasks":
         if "beforeTaskId" in request:

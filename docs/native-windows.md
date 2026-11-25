@@ -27,7 +27,7 @@ sudo apt install --no-install-recommends gnome-shell ubuntu-session ubuntu-setti
 - **Claude**。Anthropic 的 Linux 客户端在应用菜单注册为 `com.anthropic.Claude.desktop`。桌面图标会打开它自己的窗口。Claude 对话与 Artifacts 的可用性取决于登录账户。[Anthropic 官方安装说明](https://support.claude.com/en/articles/10065433-install-claude-desktop)
 - **Windows 版本**。在 WSL 中，缺少相应 Linux 客户端时仍提供对应的 Windows 应用入口。用户选择该入口时，启动器调起已安装的官方 Microsoft Store 版本。如果尚未安装商店版，会询问是否打开官方商品页。Windows 应用在独立的 Windows 窗口中运行。[ChatGPT 商店页](https://apps.microsoft.com/detail/9plm9xgg6vks) · [Claude 商店页](https://apps.microsoft.com/detail/9p6k58ths811)
 
-- **项目数据**。需要在应用内读取云项目时，从 GNOME “活动”打开 **连接 InstaBox 到官方客户端**，选择应用并核对项目。此连接可列目录、读文本及查询 Git 状态。要保存文件，可用下述文件管理器操作。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
+- **项目数据**。需要在应用内读取云项目时，从 GNOME “活动”打开 **连接 InstaBox 到官方客户端**，选择应用并核对项目。默认可列目录、读文本及查询 Git 状态。需要在原厂对话中审阅代码改动时，在同一确认页选择“包含 Git 差异”。要保存文件，可用下述文件管理器操作。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
 - **在 Ubuntu 直接编辑项目文件**。完成绑定后，在“活动”打开 InstaBox 项目文件，从云端选一个文件，双击本地工作副本即可用系统编辑器修改。客户端会话和文件管理器可以独立使用。[原生文件操作](native-project-files.md)
 
 在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py` 启动本地会话。Ubuntu 桌面会为已安装的官方 ChatGPT 和 Claude 提供快捷方式。Windows 应用入口在 WSL 中注册。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。
@@ -69,6 +69,8 @@ powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1 -VerifyApps |
 在已授权项目中，可通过原厂客户端读取一个已知文件，再到云机独立比对。[项目连接](official-client-workspace.md)
 
 ## 官方客户端验收
+
+在全新的 Ubuntu 用户目录中，分别从官方 GNOME 应用入口打开 Claude 和 ChatGPT，将窗口还原到普通大小。两份整屏截图都保留了桌面、Dock 和工作区宿主边框。Mutter 记录的窗口进程与对应原厂软件包的程序摘要相符。画面停留在公开欢迎页。[Claude 实拍](native-floating-claude.png) · [ChatGPT 实拍](native-floating-chatgpt.png) · [进程与窗口几何记录](measurements/native-floating-clients.json)
 
 - 在 Ubuntu 桌面双击 ChatGPT，打开登录页和选择登录方式的面板。最小化整个工作区时，ChatGPT 随之消失。还原后再次看到登录页，子 Mutter 记录的客户进程与 OpenAI 安装包匹配。只有回环接口时也能操作这个面板。[Ubuntu 桌面](native-ubuntu-official-apps.png) · [ChatGPT 登录页](native-ubuntu-chatgpt.png) · [离线点击后的窗口](native-ubuntu-chatgpt-offline-options.png) · [进程与窗口归属记录](measurements/native-linux-clients.json)
 - 在 Ubuntu 24.04.5 的 GNOME Shell 46.0 上，使用 Dock 中的原版文件管理器新建了目录并核对了磁盘结果。随后通过“活动”启动了 Anthropic 官方签名的 Claude Desktop 6.28899.6。程序映像与签名软件包中的文件摘要相同。[Ubuntu 桌面截图](native-ubuntu-desktop.png) · [Claude 窗口截图](native-ubuntu-claude.png)

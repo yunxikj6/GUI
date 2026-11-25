@@ -198,3 +198,109 @@ class DiffScopeTests(unittest.TestCase):
         for invalid in ("", "combined", None, True, [], {}):
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.rpc(scope=invalid)["error"]["code"], "invalid_request")
+
+    def test_last_commit_root_then_ordinary_commit_ignores_index_and_worktree(self):
+        self.assertEqual(self.data(op="commit_diff"), {
+            "scope": "last_commit", "gitState": "unborn", "diff": "", "truncated": False})
+        plain = self.base / "plain"
+        plain.mkdir()
+        self.assertEqual(self.data(plain, op="commit_diff")["gitState"], "none")
+        self.assertEqual(self.rpc(op="commit_diff", ref="main")["error"]["code"], "invalid_request")
+        self.assertEqual(self.rpc(scope="last_commit")["error"]["code"], "invalid_request")
+        self.write("public.txt", "first\n")
+        self.write("sub/.cloudwork/private.txt", "private\n")
+        self.git("add", ".")
+        self.commit()
+        first = self.git("rev-parse", "HEAD").decode().strip()
+        tree = self.git("hash-object", "-t", "tree", os.devnull).decode().strip()
+        self.assertEqual(self.data(op="commit_diff"), {
+            "scope": "last_commit", "commit": first, "parent": None, "truncated": False,
+            "diff": self.native(tree, first, paths=("public.txt",)).decode()})
+        self.write("public.txt", "committed\n")
+        self.git("add", ".")
+        self.commit()
+        second = self.git("rev-parse", "HEAD").decode().strip()
+        expected = self.native(first, second).decode()
+        self.write("public.txt", "only staged\n")
+        self.git("add", "public.txt")
+        self.write("public.txt", "only working\n")
+        self.write("local-only", "untracked\n")
+        self.assertEqual(self.data(op="commit_diff"), {
+            "scope": "last_commit", "commit": second, "parent": first, "truncated": False, "diff": expected})
+
+    def test_last_commit_on_merge_and_detached_linked_worktree(self):
+        self.write("common", "base\n")
+        self.git("add", ".")
+        self.commit()
+        self.git("branch", "topic")
+        self.write("main.txt", "main-only change\n")
+        self.git("add", ".")
+        self.commit()
+        linked = self.base / "linked"
+        self.git("worktree", "add", "-q", str(linked), "topic")
+        self.write("feature.txt", "topic-only change\n", linked)
+        self.git("add", ".", root=linked)
+        self.git("-c", "user.name=Test", "-c", "user.email=test@localhost", "commit", "-qm", "topic", root=linked)
+        self.git("-c", "user.name=Test", "-c", "user.email=test@localhost", "merge", "--no-ff", "-qm", "merge", "topic")
+        merged = self.data(op="commit_diff")
+        self.assertEqual(merged["commit"], self.git("rev-parse", "HEAD").decode().strip())
+        self.assertEqual(merged["parent"], self.git("rev-parse", "HEAD^1").decode().strip())
+        self.assertEqual(merged["diff"], self.native("HEAD^1", "HEAD").decode())
+        self.assertIn("topic-only change", merged["diff"])
+        self.assertNotIn("main-only change", merged["diff"])
+        self.git("checkout", "--detach", "HEAD", root=linked)
+        own = self.data(linked, op="commit_diff")
+        self.assertNotEqual(own["commit"], merged["commit"])
+        self.assertEqual(own["commit"], self.git("rev-parse", "HEAD", root=linked).decode().strip())
+        self.assertEqual(own["diff"], self.native("HEAD^", "HEAD", root=linked).decode())
+
+    def test_shallow_head_reports_unavailable_until_its_first_parent_object_exists(self):
+        self.write("previous", "old\n")
+        self.git("add", ".")
+        self.commit()
+        self.git("branch", "earlier")
+        parent = self.git("rev-parse", "HEAD").decode().strip()
+        self.write("recent", "recent\n")
+        self.git("add", ".")
+        self.commit()
+        head = self.git("rev-parse", "HEAD").decode().strip()
+        shallow = self.base / "shallow"
+        self.git("clone", "-q", "--depth=1", self.root.as_uri(), str(shallow))
+        self.assertEqual(self.git("rev-parse", "--is-shallow-repository", root=shallow), b"true\n")
+        self.assertEqual(self.data(shallow, op="commit_diff"), {
+            "scope": "last_commit", "commit": head, "parent": parent,
+            "gitState": "parent_unavailable", "diff": "", "truncated": False})
+        self.git("fetch", "-q", "--depth=1", "origin", "earlier", root=shallow)
+        self.assertEqual(self.data(shallow, op="commit_diff"), {
+            "scope": "last_commit", "commit": head, "parent": parent,
+            "diff": self.native(parent, head).decode(), "truncated": False})
+
+    def test_last_commit_quotes_raw_path_and_honors_utf8_patch_budget(self):
+        name = os.fsdecode(b"file-\xff.txt")
+        self.write(name, "连接\n" * 24000)
+        self.git("add", "--", name)
+        self.commit()
+        result = self.data(op="commit_diff")
+        self.assertTrue(result["truncated"])
+        self.assertLessEqual(len(result["diff"].encode()), LIMIT)
+        self.assertIn(r"file-\377.txt", result["diff"])
+        self.assertNotIn("\ufffd", result["diff"])
+
+    def test_last_commit_supports_sha256_object_names(self):
+        repo = self.base / "sha256"
+        try:
+            self.git("init", "-q", "--object-format=sha256", "--initial-branch=main", str(repo))
+        except subprocess.CalledProcessError:
+            self.skipTest("installed system Git does not support SHA-256 repositories")
+        for contents in ("initial\n", "updated\n"):
+            self.write("hello", contents, repo)
+            self.git("add", ".", root=repo)
+            self.git("-c", "user.name=Test", "-c", "user.email=test@localhost", "commit", "-qm", "sha256", root=repo)
+            result = self.data(repo, op="commit_diff")
+            self.assertEqual(result["commit"], self.git("rev-parse", "HEAD", root=repo).decode().strip())
+            self.assertEqual(len(result["commit"]), 64)
+            self.assertIn("+" + contents, result["diff"])
+            if contents == "initial\n":
+                self.assertIsNone(result["parent"])
+            else:
+                self.assertEqual(result["parent"], self.git("rev-parse", "HEAD^", root=repo).decode().strip())

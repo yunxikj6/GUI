@@ -5,12 +5,12 @@
 ## 在 Ubuntu 桌面连接
 
 1. 从 GNOME 顶栏进入“活动”，搜索 **连接 InstaBox 到官方客户端**（英文 **Connect InstaBox to desktop apps**）。选择 **Claude** 或 **ChatGPT**。ChatGPT 使用已安装的 Ubuntu 官方桌面程序中的本地 Codex 项目。
-2. 已在“InstaBox 项目文件”中选过云机和目录时，这里会沿用该项目。首次绑定会引导你选择云机和目录，并把凭据存入 Ubuntu 用户密钥环。核对确认页上的客户端、机器和绝对路径，再点 **连接此项目**。已有合适的 Python 环境会直接复用，首次需要下载连接组件时，确认页会说明。若从旧版升级并提示缺少 `python3-venv`，在 Windows 中再运行一次新版 `Setup.cmd` 即可补装。
+2. 已在“InstaBox 项目文件”中选过云机和目录时，这里会沿用该项目。首次绑定会引导你选择云机和目录，并把凭据存入 Ubuntu 用户密钥环。核对确认页上的客户端、机器和绝对路径，选择读取权限，再点 **连接此项目**。已有合适的 Python 环境会直接复用，首次需要下载连接组件时，确认页会说明。若从旧版升级并提示缺少 `python3-venv`，在 Windows 中再运行一次新版 `Setup.cmd` 即可补装。
 3. 完全退出并重新打开所选客户端。在 Claude 的 **Settings → Developer → Local MCP servers** 或 ChatGPT 本地 Codex 项目的 **MCP** 设置中查看 `instabox-workspace`。可在已登录的项目会话中要求“读取这个云项目的 README.md”，并在客户端核对工具授权。实际返回的项目内容可进入这次厂商会话。
 
 每次只配置所选客户端。要让另一个客户端访问该项目，重新打开同一入口并选择它。要切换云项目，先在“InstaBox 项目文件”的“连接 InstaBox 项目”中更改项目，再为需要切换的客户端运行上述步骤。迁移解压目录后也可重新运行以更新启动路径。桌面入口使用系统密钥环和只读工具。需要开启保存时可使用下面的手工配置。
 
-首次连接的确认框来自 GNOME。确认后，ChatGPT 通过软件包自带的 Codex 设置接口登记连接，Claude 使用当前用户的 `claude_desktop_config.json`。如果已存在用户自行配置的同名服务，工作区会提示检查该项。[项目授权框实拍](native-client-connection.png) · [配置和读回记录](measurements/native-client-connections.json)
+首次连接的确认框来自 GNOME。确认后，ChatGPT 通过软件包自带的 Codex 设置接口登记连接，Claude 使用当前用户的 `claude_desktop_config.json`。如果已存在用户自行配置的同名服务，工作区会提示检查该项。[项目授权框实拍](native-client-git-review.png) · [配置和读回记录](measurements/native-client-connections.json)
 
 切换项目时，ChatGPT 的设置接口可能重新排布该服务启动参数数组里的注释。如果另一个程序同时编辑设置并出现冲突，请先核对客户端的当前设置再重试。Claude 的配置目录如果位于不支持原子交换的文件系统上，可以在下面的手工配置步骤中合并已有文件。
 
@@ -58,11 +58,26 @@ py -3 -m venv .venv-mcp
 
 在 Ubuntu 上，已用 OpenAI 官方 ChatGPT Linux 软件包自带的 Codex 组件读取授权的 InstaBox 项目。组件通过系统密钥环连接，列出三项只读工具，查询云端 Git 状态，读回 3,549 字节的文件并与对应提交逐字节比对。生成的 TOML 允许子进程继承系统 HTTPS 代理和证书设置，代理地址及凭据保留在运行环境中。这项测试没有发送模型请求。登录后的聊天界面调用仍待验收。[OpenAI Linux 客户端](https://learn.chatgpt.com/docs/linux/linux-app) · [调用与文件实测记录](measurements/native-linux-clients.json)
 
-## 默认只读工具和可选保存
+## 在原厂客户端审阅云端代码
+
+在 GNOME 的“连接 InstaBox 到官方客户端”里选好应用和项目，确认页默认提供基础读取。选 **包含 Git 差异**，保存并完全重启所选客户端，就可以向已登录的会话提问，例如“解释这个项目最近一次提交”，或“分别查看已暂存和未暂存的改动”。云机上的 Git 计算补丁，结果可能包含已删除的行以及未跟踪文本文件的内容。重新打开同一入口，选择基础权限、保存并重启，即可收回差异工具。已经返回到厂商会话的内容仍由该会话管理。
+
+手工配置时，在原有的 `--print-config` 命令中加入 `--allow-diff`。这项权限只读，与允许保存文件的 `--allow-save` 分别设置。差异工具每次读取一个范围，补丁正文最多 64 KiB。若 `truncated` 为真，本次结果只覆盖补丁的开头。
+
+| 请求范围 | 云机上比较的内容 |
+| --- | --- |
+| `staged` | 当前提交与暂存区。尚无提交时也可以查看已暂存的新文件。 |
+| `unstaged` | 暂存区与工作树。还会预览未被 Git 忽略的未跟踪文本。 |
+| `last_commit` | 最近一次提交与其第一父提交。结果附提交号，根提交则与空树比较。 |
+
+各范围分别采样。切换分支或再次编辑文件后，下一次读取会反映新的状态。仓库尚无提交或浅克隆缺少父对象时，最近提交查询会报告对应状态。[原厂组件和云机结果核对](measurements/native-git-review.json)
+
+## 默认工具与可选权限
 
 - `list_workspace_directory` 按项目相对路径列出目录。根目录可省略路径；后续页使用返回的 `nextCursor` 及原路径。每页最多 400 项。
 - `read_workspace_text` 读取不超过 128 KiB 的 UTF-8 文本，附带路径、字节数和 SHA-256 版本。云文件接口沿用现有路径和符号链接限制。
 - `get_workspace_git_status` 在云机运行固定的 Git 状态检查，返回分支、暂存和工作树状态及未跟踪项。每次最多 400 项或 64 KiB 的 Git 输出。截断时 `truncated` 为真。无仓库与损坏的仓库分别返回 `gitState=none` 和 `gitState=error`。
+- 选用 Git 差异后会增加 `get_workspace_git_diff` 工具，必填参数 `scope` 对应上表中的三个范围。
 - 需要编辑时，在生成配置的命令中加 `--allow-save`，将新配置片段更新至官方客户端并重新启动连接。此时才提供 `save_workspace_text`。保存需要同一连接已读取的既有文件及其 SHA-256 版本。工具按该版本核对云端文件，并执行原子替换。版本过期时返回 `conflict`，应重新读取、核对改动后再决定是否保存。Codex 的可写配置会为该工具请求宿主确认。去掉该参数并重启连接即可恢复只读模式。
 - 工作区代码在云机内存中运行。云机暂停、项目不存在、文本过大或属于二进制格式时，工具会向官方客户端返回错误。
 

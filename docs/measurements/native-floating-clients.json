@@ -1,0 +1,102 @@
+{
+  "environment": "Ubuntu 24.04.5 amd64, GNOME Shell 46 and Mutter Wayland inside a Linux host window.",
+  "capture": "Each installed desktop entry was opened in its own fresh HOME and private display. The window was unmaximized and positioned with Mutter. Each full host screen was captured in one frame. Original PNG bytes are published.",
+  "hostCapturePixels": [
+    1568,
+    956
+  ],
+  "gnomeDesktopPixels": [
+    1536,
+    904
+  ],
+  "windowsHost": false,
+  "signedIn": false,
+  "modelTurns": 0,
+  "clients": {
+    "chatgpt": {
+      "entry": "gio launch of installed /usr/share/applications/chatgpt.desktop with the nested GNOME Wayland and session bus",
+      "shellPidInPrivateNamespace": 152,
+      "privateHomeInitiallyEmpty": true,
+      "officialAppWindowsBeforeLaunch": 0,
+      "floatingWindow": {
+        "id": "chatgpt.desktop",
+        "type": "Wayland",
+        "pid": 352,
+        "stableId": 2,
+        "rect": [
+          301,
+          130,
+          960,
+          638
+        ],
+        "workArea": [
+          66,
+          32,
+          1470,
+          872
+        ],
+        "maximized": 0,
+        "fullScreen": false,
+        "focused": true
+      },
+      "vendorPackage": {
+        "name": "chatgpt",
+        "version": "26.1120.50957",
+        "archiveSha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2"
+      },
+      "executableSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+      "visibleWelcome": [
+        "Sign in to ChatGPT",
+        "Continue to sign in",
+        "Sign in another way",
+        "Sign up"
+      ],
+      "screenshot": {
+        "path": "../native-floating-chatgpt.png",
+        "sha256": "0cdbf2a094baf985ddafe85dae2211db6a6ae3c01d9af45c83679f23b7e5c573"
+      }
+    },
+    "claude": {
+      "entry": "gio launch of installed /usr/share/applications/com.anthropic.Claude.desktop with the nested GNOME Wayland and session bus",
+      "shellPidInPrivateNamespace": 152,
+      "privateHomeInitiallyEmpty": true,
+      "officialAppWindowsBeforeLaunch": 0,
+      "floatingWindow": {
+        "id": "com.anthropic.Claude.desktop",
+        "type": "Wayland",
+        "pid": 346,
+        "stableId": 2,
+        "rect": [
+          301,
+          130,
+          960,
+          638
+        ],
+        "workArea": [
+          66,
+          32,
+          1470,
+          872
+        ],
+        "maximized": 0,
+        "fullScreen": false,
+        "focused": true
+      },
+      "vendorPackage": {
+        "name": "claude-desktop",
+        "version": "6.28899.6",
+        "archiveSha256": "7e381601d86570149643d52e9b89c26575ab12fa788aa41ffdd4cca5b0638cf8"
+      },
+      "executableSha256": "f7287f483e7d7fdd92ec68ada543c23e23b623a8edbf47715d177eb72d0b8a4c",
+      "visibleWelcome": [
+        "Claude for Linux",
+        "The fastest way to talk with Claude",
+        "Get started"
+      ],
+      "screenshot": {
+        "path": "../native-floating-claude.png",
+        "sha256": "f0cb0d37604c6015bef6df1bbb128a49b083c05600ef58cc67c0cc40192ad259"
+      }
+    }
+  }
+}

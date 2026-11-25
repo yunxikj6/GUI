@@ -128,7 +128,8 @@
       "additionalToolWithAllowSave": "save_workspace_text",
       "modelRequestTested": false
     },
-    "desktopConnectionRecord": "native-client-connections.json"
+    "desktopConnectionRecord": "native-client-connections.json",
+    "gitDiffPermissionRecord": "native-git-review.json"
   },
   "windows": {
     "launcherPeArchitectures": [
@@ -151,10 +152,10 @@
     "applicationWindowVerifierRecord": "native-app-window-verifier.json"
   },
   "pythonRegression": {
-    "archiveRevision": "5f0d6633541d9fb07883687a9aff170d943a1acd",
-    "passed": 308,
+    "archiveRevision": "bfc722051d1140409a2a0a38a178db5ffebab1bc",
+    "passed": 314,
     "skipped": 0,
-    "snapshotFiles": 217,
+    "snapshotFiles": 224,
     "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }

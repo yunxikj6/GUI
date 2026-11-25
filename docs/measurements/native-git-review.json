@@ -1,0 +1,192 @@
+{
+  "linuxDesktop": {
+    "system": "Ubuntu 24.04.5, GNOME Shell 46.0, Zenity 4.0.1. ChatGPT came from the original APT root; Claude uses its published payload from a separate completed Ubuntu APT transaction.",
+    "syntheticProject": "m_fixture /data/workspace-sample",
+    "noExternalRoutes": true,
+    "accountsOrCredentialsUsed": false,
+    "modelOrCloudRequests": 0,
+    "entry": "GNOME Activities search → Connect InstaBox to desktop apps → actual GTK app choice → native radio buttons → confirm or Escape",
+    "screen": {
+      "displayDpi": "100x100",
+      "physicalCapture": [
+        1512,
+        1000
+      ],
+      "security": "Fresh fixture HOME and loopback-only network namespace, no host desktop or clipboard access"
+    },
+    "clients": {
+      "ChatGPT": {
+        "metadataDiscovery": "Bundled official app-server, newly started after each change; mcpServerStatus/list",
+        "defaultToolNames": [
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ],
+        "grantedToolNames": [
+          "get_workspace_git_diff",
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ],
+        "revokedToolNames": [
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ],
+        "canceledGrantChangePreservedConfigAndReceiptBytesAndMtimes": true,
+        "idempotentBasicPreservedConfigBytesAndMtime": true
+      },
+      "Claude": {
+        "metadataDiscovery": "Upstream MCP SDK listing the stdio entry in the actual Claude Desktop configuration",
+        "defaultToolNames": [
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ],
+        "grantedToolNames": [
+          "get_workspace_git_diff",
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ],
+        "revokedToolNames": [
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ],
+        "canceledGrantChangePreservedConfigAndReceiptBytesAndMtimes": true,
+        "idempotentBasicPreservedConfigBytesAndMtime": true
+      }
+    },
+    "checks": [
+      "Both visible GTK radio buttons from first setup and when returning with an existing grant",
+      "Click or press Down then Space to explicitly select Git diff",
+      "Reopening the same app and project presets the existing permission",
+      "Escape preserves both config and receipt bytes + mtimes",
+      "Switching to basic independently removes the extra tool from each host registration",
+      "Reconfirming unchanged basic scope preserves vendor config bytes + mtimes",
+      "Original independent manual MCP entries and Claude preferences/Codex comment preserved",
+      "No save tool was registered"
+    ],
+    "sourceSha256": {
+      "workspace_mcp.py": "86b8818815da4f17d269638aae3cafe318660f4da82d1e0af94d23481b389695",
+      "linux/native_client_setup.py": "cb3de600c0ebd0cccfa48741ec0fb36e19d4bf13f4168f960793bb1ea6695a65",
+      "linux/claude_project_connection.py": "fba6ac2da72fcd9d78cc0d72cc9ff712ec8a8b86041783e347ad6e3456d5669a",
+      "linux/codex_project_connection.py": "8f5c64207c4019bc9c786745637759fd9c54ab916024a7ef76e49ab879ea5009",
+      "linux/native_mcp_runtime.py": "dd609c4b6c24f2117f44935e6d768a5aa1c85d6d4d2ed547eeed2fce3a99f186"
+    },
+    "sourceTimeline": {
+      "initialBasicAndFirstExplicitGrant": "8dd6b9c1b60e0d42dd3ddf868d61abf8682135dd55faf2ffc87690cbb72f1f4d",
+      "revocationAndReconfirmation": "cb3de600c0ebd0cccfa48741ec0fb36e19d4bf13f4168f960793bb1ea6695a65",
+      "changeDuringRun": "Final revision adds a full directory column for paths longer than 80 UTF-8 bytes; synthetic project is /data/workspace-sample."
+    },
+    "finalRevisionRegrantAndRevoke": [
+      {
+        "action": "Final revision: explicitly re-granted Git diff",
+        "permission": "diff",
+        "toolDiscovery": [
+          "get_workspace_git_diff",
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ]
+      },
+      {
+        "action": "Final revision: removed Git diff again",
+        "permission": "basic",
+        "toolDiscovery": [
+          "get_workspace_git_status",
+          "list_workspace_directory",
+          "read_workspace_text"
+        ]
+      }
+    ],
+    "screenshot": {
+      "path": "../native-client-git-review.png",
+      "sha256": "28f63bf218822285c907d9afa0c26bbe306125d68c188da2c88cd682b25e9bff"
+    }
+  },
+  "cloudReadback": {
+    "connection": "ChatGPT desktop bundled Codex app-server via stdio to an isolated local MCP process with the system keyring. Each scope change starts a new vendor process.",
+    "project": "Clean staging checkout of the exact public revision on the authorized InstaBox Linux machine.",
+    "officialPackage": "ChatGPT for Linux 26.1120.50957",
+    "appServerVersion": "codex-cli 0.171.0-alpha.13.2",
+    "appServerSha256": "13f4960291147ba63dca2508920962f97dccf8710e11cb931125048b5436e9b2",
+    "modelTurns": 0,
+    "accountLogin": false,
+    "base": {
+      "tools": [
+        "get_workspace_git_status",
+        "list_workspace_directory",
+        "read_workspace_text"
+      ],
+      "directDiffCallRejected": true
+    },
+    "granted": {
+      "tools": [
+        "get_workspace_git_diff",
+        "get_workspace_git_status",
+        "list_workspace_directory",
+        "read_workspace_text"
+      ],
+      "invalidArgumentsRejected": true,
+      "staged": {
+        "patchBytes": 0,
+        "truncated": false
+      },
+      "unstaged": {
+        "patchBytes": 0,
+        "truncated": false
+      },
+      "last_commit": {
+        "commit": "bfc722051d1140409a2a0a38a178db5ffebab1bc",
+        "firstParent": "e00e3259238116640681f854a8ff4a03f40f33bc",
+        "patchBytes": 1186,
+        "completeGitPatchBytes": 1186,
+        "sha256": "03da3cdfcd2c80b797027469ca4e1a542f7298f1740cf52e588cf4b10dbebb4b",
+        "truncated": false,
+        "matchesIndependentGit": true
+      }
+    },
+    "revoked": {
+      "tools": [
+        "get_workspace_git_status",
+        "list_workspace_directory",
+        "read_workspace_text"
+      ],
+      "directDiffCallRejected": true
+    }
+  },
+  "gitFixtures": {
+    "objectFormats": [
+      "sha1",
+      "sha256"
+    ],
+    "casesPerFormat": [
+      "initial commit compared with empty tree",
+      "merge compared with first parent",
+      "shallow boundary with missing parent",
+      "shallow boundary with readable parent"
+    ],
+    "patchComparedWithNativeGit": true,
+    "objectStoresUnchanged": true,
+    "results": [
+      {
+        "git": "2.43.0",
+        "checksPassed": 8
+      },
+      {
+        "git": "2.47.3",
+        "checksPassed": 8
+      },
+      {
+        "git": "2.56.1",
+        "checksPassed": 8
+      }
+    ]
+  },
+  "remainingAcceptance": [
+    "Interactive Windows 11 with WSLg",
+    "Signed-in ChatGPT messages and Claude conversations and Artifacts"
+  ]
+}
