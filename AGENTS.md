@@ -4,7 +4,7 @@
 
 ## 当前基线
 
-首个真机验证版本为 `v0.1.0`，对应提交 `dd835d363559cce5e89aa7a5402d8123499d78a1`。GitHub 的 `main` 包含这份实现和后续交接资料。原始发布资产 `cloud-workbench.zip` 为 334,015 字节，SHA-256 为 `f719081d013fe89ab809603cdc6449547e0144db8a364ac50d5a3cab4faf931f`。此校验值对应带启动器的上传资产。[0.1 发布页](https://github.com/yunxikj6/GUI/releases/tag/v0.1.0)
+首个真机验证版本为 `v0.1.0`，对应提交 `dd835d363559cce5e89aa7a5402d8123499d78a1`。GitHub 的 `main` 包含这份实现和后续交接资料。原始发布资产 `cloud-workbench.zip` 为 334,015 字节，SHA-256 为 `f719081d013fe89ab809603cdc6449547e0144db8a364ac50d5a3cab4faf931f`。可在包目录运行 `sha256sum -c SHA256SUMS` 核验这份原始文件。[原始 ZIP](releases/v0.1.0/cloud-workbench.zip) · [校验文件](releases/v0.1.0/SHA256SUMS) · [0.1 发布页](https://github.com/yunxikj6/GUI/releases/tag/v0.1.0)
 
 | 需要继续的工作 | 从哪里进入 | 已有证据 |
 | --- | --- | --- |
