@@ -29,5 +29,10 @@ if not defined target (
   pause
   exit /b 2
 )
-start "" "%~dp0windows\CloudLinuxWorkspace-%target%.exe" %*
+if not "%~1"=="" goto native_args
+start "" "%~dp0windows\CloudLinuxWorkspace-%target%.exe"
+exit /b %errorlevel%
+
+:native_args
+"%~dp0windows\CloudLinuxWorkspace-%target%.exe" %*
 exit /b %errorlevel%

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -16,6 +15,13 @@ import (
 var kernel = syscall.NewLazyDLL("kernel32.dll")
 var getSystemWindowsDirectory = kernel.NewProc("GetSystemWindowsDirectoryW")
 var attachConsole = kernel.NewProc("AttachConsole")
+var setConsoleHandler = kernel.NewProc("SetConsoleCtrlHandler")
+var setupHandler = syscall.NewCallback(func(event uint32) uintptr {
+	if event == syscall.CTRL_C_EVENT {
+		return 1
+	}
+	return 0
+})
 var messageBox = syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW")
 
 func windowsDirectory() string {
@@ -30,7 +36,10 @@ func windowsDirectory() string {
 // With a GUI subsystem the inherited standard handles can be absent or point to NUL.
 // Give WSL actual console devices and leave sudo prompts and passwords inside that console.
 func runSetup(program string, args, env []string) runResult {
-	kernel.NewProc("AllocConsole").Call() // already having a console is fine
+	// Reuse the terminal that invoked Setup.cmd when available. Explorer launches need a new one.
+	if attached, _, _ := attachConsole.Call(uintptr(^uint32(0))); attached == 0 {
+		kernel.NewProc("AllocConsole").Call() // Already attached is harmless.
+	}
 	input, err := os.OpenFile("CONIN$", os.O_RDWR, 0)
 	if err != nil {
 		return runResult{exit: -1}
@@ -41,9 +50,13 @@ func runSetup(program string, args, env []string) runResult {
 		return runResult{exit: -1}
 	}
 	defer output.Close()
-	interrupts := make(chan os.Signal, 1)
-	signal.Notify(interrupts, os.Interrupt) // WSL gets the same control event and can clean up.
-	defer signal.Stop(interrupts)
+	// Attaching or allocating a console resets the process control-handler table. Register
+	// after that step. A non-NULL callback only handles Ctrl+C in this launcher; WSL gets
+	// its own event and we wait for its exit. The NULL "ignore Ctrl+C" flag is inherited.
+	if ok, _, _ := setConsoleHandler.Call(setupHandler, 1); ok == 0 {
+		return runResult{exit: -1}
+	}
+	defer setConsoleHandler.Call(setupHandler, 0)
 	cmd := exec.Command(program, args...)
 	cmd.Env, cmd.Stdin, cmd.Stdout, cmd.Stderr = env, input, output, output
 	if err := cmd.Run(); err != nil {

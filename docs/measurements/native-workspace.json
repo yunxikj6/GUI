@@ -61,7 +61,14 @@
       "View",
       "Go",
       "Help"
-    ]
+    ],
+    "preLoginMcpObservation": {
+      "freshProfile": true,
+      "configAccessObserved": true,
+      "observedSecondsAfterWelcome": 40,
+      "configuredStdioProcessStarts": 0,
+      "postLoginTested": false
+    }
   },
   "workspaceMcp": {
     "transport": "stdio",
@@ -105,8 +112,13 @@
     "windowsChatGptWindowObserved": false,
     "windowsClaudeWindowObserved": false,
     "launcherSha256": {
-      "x64": "28d9883eab1f3afda554966470e7d6e6b6a60dd423552e1044d18650c07ce581",
-      "arm64": "e3d4f2b9e60cc7b0de81f0553282fc698eb311978b75d92ac2edcf5a06c9adbc"
+      "x64": "1bbfcb7c6ae1d89df8c52cea002f23a2565d76ad339f301ebf70e513c7c6e117",
+      "arm64": "8df426624425ea00dbfdf5967b6fc09863f3e017872a951c69baf302c813ed19"
     }
+  },
+  "pythonRegression": {
+    "passed": 198,
+    "skipped": 0,
+    "testedSourceArchive": "8867dc8fea856b819509ff28c46b8904e1166f32"
   }
 }

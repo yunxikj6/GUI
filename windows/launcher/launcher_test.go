@@ -232,10 +232,11 @@ func TestExplicitSetup(t *testing.T) {
 	touch(t, script)
 	wsl := filepath.Join(dir, "System32", "wsl.exe")
 	touch(t, wsl)
+	nativeCtrlC := uint32(0xc000013a) // STATUS_CONTROL_C_EXIT from GetExitCodeProcess
 	for _, tc := range []struct {
 		exit int
 		code string
-	}{{0, ""}, {-1, "setup-console"}, {65, "setup-version"}, {69, "setup-wslg"}, {70, "setup-console"}, {71, "setup-exit"}, {72, "setup-exit"}, {130, "setup-cancelled"}} {
+	}{{int(nativeCtrlC), "setup-cancelled"}, {0, ""}, {-1, "setup-console"}, {65, "setup-version"}, {69, "setup-wslg"}, {70, "setup-console"}, {71, "setup-exit"}, {72, "setup-exit"}, {130, "setup-cancelled"}} {
 		n := 0
 		problem := execute(opt, exe, dir, []string{"INSTABOX_API_KEY=never-forward"}, func(program string, args, env []string, mode runMode) runResult {
 			if program != wsl || len(env) > 0 {
