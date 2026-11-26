@@ -70,3 +70,19 @@ bash experiments/mutter_app/run.sh --interactive "$HOME/manual-pair-01" "$HOME/m
 
 
 源端读取参考画面时显式保留应用自身的插入光标样式。测试中的真实 Mutter 在光标切换时记录到 1 × 15 像素的原生损伤提交；带这一设置的独立窗口完成了文本编辑、选择与返回。选择区、文本与按钮仍来自同一原厂绘图。各次闪烁是否都能在 Windows 上及时重绘需另行测量。
+
+### 在云源核对一次物理指针投递
+
+在已安装本实验依赖的 Ubuntu Noble 云源上，可以为一次专用测试会话启用只读诊断。它读取 Mutter 发送给原厂 Wayland 客户端的 enter、motion、leave、button，以及当前 MetaWindow 和 Clutter actor 的实际位置。普通构建省略这段诊断。坐标写入源机的私有目录，完成诊断后由操作者清理。
+
+```bash
+build=$(mktemp -d)
+install -m 600 experiments/mutter_app/mutter_witness.c "$build/mutter_witness.c"
+gcc -std=gnu11 -fPIC -shared -Wall -Werror -O2 -DCW_POINTER_DIAGNOSTICS \
+    -o "$build/witness.so" "$build/mutter_witness.c" -ldl -lcrypto -pthread
+(cd "$build" && sha256sum mutter_witness.c witness.so > SHA256SUMS)
+CW_MUTTER_PREBUILD="$build" experiments/mutter_app/run.sh --interactive "$HOME/ptr-pair-new" "$HOME/ptr-source-new"
+python3 -m experiments.mutter_app.pointer_diagnostics "$HOME/ptr-source-new"
+```
+
+按上面的手动模式配对 Windows 窗口并操作。关闭窗口后，最后一条命令核对原厂进程、Wayland 连接、主窗口、已完成的绘制记录以及 Mutter 的三份几何数据。报告只列出原窗口内按下并松开的左键。移动时的 Wayland 坐标保留 1/256 像素精度。在独立的 1280 × 900 Ubuntu 会话里，窗口原点为 (127, 67)，桌面 (672, 502) 的物理点击到达应用内 (545, 435)，随后出现厂商登录方式菜单。坐标反映当次窗口位置。本工具只能证明系统把输入投递到哪个窗口。应用内部控件的身份、下一次点击的许可与绘图签发均由各自原有路径处理。

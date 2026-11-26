@@ -52,10 +52,16 @@ struct connection {
     void *client;
     uint32_t seq;
 };
+#ifdef CW_POINTER_DIAGNOSTICS
+static void say(const char *fmt, ...);
+#endif
 static struct connection connections[32];
 static uint32_t next_connection;
 static void client_gone(struct listener *l, void *d) {
     struct connection *c = (void *)l;
+#ifdef CW_POINTER_DIAGNOSTICS
+    say("POINTER_DISCONNECT %u\n", c->seq);
+#endif
     c->client = NULL;
 }
 struct ownership {
@@ -129,14 +135,91 @@ static int vendor(pid_t pid) {
     return stat(path, &candidate) == 0 && stat("/usr/lib/chatgpt/ChatGPT", &installed) == 0 &&
            candidate.st_ino == installed.st_ino && candidate.st_dev == installed.st_dev;
 }
+#ifdef CW_POINTER_DIAGNOSTICS
+/* Optional source-only diagnostics for the supported Mutter 46 ABI. All functions
+ * below are accessors. Nothing in the input or drawing path uses these records. */
+struct actor_rectangle { int x, y, width, height; };
+typedef int (*integer_getter)(void *);
+typedef int (*type_test)(void *, unsigned long);
+typedef unsigned long (*type_getter)(void);
+typedef void (*rect_getter)(void *, struct actor_rectangle *);
+typedef void (*point_getter)(void *, float *, float *);
+
+static void note_placement(void *resource, uint64_t attach, uint32_t client, pid_t pid, uint32_t id) {
+    FN(one, wl_resource_get_user_data);
+    FN(one, meta_wayland_surface_get_resource);
+    FN(one, meta_wayland_surface_get_window);
+    FN(one, meta_wayland_surface_get_actor);
+    FN(one, meta_window_get_wayland_surface);
+    FN(integer_getter, meta_window_get_pid);
+    FN(integer_getter, clutter_actor_is_mapped);
+    FN(type_test, g_type_check_instance_is_a);
+    FN(type_getter, meta_wayland_surface_get_type);
+    FN(rect_getter, meta_window_get_buffer_rect);
+    FN(rect_getter, meta_window_get_frame_rect);
+    FN(point_getter, clutter_actor_get_transformed_position);
+    FN(point_getter, clutter_actor_get_transformed_size);
+
+    if (!wl_resource_get_user_data || !meta_wayland_surface_get_resource || !meta_wayland_surface_get_window ||
+        !meta_wayland_surface_get_actor || !meta_window_get_wayland_surface || !meta_window_get_pid ||
+        !clutter_actor_is_mapped || !g_type_check_instance_is_a || !meta_wayland_surface_get_type ||
+        !meta_window_get_buffer_rect || !meta_window_get_frame_rect || !clutter_actor_get_transformed_position ||
+        !clutter_actor_get_transformed_size) return;
+    void *surface = wl_resource_get_user_data(resource);
+    if (!surface || !g_type_check_instance_is_a(surface, meta_wayland_surface_get_type()) ||
+        meta_wayland_surface_get_resource(surface) != resource) return;
+    void *window = meta_wayland_surface_get_window(surface);
+    void *actor = meta_wayland_surface_get_actor(surface);
+    if (!window || meta_window_get_wayland_surface(window) != surface || meta_window_get_pid(window) != pid ||
+        !actor || !clutter_actor_is_mapped(actor)) return;
+
+    struct actor_rectangle buffer, frame;
+    float x, y, width, height;
+    meta_window_get_buffer_rect(window, &buffer);
+    meta_window_get_frame_rect(window, &frame);
+    clutter_actor_get_transformed_position(actor, &x, &y);
+    clutter_actor_get_transformed_size(actor, &width, &height);
+    say("PLACEMENT %u %d %u %lu %d %d %d %d %d %d %d %d %.3f %.3f %.3f %.3f\n",
+        client, pid, id, attach, buffer.x, buffer.y, buffer.width, buffer.height,
+        frame.x, frame.y, frame.width, frame.height, x, y, width, height);
+}
+
+static void note_pointer(const struct msg *m, const char *op, uint32_t client, pid_t pid, uint32_t id) {
+    FN(idfn, wl_resource_get_id);
+    FN(one, wl_resource_get_client);
+    if (!strcmp(op, "enter") || !strcmp(op, "leave")) {
+        if (m->argc < 2 || !m->args[1].o ||
+            wl_resource_get_client(m->resource) != wl_resource_get_client(m->args[1].o)) return;
+        uint32_t surface = wl_resource_get_id(m->args[1].o);
+        if (!strcmp(op, "enter") && m->argc == 4)
+            say("POINTER_ENTER %u %d %u %u %u %d %d\n", client, pid, id, surface,
+                m->args[0].u, m->args[2].i, m->args[3].i);
+        else if (!strcmp(op, "leave") && m->argc == 2)
+            say("POINTER_LEAVE %u %d %u %u %u\n", client, pid, id, surface, m->args[0].u);
+    } else if (!strcmp(op, "motion") && m->argc == 3) {
+        say("POINTER_MOTION %u %d %u %u %d %d\n", client, pid, id,
+            m->args[0].u, m->args[1].i, m->args[2].i);
+    } else if (!strcmp(op, "button") && m->argc == 4) {
+        say("POINTER_BUTTON %u %d %u %u %u %u %u\n", client, pid, id,
+            m->args[0].u, m->args[1].u, m->args[2].u, m->args[3].u);
+    }
+}
+#endif
+
 static void observe(void *data, int direction, const struct msg *m) {
-    if (direction != 0 || !m || !m->resource || !m->message || !m->message->name) return;
+#ifndef CW_POINTER_DIAGNOSTICS
+    if (direction != 0) return;
+#endif
+    if (!m || !m->resource || !m->message || !m->message->name) return;
     FN(strfn, wl_resource_get_class);
     FN(one, wl_resource_get_client);
     FN(creds, wl_client_get_credentials);
     FN(idfn, wl_resource_get_id);
     FN(one, wl_shm_buffer_get);
     const char *type = wl_resource_get_class(m->resource), *op = m->message->name;
+#ifdef CW_POINTER_DIAGNOSTICS
+    if (direction != 0 && (direction != 1 || strcmp(type, "wl_pointer"))) return;
+#endif
     if (strcmp(type, "wl_surface") && strcmp(type, "xdg_wm_base") && strcmp(type, "xdg_surface") &&
         strcmp(type, "xdg_toplevel") && strcmp(type, "zxdg_toplevel_decoration_v1") &&
         strcmp(type, "wl_pointer"))
@@ -148,6 +231,16 @@ static void observe(void *data, int direction, const struct msg *m) {
     if (uid != geteuid() || !vendor(pid)) return;
     uint32_t seq = client_seq(client), id = wl_resource_get_id(m->resource);
     if (!seq) return;
+#ifdef CW_POINTER_DIAGNOSTICS
+    if (direction == 1) {
+        note_pointer(m, op, seq, pid, id);
+        return;
+    }
+    if (!strcmp(type, "wl_pointer") && !strcmp(op, "release"))
+        say("POINTER_RELEASE %u %d %u\n", seq, pid, id);
+    if (!strcmp(type, "wl_surface") && !strcmp(op, "destroy"))
+        say("POINTER_SURFACE_GONE %u %d %u\n", seq, pid, id);
+#endif
     if (!strcmp(type, "xdg_wm_base") && !strcmp(op, "get_xdg_surface") && m->argc == 2) {
         say("XDG_SURFACE %u %d %u %u\n", seq, pid, m->args[0].u, wl_resource_get_id(m->args[1].o));
         return;
@@ -174,6 +267,9 @@ static void observe(void *data, int direction, const struct msg *m) {
         for (int j = 0; j < count; j++)
             if (attached_surface[j] == m->resource && attach_con[j] == seq) {
                 say("COMMIT %u %d %u %lu\n", seq, pid, id, table[j].attach);
+#ifdef CW_POINTER_DIAGNOSTICS
+                note_placement(m->resource, table[j].attach, seq, pid, id);
+#endif
                 attached_surface[j] = NULL;
             }
         return;
