@@ -109,6 +109,12 @@ class OfflineViewport(Session):
         self.window = None
         self.navigation = None
         self.viewer_closed = asyncio.Event()
+        self.failure_kind = None
+
+    async def wait_for_viewer(self):
+        await self.viewer_closed.wait()
+        if self.failure_kind is not None:
+            raise CaptureError('The paired browser viewport failed: ' + self.failure_kind)
 
     async def next_frame(self):
         if self.sequence == 0xffffffff:
@@ -150,6 +156,12 @@ class OfflineViewport(Session):
                 elif not same_scene(candidate, current):
                     await self._publish(writer, candidate)
                     current = candidate
+        except Exception as exc:
+            # Session.accept closes an individual failed connection. The one-shot
+            # CLI also needs to distinguish that outcome from the viewer's EOF.
+            if isinstance(exc, CaptureError) or not self.page.is_closed():
+                self.failure_kind = type(exc).__name__
+            raise
         finally:
             self.viewer_closed.set()
             if incoming is not None:
@@ -264,7 +276,7 @@ async def run(executable, port, pairing, size):
                     print(f'云端 Chromium 视口端口 {server.sockets[0].getsockname()[1]}。', flush=True)
                     page.on('close', lambda *_: service.viewer_closed.set())
                     if not page.is_closed():
-                        await service.viewer_closed.wait()
+                        await service.wait_for_viewer()
             finally:
                 await context.close()
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from cloud_render import browser_viewport_service as service
 from cloud_render.browser_surface import SystemBrowserWindow
+from cloud_render.chromium_capture import CaptureError
 from cloud_render.wire import Click, Frame, InputAck, KeyPress, Layer, async_read_message, encode_message
 from experiments.live_browser_viewport import present_viewport
 
@@ -49,6 +50,19 @@ class CloudWindow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(updated, frame(3, b'B'))
         self.owner = SystemBrowserWindow(45, 14, 'one', 'changed-loader')
         self.assertEqual(await asyncio.wait_for(reader.read(), 2), b'')
+        with self.assertRaisesRegex(CaptureError, 'CaptureError'):
+            await self.source.wait_for_viewer()
+
+    async def test_normal_paired_eof_and_unpaired_rejection_have_distinct_ownership(self):
+        denied, _ = await self.connect(b'z' * 43)
+        self.assertEqual(await denied.read(1), b'')
+        self.assertFalse(self.source.viewer_closed.is_set())
+        reader, writer = await self.connect(b't' * 43)
+        await async_read_message(reader, expected=Frame)
+        writer.close()
+        await writer.wait_closed()
+        await asyncio.wait_for(self.source.wait_for_viewer(), 2)
+        self.assertIsNone(self.source.failure_kind)
 
     async def test_actions_require_the_painted_scene_even_with_same_document(self):
         applied = []
