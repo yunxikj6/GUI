@@ -19,7 +19,7 @@ class DesktopTests(unittest.TestCase):
                              side_effect=lambda start, *args, **kwargs: start()):
             self.assertEqual(gnome_desktop.main(['--forwarded', '--port', '41325', '--size', '1280x900']), 0)
         self.assertEqual([call.args[0] for call in secret.call_args_list], ['CLOUDWORKSPACE_GNOME_TOKEN'])
-        forwarded.assert_called_once_with(41325, 't' * 43, size=(1280, 900), wallpaper=True)
+        forwarded.assert_called_once_with(41325, 't' * 43, size=(1280, 900), wallpaper=True, search_input=True)
 
     def test_pointer_moves_coalesce_only_between_buttons_and_keys(self):
         inputs = InputQueue(3)

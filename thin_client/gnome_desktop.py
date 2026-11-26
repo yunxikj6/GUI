@@ -92,6 +92,13 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
 
     window = open_window(f'{TITLE} · 正在连接云端桌面', width, height, submit)
 
+    def current_text_focus():
+        with lock:
+            session = peer
+        return session.text_focus() if session is not None and not stop.is_set() else None
+
+    window.text_focus = current_text_focus
+
     def send_input(session):
         try:
             while not stop.is_set() and (event := inputs.get()) is not None:
@@ -106,6 +113,8 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
                     session.click(*args)
                 elif kind == 'key':
                     session.key(*args)
+                elif kind == 'text':
+                    session.commit_text(*args)
         except Exception as exc:
             fail(exc)
 
@@ -241,10 +250,10 @@ def main(argv=None):
             except (OSError, ValueError, ImportError):
                 artwork = None
             if args.forwarded:
-                return connect_forwarded(args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None)
+                return connect_forwarded(args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True)
             box = InstaBox(key, args.machine)
             box.ensure_running()
-            return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None)
+            return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True)
 
         def render(session, present):
             replay(session, present, wallpaper=artwork)

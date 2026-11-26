@@ -4,6 +4,8 @@ import os
 import threading
 from ctypes import wintypes as w
 
+from .gnome_wintext import TextInput, ime_result
+
 user = c.WinDLL('user32', use_last_error=True)
 gdi = c.WinDLL('gdi32', use_last_error=True)
 kernel = c.WinDLL('kernel32', use_last_error=True)
@@ -67,10 +69,14 @@ cursor = function(user, 'LoadCursorW', w.HANDLE, w.HINSTANCE, c.c_void_p)
 
 set_title = function(user, 'SetWindowTextW', w.BOOL, w.HWND, w.LPCWSTR)
 get_key_state = function(user, 'GetKeyState', c.c_short, c.c_int)
+get_focus = function(user, 'GetFocus', w.HWND)
 move_window = function(user, 'SetWindowPos', w.BOOL, w.HWND, w.HWND, *([c.c_int] * 4), w.UINT)
 WM_PAINT, WM_CLOSE, WM_DESTROY, WM_SIZE = 15, 16, 2, 5
 WM_MOUSEMOVE, WM_LBUTTONUP, WM_RBUTTONUP = 0x200, 0x202, 0x205
 WM_KEYDOWN, WM_KEYUP, WM_DPICHANGED = 0x100, 0x101, 0x02e0
+WM_KILLFOCUS, WM_CHAR = 0x0008, 0x0102
+WM_IME_STARTCOMPOSITION, WM_IME_ENDCOMPOSITION, WM_IME_COMPOSITION = 0x010d, 0x010e, 0x010f
+WM_IME_CHAR, GCS_RESULTSTR = 0x0286, 0x0800
 VK_CONTROL, VK_SHIFT, VK_MENU = 0x11, 0x10, 0x12
 NAVIGATION = {
     0x08: 'Backspace', 0x09: 'Tab', 0x0d: 'Enter', 0x1b: 'Escape',
@@ -133,6 +139,9 @@ class NativeWindow:
             raise ValueError('invalid scanout dimensions')
         self.width, self.height, self.on_input = width, height, on_input
         self.closed = False
+        self.text_focus = lambda: None
+        self._text = TextInput(lambda: self.text_focus(), on_input)
+        self._space_as_key = False
         self._pixels = None
         self._lock = threading.Lock()
         self._posted = False
@@ -159,6 +168,9 @@ class NativeWindow:
         show(self.hwnd, 5)
 
     def _window_proc(self, hwnd, msg, wp, lp):
+        if msg in (WM_KILLFOCUS, WM_DESTROY):
+            self._text.reset()
+            self._space_as_key = False
         if msg == WM_CLOSE:
             destroy(hwnd)
             return 0
@@ -196,6 +208,30 @@ class NativeWindow:
             move_window(hwnd, None, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, 0x14)
             return 0
         if self.on_input and self._pixels is not None:
+            if msg == WM_IME_STARTCOMPOSITION:
+                if get_focus() == hwnd:
+                    self._text.start()
+                else:
+                    self._text.reset()
+                return default(hwnd, msg, wp, lp)
+            if msg == WM_IME_ENDCOMPOSITION:
+                self._text.end()
+                return default(hwnd, msg, wp, lp)
+            if msg == WM_IME_COMPOSITION and lp & GCS_RESULTSTR:
+                if self._text.revision is not None and get_focus() == hwnd:
+                    self._text.commit(ime_result(hwnd))
+                # The default window may display simultaneous preedit updates.
+                # Only this handler consumes the result and sends committed text.
+                return default(hwnd, msg, wp, lp & 0x1ff) if lp & 0x1ff else 0
+            if msg == WM_IME_CHAR:
+                # DefWindowProc would translate this legacy copy into a second WM_CHAR.
+                return 0
+            if msg == WM_CHAR:
+                if wp == 0x20 and self._space_as_key:
+                    self._space_as_key = False
+                elif get_focus() == hwnd:
+                    self._text.character(wp)
+                return 0
             if msg in (WM_MOUSEMOVE, WM_LBUTTONUP, WM_RBUTTONUP):
                 x, y = c.c_short(lp & 0xffff).value, c.c_short((lp >> 16) & 0xffff).value
                 rect = w.RECT()
@@ -213,6 +249,14 @@ class NativeWindow:
             if msg == WM_KEYUP and wp in (0x5b, 0x5c):
                 self.on_input(('super',))
                 return 0
+            if msg == WM_KEYDOWN:
+                self._text.next_key()
+            if msg == WM_KEYDOWN and self._text.composing:
+                return default(hwnd, msg, wp, lp)
+            if msg == WM_KEYDOWN and wp == 0x20:
+                self._space_as_key = self.text_focus() is None
+                if not self._space_as_key:
+                    return default(hwnd, msg, wp, lp)
             if msg == WM_KEYDOWN and not (lp & (1 << 30)):
                 ctrl = get_key_state(VK_CONTROL) < 0
                 shift = get_key_state(VK_SHIFT) < 0

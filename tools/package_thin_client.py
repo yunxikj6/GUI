@@ -24,7 +24,7 @@ FILES = (
     ('cloud_render/frame_delta.py', 'cloud_render/frame_delta.py'),
     ('cloud_render/instabox_relay.py', 'cloud_render/instabox_relay.py'),
 )
-CLIENT_FILES = ('gnome_desktop.py', 'gnome_window.py', 'gnome_transport.py', 'virgl_windows.py', 'virgl_runtime.json',
+CLIENT_FILES = ('gnome_desktop.py', 'gnome_window.py', 'gnome_wintext.py', 'gnome_transport.py', 'virgl_windows.py', 'virgl_runtime.json',
                 'viewer.py', 'app_window.py', 'instabox_transport.py', 'index.html', 'renderer.js',
                 'viewer.js', 'input.js', 'viewer.css', 'vendor/canvaskit.js', 'vendor/canvaskit.wasm.gz',
                 'vendor/CanvasKit.json', 'vendor/CanvasKit-LICENSE.txt', 'vendor/DejaVu-COPYRIGHT.txt',
