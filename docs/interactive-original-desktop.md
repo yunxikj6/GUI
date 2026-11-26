@@ -28,6 +28,22 @@ python3 -m experiments.original_desktop_source --profile "$HOME/.local/share/clo
 Start.cmd --forwarded --port 17326
 ```
 
+## 打开云端系统浏览器的原版视口
+
+完整桌面使用上面的默认入口。要单独操作 Chromium 自己绘制的离线错误页，在有图形会话、GIO、原版 Chromium 和 `requirements-render.txt` 中依赖的云机上，进入解压的云端服务目录再运行以下命令。默认可执行文件为 `/usr/lib/chromium/chromium`。
+
+```sh
+python3 -m cloud_render.browser_viewport_service --port 17328
+```
+
+云端会给本次视口单独生成配对码。Windows 解压完整 x64 客户端，在其目录内运行以下命令，并输入该配对码。已自行建立私有回环转发时，省略 `--instabox`。
+
+```bat
+Start.cmd --browser-viewport --instabox --port 17328
+```
+
+云端用系统默认处理器打开真实 Chromium 窗口。Windows 收到浏览器内容区的原始 Skia 绘图，在独立原生窗口本地执行。此入口使用固定无查询参数的离线页面，用于验证窗口、绘图和输入。原厂账户登录、浏览器地址栏和标签栏在完整桌面中的显示仍需接入。
+
 ## 用户操作验证
 
 独立解压的 Windows 客户端经配对桥进入本次真实 Ubuntu。用户从原版 Dock 点击 (32,66) 启动 ChatGPT，再在欢迎页点击 (672,502)。云端依次确认四次真实移动和左键。窗口在第二次点击后约 4.57 秒显示登录方式，随后 Alt+F4 正常关闭本机窗口，云端收到了控制连接 EOF。该次启动使用包内的 Windows Python、Node 和渲染库。操作过程中未向客户端传入预录的提交表或截图。[初始桌面](measurements/original-window/manual-desktop.png) · [应用欢迎页](measurements/original-window/manual-before.png) · [登录方式](measurements/original-window/manual-after.png)
