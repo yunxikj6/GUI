@@ -22,6 +22,7 @@ PACKAGE = {
     "size": 501426562,
     "sha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
 }
+CACHED_PACKAGE = Path("/var/cache/apt/archives/chatgpt_26.1120.50957_amd64.deb")
 INSTALLED_BYTES = 1560353 * 1024  # Installed-Size in the verified vendor control file.
 EXECUTABLE_SHA256 = "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7"
 
@@ -59,7 +60,13 @@ def fetch_vendor(directory):
     with tempfile.TemporaryDirectory(dir=directory, prefix="vendor-download-") as scratch:
         candidate = Path(scratch) / "chatgpt.deb"
         try:
-            download(PACKAGE, candidate)
+            try:
+                cached = CACHED_PACKAGE.open("rb")
+            except FileNotFoundError:
+                download(PACKAGE, candidate)
+            else:
+                with cached:
+                    checked_copy(cached, candidate, PACKAGE)
         except (OSError, ValueError) as exc:
             raise RuntimeError(
                 "云机未能下载并校验指定版本。可从官方渠道取得安装包，用 --chatgpt-deb FILE 启动。"

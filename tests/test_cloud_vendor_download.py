@@ -13,6 +13,7 @@ class CloudVendorDownload(unittest.TestCase):
         data = b'cloud-side vendor archive'
         record = dict(chatgpt.PACKAGE, size=len(data), sha256=hashlib.sha256(data).hexdigest())
         with tempfile.TemporaryDirectory() as tmp, patch.object(chatgpt, 'PACKAGE', record), \
+                patch.object(chatgpt, 'CACHED_PACKAGE', Path(tmp) / 'missing.deb'), \
                 patch('urllib.request.build_opener') as opener:
             destination = Path(tmp)
             request = opener.return_value.open
@@ -29,3 +30,16 @@ class CloudVendorDownload(unittest.TestCase):
             request.return_value = io.BytesIO(data)
             with self.assertRaises(FileExistsError):
                 chatgpt.fetch_vendor(destination)
+
+
+    def test_exact_cloud_apt_cache_starts_without_network(self):
+        data = b'provider-selected verified archive'
+        record = dict(chatgpt.PACKAGE, size=len(data), sha256=hashlib.sha256(data).hexdigest())
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d)
+            cached = target / 'original.deb'
+            cached.write_bytes(data)
+            with patch.object(chatgpt, 'CACHED_PACKAGE', cached), patch.object(chatgpt, 'PACKAGE', record), \
+                    patch.object(chatgpt, 'download') as network:
+                self.assertEqual(chatgpt.fetch_vendor(target).read_bytes(), data)
+                network.assert_not_called()
