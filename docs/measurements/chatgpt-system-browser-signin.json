@@ -1,0 +1,50 @@
+{
+  "measurement": "Original ChatGPT desktop system-browser sign-in handoff",
+  "date": "2026-11-26",
+  "app": {
+    "package": "chatgpt",
+    "version": "26.1120.50957",
+    "architecture": "amd64",
+    "archiveSha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
+    "packageDocumentation": "https://learn.chatgpt.com/docs/linux/linux-app",
+    "launchExecutable": "/usr/bin/chatgpt"
+  },
+  "source": {
+    "distribution": "Ubuntu 24.04 application root",
+    "graphics": "isolated X11 display",
+    "networkInterfaces": [
+      "lo"
+    ],
+    "defaultBrowser": "original Debian system Chromium, fresh profile, delivered via an ephemeral XDG desktop handler on the same display and private network namespace",
+    "applicationProfile": "empty",
+    "vendorSandboxEnabled": true
+  },
+  "action": "Click the original Continue to sign in button once with a pointer. The XDG default browser receives the application-generated URI. Only scheme, host, path and protocol shape were recorded.",
+  "sourceResult": {
+    "applicationMainPage": "app://-/index.html",
+    "namedApplicationPagesAfterClick": 1,
+    "separateNativeWindowsObserved": [
+      "ChatGPT",
+      "Chromium"
+    ],
+    "systemBrowserAuthorizationEndpoint": "https://auth.openai.com/oauth/authorize",
+    "pkceMethod": "S256",
+    "statePresent": true,
+    "originalApplicationCallback": "http://127.0.0.1:1455/auth/callback",
+    "sourceSocketBoundIPv4": "127.0.0.1:1455",
+    "loopbackListenerAcceptedTCP": true,
+    "attemptedCallbackRequest": false,
+    "browserNavigationOutcome": "net::ERR_INTERNET_DISCONNECTED",
+    "externalResponseCount": 0,
+    "accountOrCredentialInput": false
+  },
+  "onlineScope": {
+    "developmentEnvironment": "An independent public-origin handshake through the configured development proxy returned an internal certificate chain. With only Ubuntu Mozilla public roots, certificate verification failed. The managed environment also refused direct TCP/443. No trust store or egress policy was changed.",
+    "notYetVerified": [
+      "A policy-approved cloud egress connection to the real vendor sign-in page",
+      "The separate original browser surface rendered and controlled in the Windows desktop",
+      "Completing authorization, returning to the original app, and authenticated conversation UI"
+    ],
+    "nextIntegration": "The native system browser and original application must stay in the same cloud network namespace for the loopback callback, with independent surface provenance and original client-side drawing. The OAuth URI, PKCE material and callback stay on that cloud source."
+  }
+}
