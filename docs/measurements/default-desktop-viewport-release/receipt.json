@@ -1,0 +1,308 @@
+{
+  "exactZip": "a2cdbc2fe86ad6ea554d0ca5e5c10a7e2fb76473b9ce68efc31bf6b09154c174",
+  "features": {
+    "offered": 190,
+    "negotiated": 190,
+    "width": 1280,
+    "height": 900,
+    "returnedBytes": 1019558,
+    "seconds": 96.71
+  },
+  "witnessedOriginalSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "boundPid": 558,
+  "verifiedGvglBlocks": 130,
+  "truncatedLastGvglBytes": 0,
+  "verifiedGvglLogicalBytes": 8557930,
+  "verifiedGvglLogicalSha256": "853b6b17d5601ec20aea7ae3b491ad38b46d9183853c411880ac651ab9a7f7f2",
+  "rawDraws": 0,
+  "deltaDraws": 20,
+  "holds": 72,
+  "reuses": 49,
+  "ubuntuArtworkReferences": 1,
+  "ubuntuArtworkDigests": {
+    "b4da4262ad652769b76d6d97c46514ea7e611362f436be6f965edf90c9330ca1": 1
+  },
+  "rows": [
+    {
+      "digest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+      "ordinal": 1,
+      "delta": true,
+      "transportedBytes": 414766,
+      "reconstructedSourceBytes": 1526443
+    },
+    {
+      "digest": "1b3bd48b1c349bc243f4a866ff58216d2e7a068199f6a8f446ba69786353a514",
+      "ordinal": 2,
+      "delta": true,
+      "transportedBytes": 4878,
+      "reconstructedSourceBytes": 1526443
+    },
+    {
+      "digest": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+      "ordinal": 3,
+      "delta": true,
+      "transportedBytes": 13559,
+      "reconstructedSourceBytes": 2289392
+    },
+    {
+      "digest": "55829f368dece9d8a9d380484fbcadc3065e4653881696d70cd572693087153d",
+      "ordinal": 4,
+      "delta": true,
+      "transportedBytes": 4304,
+      "reconstructedSourceBytes": 2289392
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 5,
+      "delta": true,
+      "transportedBytes": 16257,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "fe2330433466fe2af4a6ed5bffe477797ab230b8c182db97e4749b94188609b9",
+      "ordinal": 6,
+      "delta": true,
+      "transportedBytes": 6866,
+      "reconstructedSourceBytes": 2285435
+    },
+    {
+      "digest": "b720bb58dee1de7797f78338b0d59158042c1fc7be93f97d14c957e57473ae04",
+      "ordinal": 7,
+      "delta": true,
+      "transportedBytes": 2392,
+      "reconstructedSourceBytes": 2285391
+    },
+    {
+      "digest": "fe2330433466fe2af4a6ed5bffe477797ab230b8c182db97e4749b94188609b9",
+      "ordinal": 8,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285435
+    },
+    {
+      "digest": "b720bb58dee1de7797f78338b0d59158042c1fc7be93f97d14c957e57473ae04",
+      "ordinal": 9,
+      "delta": true,
+      "transportedBytes": 2392,
+      "reconstructedSourceBytes": 2285391
+    },
+    {
+      "digest": "fe2330433466fe2af4a6ed5bffe477797ab230b8c182db97e4749b94188609b9",
+      "ordinal": 10,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285435
+    },
+    {
+      "digest": "b720bb58dee1de7797f78338b0d59158042c1fc7be93f97d14c957e57473ae04",
+      "ordinal": 11,
+      "delta": true,
+      "transportedBytes": 2392,
+      "reconstructedSourceBytes": 2285391
+    },
+    {
+      "digest": "fe2330433466fe2af4a6ed5bffe477797ab230b8c182db97e4749b94188609b9",
+      "ordinal": 12,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285435
+    },
+    {
+      "digest": "dcffb03b16683176e23d81ffb43265228516bf53f84315a278ed6170c0aee2f0",
+      "ordinal": 13,
+      "delta": true,
+      "transportedBytes": 9199,
+      "reconstructedSourceBytes": 2284071
+    },
+    {
+      "digest": "dc641b60b875a5fe6e7cdf1ffe6e2f297ed0e679b34648773ce7be16497f79df",
+      "ordinal": 14,
+      "delta": true,
+      "transportedBytes": 9427,
+      "reconstructedSourceBytes": 2285423
+    },
+    {
+      "digest": "9b95e196b9b7de096f8bc547f4577821dbd12897f4bd89ab64a874cf97d4885f",
+      "ordinal": 15,
+      "delta": true,
+      "transportedBytes": 2390,
+      "reconstructedSourceBytes": 2285379
+    },
+    {
+      "digest": "dc641b60b875a5fe6e7cdf1ffe6e2f297ed0e679b34648773ce7be16497f79df",
+      "ordinal": 16,
+      "delta": true,
+      "transportedBytes": 2411,
+      "reconstructedSourceBytes": 2285423
+    },
+    {
+      "digest": "9b95e196b9b7de096f8bc547f4577821dbd12897f4bd89ab64a874cf97d4885f",
+      "ordinal": 17,
+      "delta": true,
+      "transportedBytes": 2390,
+      "reconstructedSourceBytes": 2285379
+    },
+    {
+      "digest": "dc641b60b875a5fe6e7cdf1ffe6e2f297ed0e679b34648773ce7be16497f79df",
+      "ordinal": 18,
+      "delta": true,
+      "transportedBytes": 2411,
+      "reconstructedSourceBytes": 2285423
+    },
+    {
+      "digest": "9b95e196b9b7de096f8bc547f4577821dbd12897f4bd89ab64a874cf97d4885f",
+      "ordinal": 19,
+      "delta": true,
+      "transportedBytes": 2390,
+      "reconstructedSourceBytes": 2285379
+    },
+    {
+      "digest": "dc641b60b875a5fe6e7cdf1ffe6e2f297ed0e679b34648773ce7be16497f79df",
+      "ordinal": 20,
+      "delta": true,
+      "transportedBytes": 2411,
+      "reconstructedSourceBytes": 2285423
+    }
+  ],
+  "independentWindowReadback": {
+    "welcome": {
+      "fullImageDigest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 714000,
+      "exactFraction": 1.0
+    },
+    "method": {
+      "fullImageDigest": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713708,
+      "exactFraction": 0.9995910364145658
+    },
+    "empty": {
+      "fullImageDigest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    },
+    "input": {
+      "fullImageDigest": "fe2330433466fe2af4a6ed5bffe477797ab230b8c182db97e4749b94188609b9",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    },
+    "replace": {
+      "fullImageDigest": "dc641b60b875a5fe6e7cdf1ffe6e2f297ed0e679b34648773ce7be16497f79df",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    }
+  },
+  "windowExits": {
+    "productExit": 0,
+    "sourceExit": 0,
+    "privateDirectoryGone": true
+  },
+  "interaction": {
+    "steps": [
+      [
+        "welcome",
+        61.615
+      ],
+      [
+        "method",
+        71.562
+      ],
+      [
+        "empty",
+        81.147
+      ],
+      [
+        "input",
+        88.011
+      ],
+      [
+        "replace",
+        96.252
+      ]
+    ],
+    "typedKeys": 7,
+    "acknowledgedKeys": 7,
+    "focusEpoch": 1,
+    "submitted": false,
+    "selectedAndReplaced": true,
+    "testing": "True Win64 Python, Node and HWND under Wine and private isolated Ubuntu source",
+    "zip": "a2cdbc2fe86ad6ea554d0ca5e5c10a7e2fb76473b9ce68efc31bf6b09154c174",
+    "command": "Start.cmd --forwarded --port <authenticated local forward>"
+  },
+  "clientArchiveSha": "a2cdbc2fe86ad6ea554d0ca5e5c10a7e2fb76473b9ce68efc31bf6b09154c174",
+  "verifiedClientFiles": 95,
+  "sharedVerifiedBytes": 130704677,
+  "verifiedSourceFiles": 59,
+  "sourceArchiveSha": "17f757786722e6d182a0ca10279692ca31cfaaea1ae056fa37b19499926d60d4",
+  "sourceGitRevision": "f960e3586a26e00f63b43500c31a2e99bc53780b",
+  "mutterWitnessSourceSha256": "0ec3862e78fb50ab9cdcb55e40b98830b25afbd8438b8001d77e26a9d76cf85a",
+  "closedEndpointChecks": {
+    "source": true,
+    "observerForwarder": true
+  },
+  "pairingFileRemoved": true,
+  "mode": "Actual cmd.exe /d /c Start.cmd --forwarded --port <temporary local port> in isolated Wine 10 Win64, with private OS input and an isolated Ubuntu Noble role running the signed original application. Neither role accessed an account or used InstaBox credentials. Physical Windows 11 and public network were not part of this test.",
+  "source": "Exact published candidate server ZIP extracted byte-for-byte, with the original executable/cloud OS installed on the separate Ubuntu role. Owner supplied a verified x86-64 native probe built with the packaged Mutter source and its own build flags. The operator used the bundled one-shot original_desktop_source module.",
+  "windowReadback": "Independent OS display capture against a separate CanvasKit execution of original CLRP retained by the source. Scores cover the central 1050 \u00d7 680 pixels of the original software surface.",
+  "submittedCredentials": false,
+  "defaultStart": {
+    "exitCode": 2,
+    "fullDesktopUsage": true,
+    "providerCredentialsUsed": false,
+    "networkNamespace": "isolated with no external interfaces",
+    "observation": "Zero-argument cmd.exe /d /c Start.cmd entered the full desktop module in a network-isolated role. A deliberately invalid local pairing value stopped it before provider access. The separate paired GUI exercise used the forwarded transport."
+  },
+  "screenshots": {
+    "native-input.png": "f95963e5437e197553001dabdd9ac6359d3dcff71b2283371f975b22660843a3"
+  },
+  "fullDesktopInteraction": "Used the exact Win64 archive through Start.cmd --forwarded --port. The paired source ran the default desktop and launched ChatGPT only after the OS pointer clicked its real GNOME Dock icon. No browser viewport argument was supplied.",
+  "initialDockInteraction": "One initial attempt moved directly to the Dock and clicked immediately. The icon displayed its hover label, only one input was acknowledged, and the app did not launch. In the recorded run the operator first moved to the icon, allowed the hover state to settle for two seconds, then clicked once.",
+  "capturedDisplaySize": [
+    1460,
+    1040
+  ]
+}
