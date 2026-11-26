@@ -1,0 +1,21 @@
+{
+  "source": "Paired InstaBox, Ubuntu 24.04 GNOME Shell, 800x520. This test reuses an authenticated command recording from an earlier live cloud session.",
+  "sourceCommandSha256": "96cff321457e58d85b6f687b1101e5aa515261aad167d8d80ad6c1587a1a73b9",
+  "originalCommandBytes": 9470924,
+  "compressedBlocksPlusPendingTailBytes": 783937,
+  "environment": "Win64 CPython 3.13.17, native VirGL/WGL in Wine 10, private network namespace, separate X11 window reader",
+  "procedure": [
+    "Replay the original command recording, checking every local scanout against the corresponding cloud hash.",
+    "Close and remove the command file. Drop the last callback's pixel buffer and paint the client area black. Check that the independent window reader sees black.",
+    "Create a fresh native renderer and WGL context. Execute only the in-memory command prefix. Publish the final scanout after digest and geometry validation."
+  ],
+  "sourceFrames": 97,
+  "firstReplayFramesMatchingSource": 97,
+  "offlineReplayFramesMatchingSource": 97,
+  "drawVboCallsOnSource": 2377,
+  "sourceWholeDisplayUploads": 0,
+  "originalAndOfflineVisibleWindowRgbSha256": "decfd99819fa3e5061f19dcd9ce20d17f639485c90ba17b0ca29a4ecf594207c",
+  "windowRgbPixelsMatched": 416000,
+  "freshReplayMsOnThisRun": 1882,
+  "caveats": "One desktop trace. Excludes application-specific picture composition, live network failure timing, signed-in accounts and Windows 11 hardware."
+}

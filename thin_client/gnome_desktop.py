@@ -54,14 +54,16 @@ class InputQueue:
             self.condition.notify_all()
 
 
-def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_on_disconnect=False):
+def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_on_disconnect=False, restore=None):
     """Keep the Win32 message pump independent of the GPU, source and input ACKs."""
     width, height = checked_size(size)
     inputs = InputQueue()
     stop = threading.Event()
     finished = threading.Event()
     got_scene = threading.Event()
+    window_closed = threading.Event()
     lock = threading.Lock()
+    disconnect_lock = threading.Lock()
     peer = None
     errors = []
 
@@ -128,12 +130,21 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
                 raise InterruptedError('本机窗口已关闭。')
             got_scene.set()
 
+    def present_restored(w, h, pixels):
+        with lock:
+            if window_closed.is_set():
+                raise InterruptedError('窗口已关闭。')
+            if (w, h) != size:
+                raise ValueError('本机重新绘制的桌面尺寸不符。')
+            window.present(pixels)
+
     def close_peer():
         nonlocal peer
-        with lock:
-            session, peer = peer, None
-        if session is not None:
-            session.close()
+        with disconnect_lock:
+            with lock:
+                session, peer = peer, None
+            if session is not None:
+                session.close()
 
     def display():
         nonlocal peer
@@ -155,6 +166,18 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
                 close_peer()
             except Exception as exc:
                 fail(exc)
+            try:
+                if restore and got_scene.is_set() and not window_closed.is_set():
+                    # A fresh WGL context replays only the authenticated prefix.
+                    # Both network directions and the input queue have been closed.
+                    restore(present_restored, window_closed.is_set)
+            except InterruptedError:
+                if not window_closed.is_set():
+                    with lock:
+                        errors.append(ValueError('本机重新绘制被中断。'))
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
             finally:
                 finished.set()
 
@@ -163,17 +186,19 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
     has_title = False
     status_until = 0.0
     retained = False
+    readonly_title = None
     try:
         while window.pump():
             if stop.is_set() or finished.is_set():
                 if not retain_on_disconnect or not got_scene.is_set():
                     break
-                if not retained:
-                    with lock:
-                        invalid = bool(errors and isinstance(errors[0], ValueError))
-                    reason = '源端绘图或输入未通过校验' if invalid else '连接已断开'
+                with lock:
+                    invalid = any(isinstance(error, ValueError) for error in errors)
+                reason = '绘图或输入未通过校验' if invalid else '连接已断开'
+                if reason != readonly_title:
                     window.set_title(f'{TITLE} · {reason} · 只读')
-                    retained = True
+                    readonly_title = reason
+                retained = True
                 # Native WM_PAINT/resize may redraw the last locally completed
                 # buffer. No network read or input submission is available now.
                 time.sleep(.025)
@@ -195,6 +220,7 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
             # also wakes immediately on a decoder or input error.
             stop.wait(0.012)
     finally:
+        window_closed.set()
         stop.set()
         inputs.close()
         window.close()
@@ -202,8 +228,9 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
         cleanup.start()
         cleanup.join(2)
         drawing.join(2)
-    if errors and (not retained or not isinstance(errors[0], OSError)):
-        raise errors[0]
+    for error in errors:
+        if not retained or isinstance(error, ValueError) or not isinstance(error, OSError):
+            raise error
 
 
 def main(argv=None):
@@ -239,6 +266,7 @@ def main(argv=None):
         from .gnome_transport import connect, connect_forwarded
         from .gnome_window import open_window
         from .virgl_windows import replay
+        from .scene_cache import SceneCache
 
         artwork = None
 
@@ -255,10 +283,27 @@ def main(argv=None):
             box.ensure_running()
             return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True)
 
-        def render(session, present):
-            replay(session, present, wallpaper=artwork)
+        cache = None
 
-        present_session(start, render, open_window, size=SIZE_NAMES[args.size])
+        def draw(stream, present):
+            replay(stream, present, wallpaper=artwork)
+
+        def render(session, present):
+            nonlocal cache
+            cache = SceneCache(session)
+
+            def capture(w, h, pixels):
+                present(w, h, pixels)
+                cache.presented(w, h, pixels)
+
+            draw(cache, capture)
+
+        def restore(present, cancelled):
+            if cache is not None:
+                cache.redraw(draw, present, cancelled)
+
+        present_session(start, render, open_window, size=SIZE_NAMES[args.size],
+                        retain_on_disconnect=True, restore=restore)
     except BridgeError as exc:
         messages = {
             'network': '无法连接 InstaBox，请检查网络和系统时间。',
