@@ -10,7 +10,7 @@ python3 -m experiments.original_desktop_source --port 17326
 
 真实 InstaBox 会话中，Windows 连入云端，点击 Dock 打开 ChatGPT，再打开原厂登录前表单。五次键盘输入均由云端确认，本机显示相同的 `orbit`。云端默认使用临时配置。要在不同配对之间保留原程序的设置，可在云端启动命令中加入 `--profile "$HOME/.local/share/cloud-workspace/chatgpt-desktop"`。应用网络仍隔离，登录后的聊天和 Claude Artifacts 待验证。此轮 Windows x64 客户端运行于 Wine 10，实体 Windows 11 尚待验收。[真实云桌面](docs/measurements/instabox-win64/desktop.png) · [Windows 输入后的原厂窗口](docs/measurements/instabox-win64/input.png) · [此会话的时间和确认记录](docs/measurements/instabox-win64/session.json)
 
-新版根据云端原始纹理的 SHA-256 引用本机附带的 Ubuntu 官方壁纸。同一段命令从起点到第一次桌面输出，按 1 MiB 协议块计算，传输量从 9,838,740 字节降到 361,588 字节。两个独立 Win64 进程重绘的 98 次桌面输出全部一致。[传输量与像素对照](docs/measurements/original-app-wallpaper.json) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
+新版根据云端原始纹理的 SHA-256 引用本机附带的 Ubuntu 官方壁纸。在匹配纹理的同一段录制中，从起点到第一次桌面输出按 1 MiB 协议块计算，传输量从 9,838,740 字节降到 361,588 字节。两个独立 Win64 进程重绘的 98 次桌面输出全部一致。一次真实 InstaBox 首屏复测未命中这份资源，仍传输了约 9.9 MB。[传输量与像素对照](docs/measurements/original-app-wallpaper.json) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
 
 ## 连接基础 Ubuntu 桌面
 
@@ -29,6 +29,8 @@ python3 -m experiments.original_desktop_source --port 17326
 应用桌面有独立的 Win64 客户端和云端服务。进入桌面后点击 Dock 中的 ChatGPT 图标，云端启动原版程序。本机用 CanvasKit 绘制程序提供的 Skia 指令，再由 Win64 VirGL 按 GNOME 的指令将窗口合成到桌面中。已在隔离的 Ubuntu 与 Win64 客户端之间验证点击欢迎页、打开登录方式。此入口需要云端安装指定版本的 ChatGPT 和绘图依赖。[桌面应用的启动与实拍](docs/interactive-original-desktop.md)
 
 完整云桌面还支持在原版概览搜索框中使用 Windows 输入法。候选词在本机选择，提交后云端原搜索框更新文字和结果。已在原控件验证中文、退格、全选替换、取消和失焦，并与独立读取的 Win32 窗口核对像素。[原生输入法验收](docs/gnome-search-ime.md)
+
+应用内容变化时，两端可协商复用同一窗口中已经验证的绘图数据。每次重组都校验原图完整 SHA-256。在两态真实云录制的五轮回放中，协议数据量中位数从 2,396,121 字节降到 812,591 字节，重建的两幅原图和全部 38,001,652 字节 GPU 指令均相同。[绘图复用与操作耗时记录](docs/measurements/original-application-delta.json)
 
 ## 单独打开云端 ChatGPT
 
