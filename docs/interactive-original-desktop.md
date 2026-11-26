@@ -6,15 +6,13 @@
 
 ## 云端启动
 
-在已具备项目说明所需的原版软件、GNOME 及见证依赖的 Ubuntu 云源中运行。下面的命令生成新的专用目录和配对码。配对码须通过你的私有渠道交给本机。
+在已安装原版 Ubuntu、ChatGPT、GNOME 和见证依赖的云机上，从仓库目录运行一次下面的命令。启动时在私有终端输入已有的 43 位随机配对码，本机客户端使用同一码。自动化部署可由密钥管理器注入环境变量 `CLOUDWORKSPACE_GNOME_TOKEN`。
 
 ```sh
-umask 077
-work=$(mktemp -d)
-export CLOUDWORKSPACE_GNOME_TOKEN=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
-bash experiments/mutter_app/run.sh --interactive "$work/pair" "$work/source" &
-python3 -m experiments.original_desktop_bridge "$work/pair" --port 17326
+python3 -m experiments.original_desktop_source --port 17326 --lifetime 3600
 ```
+
+使用 `--port 0` 会在终端报告本次分配的回环端口。默认一小时包括启动和等待配对的时间。关闭已配对的窗口、终止这条命令或达到时限后，云机会回收该会话的进程与临时目录。再次运行会创建新的桌面。
 
 配对桥只在云机回环监听。使用 InstaBox 的 Windows 客户端通过现有官方私有传输取原版指令、绘图与真实输入确认。已将同一云端回环端口私密转发到本机的环境也可运行下列命令。配对码只通过交互提示或 `CLOUDWORKSPACE_GNOME_TOKEN` 输入。
 

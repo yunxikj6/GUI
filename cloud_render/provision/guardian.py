@@ -21,14 +21,19 @@ def _exited(pid):
 
 
 def supervise(port, lifetime, app=()):
+    return watch_private_worker(MODULE, port, lifetime, prefix="ubuntu-workspace-", args=app)
+
+
+def watch_private_worker(module, port, lifetime, *, prefix, timeout_status=0, args=()):
+    """Own a private /tmp tree and process group until the controller pipe closes."""
     token = sys.stdin.buffer.readline(46)
     if not re.fullmatch(rb"[A-Za-z0-9_-]{43}\n", token):
         raise ValueError("配对输入无效。")
     # The guardian owns both the directory and the unreaped direct worker.
     # Losing the terminal controller closes its pipe even after SIGKILL.
-    with tempfile.TemporaryDirectory(prefix="ubuntu-workspace-", dir="/tmp") as workspace:
+    with tempfile.TemporaryDirectory(prefix=prefix, dir="/tmp") as workspace:
         proc = subprocess.Popen(
-            [sys.executable, "-m", MODULE, "worker", workspace, str(port), *app],
+            [sys.executable, "-m", module, "worker", workspace, str(port), *args],
             stdin=subprocess.PIPE,
             start_new_session=True,
         )
@@ -48,7 +53,11 @@ def supervise(port, lifetime, app=()):
                 selector.register(sys.stdin.buffer, selectors.EVENT_READ)
                 while not stopping and _exited(proc.pid) is None:
                     remaining = deadline - time.monotonic()
-                    if remaining <= 0 or selector.select(min(1.0, remaining)):
+                    if remaining <= 0:
+                        if timeout_status:
+                            print("本次云桌面已达到设置的最长运行时间。", file=sys.stderr)
+                        return timeout_status
+                    if selector.select(min(1.0, remaining)):
                         break
             status = _exited(proc.pid)
             return status.si_status if status is not None else 0
