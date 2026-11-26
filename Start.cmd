@@ -4,6 +4,9 @@ cd /d "%~dp0"
 if "%~1"=="" goto windows_launcher
 if /i "%~1"=="--connect-port" goto windows_launcher
 if /i "%~1"=="--instabox" goto windows_launcher
+if /i "%~1"=="--machine" goto windows_launcher
+if /i "%~1"=="--desktop-port" goto windows_launcher
+if /i "%~1"=="--cloud-app" goto windows_launcher
 if /i "%~1"=="--native" goto windows_launcher
 if /i "%~1"=="--distro" goto windows_launcher
 if /i "%~1"=="--check-native" goto windows_launcher

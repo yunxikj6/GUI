@@ -40,6 +40,7 @@ def start(check=False, distro=None, setup=False):
     env = os.environ.copy()
     env.pop('INSTABOX_API_KEY', None)
     env.pop('CLOUDWORKSPACE_RENDER_TOKEN', None)
+    env.pop('CLOUDWORKSPACE_GNOME_TOKEN', None)
     try:
         return subprocess.run(command, cwd=ROOT, env=env).returncode
     except KeyboardInterrupt:

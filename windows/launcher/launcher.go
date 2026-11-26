@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -19,12 +18,14 @@ import (
 const limit = 64 * 1024
 const help = `Cloud Linux Workspace
 
-云端应用工作区
+默认打开完整云端 GNOME 桌面
 
-  --instabox        通过 InstaBox 连接云端应用（默认云端端口 17324）
+  --instabox        使用 InstaBox 私有连接
+  --desktop-port N  指定云端 GNOME 服务端口，默认 17325
+  --cloud-app       打开单独的云端 ChatGPT 程序，默认云端端口 17324
   --machine ID      选用指定的 InstaBox 实例
   --connect-port N  指定本地转发端口，与 --instabox 同用时指定云端端口
-  CLOUDWORKSPACE_RENDER_PORT 设置默认的本地转发端口
+  CLOUDWORKSPACE_RENDER_PORT 设置 --cloud-app 的本地转发端口
   --native          兼容模式，启动本机 Ubuntu GNOME 工作区
   --distro 名称     使用 wsl --list --quiet 中的完整发行版名称
   --check-native    检查本机 Ubuntu、WSLg 和桌面依赖后退出
@@ -35,8 +36,8 @@ const help = `Cloud Linux Workspace
 
 type options struct {
 	distro, app                                  string
-	renderPort, machine                          string
-	direct                                       bool
+	renderPort, desktopPort, machine             string
+	direct, cloudApp                             bool
 	native, check, setup, showHelp, offerInstall bool
 }
 type failure struct {
@@ -51,6 +52,14 @@ func parse(args []string) (options, *failure) {
 	var opt options
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--cloud-app":
+			opt.cloudApp = true
+		case "--desktop-port":
+			i++
+			if i >= len(args) || opt.desktopPort != "" || !validRenderPort(args[i]) {
+				return opt, fail("arguments", "--desktop-port 需要 1 到 65535 之间的云端 GNOME 端口。")
+			}
+			opt.desktopPort = args[i]
 		case "--instabox":
 			opt.direct = true
 		case "--machine":
@@ -100,7 +109,10 @@ func parse(args []string) (options, *failure) {
 	if opt.app != "" && opt.distro != "" {
 		return opt, fail("arguments", "--open-app 使用 Windows 应用，不能与 --distro 同时使用。")
 	}
-	if (opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
+	if opt.desktopPort != "" && (opt.cloudApp || opt.renderPort != "") {
+		return opt, fail("arguments", "请分别选择云端桌面或单应用连接。")
+	}
+	if (opt.cloudApp || opt.desktopPort != "" || opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
 		return opt, fail("arguments", "云端绘图与本地兼容模式不能同时使用。")
 	}
 	return opt, nil
@@ -231,7 +243,7 @@ func project(exe, marker string) string {
 	return ""
 }
 func renderSecret(key string) bool {
-	return strings.EqualFold(key, "INSTABOX_API_KEY") || strings.EqualFold(key, "CLOUDWORKSPACE_RENDER_TOKEN")
+	return strings.EqualFold(key, "INSTABOX_API_KEY") || strings.EqualFold(key, "CLOUDWORKSPACE_RENDER_TOKEN") || strings.EqualFold(key, "CLOUDWORKSPACE_GNOME_TOKEN")
 }
 
 func childEnv(env []string) []string {
@@ -269,79 +281,79 @@ const (
 	setupRun
 	rendererRun
 	instaboxRendererRun
+	desktopRendererRun
 )
 
 type runner func(program string, args, env []string, mode runMode) runResult
 
-func launchRenderer(opt options, exe string, env []string, lookup func(string) (string, error), run runner) *failure {
-	port := opt.renderPort
-	direct := opt.direct || opt.machine != ""
-	if port == "" && !direct {
+func launchRenderer(opt options, exe string, env []string, run runner) *failure {
+	desktop := !opt.cloudApp && opt.renderPort == ""
+	direct := desktop || opt.direct || opt.machine != ""
+	if opt.cloudApp && opt.renderPort == "" && !direct {
+		direct = true
 		for _, pair := range env {
 			key, value, found := strings.Cut(pair, "=")
 			if found && strings.EqualFold(key, "CLOUDWORKSPACE_RENDER_PORT") {
 				if !validRenderPort(value) {
 					return fail("arguments", "CLOUDWORKSPACE_RENDER_PORT 需要设置为 1 到 65535 之间的本地转发端口。")
 				}
-				port = value
+				direct = false
 				break
 			}
 		}
 	}
-	if port == "" {
-		port = "17324"
-		direct = true
+	root := project(exe, "thin_client_entry.py")
+	if root == "" {
+		return fail("package-layout", "找不到客户端入口。请完整解压发行 ZIP 后打开 Start.cmd。")
 	}
-	root := project(exe, filepath.Join("thin_client", "viewer.py"))
-	if root == "" || !regular(filepath.Join(root, "thin_client_entry.py")) {
-		return fail("package-layout", "找不到云端绘图客户端。请将启动器和完整项目一起解压。")
+	root, cleanup, problem := packagedClient(root)
+	if problem != nil {
+		return problem
 	}
-	args := []string{"-E", "-s", "-X", "utf8", filepath.Join(root, "thin_client_entry.py")}
+	defer cleanup()
+	interpreter := filepath.Join(root, "windows", "runtime", "python.exe")
+	args := []string{"-I", "-X", "utf8", filepath.Join(root, "thin_client_entry.py")}
 	mode := rendererRun
+	tokenKey := "CLOUDWORKSPACE_RENDER_TOKEN"
 	if direct {
-		args = append(args, "--instabox")
 		mode = instaboxRendererRun
+		args = append(args, "--instabox")
 	}
-	args = append(args, "--connect-port", port)
+	if desktop {
+		mode = desktopRendererRun
+		tokenKey = "CLOUDWORKSPACE_GNOME_TOKEN"
+		if opt.desktopPort != "" {
+			args = append(args, "--desktop-port", opt.desktopPort)
+		}
+	} else {
+		args = append(args, "--cloud-app")
+		if opt.renderPort != "" {
+			args = append(args, "--connect-port", opt.renderPort)
+		}
+	}
 	if opt.machine != "" {
 		args = append(args, "--machine", opt.machine)
 	}
-	interpreter, err := lookup("py.exe")
-	if err == nil {
-		args = append([]string{"-3"}, args...)
-	} else if interpreter, err = lookup("python.exe"); err != nil {
-		return fail("no-python", "云端绘图客户端需要 Python 3。请先在此 Windows 用户下安装 Python 3，再打开工作区。")
-	}
-	trustedEnv := childEnv(env)
+	envForClient := childEnv(env)
 	for _, pair := range env {
-		name, _, ok := strings.Cut(pair, "=")
-		if ok && (strings.EqualFold(name, "CLOUDWORKSPACE_RENDER_TOKEN") || (direct && strings.EqualFold(name, "INSTABOX_API_KEY"))) {
-			trustedEnv = append(trustedEnv, pair)
+		key, _, found := strings.Cut(pair, "=")
+		if found && (strings.EqualFold(key, tokenKey) || direct && strings.EqualFold(key, "INSTABOX_API_KEY")) {
+			envForClient = append(envForClient, pair)
 		}
 	}
-	// Only run an existing runtime. Recent py launchers can offer to
-	// install a missing runtime, which belongs outside ordinary startup.
-	var child []string
-	for _, pair := range trustedEnv {
-		key, _, _ := strings.Cut(pair, "=")
-		if !strings.EqualFold(key, "PYLAUNCHER_ALLOW_INSTALL") && !strings.EqualFold(key, "PYLAUNCHER_ALWAYS_INSTALL") && !strings.EqualFold(key, "PYTHON_MANAGER_AUTOMATIC_INSTALL") {
-			child = append(child, pair)
-		}
-	}
-	child = append(child, "PYTHON_MANAGER_AUTOMATIC_INSTALL=false")
-	result := run(interpreter, args, child, mode)
+	result := run(interpreter, args, envForClient, mode)
 	if result.exit == 130 {
 		return &failure{"render-cancelled", "已取消连接。", 130}
 	}
 	if result.exit != 0 {
-		return &failure{"cloud-render-exit", "云端应用绘图连接未能运行。请核对云机、端口与配对码。可在终端用同样参数运行 python thin_client_entry.py 查看详情。", result.exit}
+		return &failure{"cloud-render-exit", "无法打开云端窗口。请核对云机、服务端口及相应会话的配对码。可在解压后的客户端目录用 windows\\runtime\\python.exe thin_client_entry.py 加相同参数查看详情。", result.exit}
 	}
 	return nil
 }
 
 func execute(opt options, exe, windows string, env []string, run runner) *failure {
 	if !opt.localDesktop() {
-		return launchRenderer(opt, exe, env, exec.LookPath, run)
+		return launchRenderer(opt, exe, env, run)
 	}
 	root := project(exe, filepath.Join("linux", "start-workspace.sh"))
 	if root == "" {

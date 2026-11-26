@@ -1,34 +1,44 @@
-# 云端应用轻量客户端
+# Windows 云工作区
 
-本机需要 Windows x64 或 ARM64、Python 3.10 及以上版本和 Microsoft Edge。先解压整个 ZIP，再双击 `Start.cmd`。原版 ChatGPT 由云服务器运行。本机使用随包的 Skia 引擎，在独立窗口中绘制从云端收到的界面。
+解压整个 ZIP，双击 `Start.cmd`。在两个 Windows 提示框中依次输入 InstaBox API 密钥和云端 GNOME 桌面的本次配对码。Windows 窗口使用显卡的 OpenGL 驱动执行云端桌面发来的绘图命令。Ubuntu、GNOME 会话和应用文件都在云机上。
 
-## 云端准备
+客户端自带 x64 CPython 3.13.17 和 VirGL。x64 Windows 直接运行内置运行时。ARM64 启动器也使用这套 x64 运行时，需要 Windows 11 的 x64 仿真和可用的 OpenGL 驱动。ARM64 实机渲染仍待验证。
 
-在云机的图形会话中安装 OpenAI 官方 ChatGPT for Linux，并解压本项目完整源码。在云机的 Python 3.11 及以上虚拟环境中，从源码目录安装绘图采集依赖并启动服务。[OpenAI 的 Linux 客户端](https://learn.chatgpt.com/docs/linux/linux-app) · [工作区源码](https://github.com/yunxikj6/GUI/tree/workbench/reviewed-edits)
+## 准备云端 GNOME
 
-请让云端源码和 Windows ZIP 使用同一次发布。早期云端服务只识别点击消息。
+在 InstaBox 的 Ubuntu 24.04 amd64 云机解压同版本源码。桌面依赖 GNOME Shell、Ubuntu 会话、Ubuntu Dock、Yaru 主题、Ubuntu 壁纸、Mesa、VirGL、Xvfb 和 D-Bus。云端管理员可在标准 Ubuntu 源安装这些组件。
+
+```sh
+sudo apt-get update
+sudo apt-get install gnome-shell ubuntu-session ubuntu-settings gnome-shell-extension-ubuntu-dock \
+  yaru-theme-gnome-shell yaru-theme-gtk yaru-theme-icon ubuntu-wallpapers ubuntu-wallpapers-noble \
+  xvfb xauth xdotool x11-utils dbus-daemon virgl-server libgl1-mesa-dri python3
+python3 -m cloud_render.gnome_relay --port 17325
+```
+
+在源码根目录运行最后一条命令。服务只监听云机回环端口，Windows 客户端通过 InstaBox 私有通道连接。如果有多台云机，或管理员指定了其他服务端口，可在 Windows 终端运行下面的命令。
+
+```bat
+Start.cmd --machine m_YOUR_MACHINE --desktop-port 17325
+```
+
+窗口支持指针移动、左右点击以及 Tab、Shift+Tab、Enter、方向键等导航键。可按 Ctrl+Esc 切换 GNOME 活动概览。当前桌面源尺寸为 800×520，调整本机窗口大小时，显示与点击坐标会一起缩放。
+
+## 单独打开原版 ChatGPT
+
+在云机图形会话中安装 OpenAI 官方 ChatGPT for Linux，使用该版本源码，在云端 Python 3.11 及以上虚拟环境内启动应用服务。[OpenAI 的 Linux 客户端](https://learn.chatgpt.com/docs/linux/linux-app) · [工作区源码](https://github.com/yunxikj6/GUI/tree/workbench/reviewed-edits)
 
 ```sh
 python3 -m pip install -r requirements-render.txt
 python3 -m cloud_render.service --port 17324
 ```
 
-终端会显示本次私有配对码。所选端口只监听云机回环地址。应用使用云机上专属于工作区的配置目录，同一用户重连时可以继续操作同一个进程。`--profile` 可指定新的空目录。`--executable` 可指定从官方包解出的程序绝对路径。
+在 Windows 运行 `Start.cmd --cloud-app`，按提示输入 InstaBox API 密钥和这个应用服务生成的配对码。此模式需要 Microsoft Edge，使用独立窗口和随包的 Skia 重绘原版界面。已公开实测登录前窗口的点击、英文输入、编辑、中文输入法提交与取消。登录后的聊天、附件和 Claude Artifacts 仍待验收。
 
-## Windows 连接
-
-双击 `Start.cmd` 时使用 InstaBox 私有连接，默认云端端口为 17324。按提示分别输入 InstaBox API 密钥和当前云端应用的配对码。若账户下有多台云机，请从终端启动，指定实例的完整 ID。
+已有本机端口转发时，运行 `Start.cmd --connect-port 17324`。此处指定本机回环端口，仅需应用配对码。`CLOUDWORKSPACE_RENDER_PORT` 可配置 `--cloud-app` 默认使用的本机转发端口。若要连接指定云机上的其他应用端口，使用下面的命令。
 
 ```bat
-Start.cmd --instabox --machine m_YOUR_MACHINE --connect-port 17324
+Start.cmd --cloud-app --instabox --machine m_YOUR_MACHINE --connect-port 17324
 ```
 
-InstaBox 连接会在本机内存中保留本次会话刚收到的完整绘图。窗口更新时，云端可以引用其中相同的字形和图面数据。客户端核对完整帧的大小和 SHA-256 后才交给 Skia。重连会重新传输所需数据，退出时释放这份缓存。
-
-已有本机端口转发时，可以运行 `Start.cmd --connect-port 17324`。此时端口号指本机回环端口，只需云端绘图配对码。若希望双击也使用此方式，可设置 `CLOUDWORKSPACE_RENDER_PORT`。
-
-## 窗口操作
-
-单击云端控件，或用 Tab、Shift+Tab 切换焦点，按 Enter 激活。可编辑控件支持文字、方向键、Home、End、退格、删除和 Ctrl+A。Ctrl+V 会将本地剪贴板的纯文本送入云端控件。每次提交最多 4096 个 UTF-8 字节。输入法的候选在本机选择，确认时才发送。云端确认每次操作后，客户端才会发送队列中的下一项。
-
-断开云端后仍可在本机缩放已收到的画面。如果窗口提示操作结果未确认，重新连接后请先查看原窗口，再决定是否重复操作。目前公开实测范围为原版 ChatGPT 的登录前窗口。登录后的聊天和附件、Claude Artifacts、完整 GNOME 桌面与 Windows 11 真机仍待验收。
+应用中的 Tab、Shift+Tab 可切换焦点，Enter 激活控件。可编辑控件支持方向键、Home、End、退格、删除和 Ctrl+A。Ctrl+V 粘贴本机剪贴板的纯文本。输入法候选在本机选择，确认后发送。每次提交最多 4096 个 UTF-8 字节。云端确认当前操作后，客户端才会发送下一项。断开连接后可缩放已收到的应用画面。如果窗口提示操作结果未确认，重连后先查看原窗口，再决定是否重复操作。

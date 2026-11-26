@@ -51,7 +51,7 @@ def _spawn(exe, origin, profile, child_read, child_write):
             '--no-first-run', '--no-default-browser-check', '--disable-sync',
             '--disable-background-networking', '--disable-background-mode', '--disable-features=Translate,msEdgeTranslate']
     env = os.environ.copy()
-    for key in ('INSTABOX_API_KEY', 'CLOUDWORKSPACE_RENDER_TOKEN'):
+    for key in ('INSTABOX_API_KEY', 'CLOUDWORKSPACE_RENDER_TOKEN', 'CLOUDWORKSPACE_GNOME_TOKEN'):
         env.pop(key, None)
     io = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
               close_fds=True, env=env)

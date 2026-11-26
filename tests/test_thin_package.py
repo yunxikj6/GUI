@@ -24,6 +24,15 @@ class ThinDownloadTest(unittest.TestCase):
                 self.assertNotIn('Setup.cmd', archive.namelist())
                 self.assertNotIn('launcher.py', archive.namelist())
                 self.assertNotIn('cloud_render/chatgpt_process.py', archive.namelist())
+                self.assertNotIn('cloud_render/gnome_source.py', archive.namelist())
+                self.assertNotIn('cloud_render/gnome_relay.py', archive.namelist())
+                names = set(archive.namelist())
+                for required in ('windows/runtime/python.exe', 'windows/runtime/python313.zip', 'windows/runtime/LICENSE.txt',
+                                 'thin_client/gnome_desktop.py', 'thin_client/gnome_window.py', 'thin_client/gnome_transport.py',
+                                 'thin_client/vendor/virgl/windows-x64/libvirglrenderer-1.dll'):
+                    self.assertIn(required, names)
+                self.assertEqual(archive.read('windows/runtime/python313._pth').splitlines(),
+                                 [b'python313.zip', b'.', b'..\\..'])
                 archive.extractall(dest)
             for line in (dest / 'SHA256SUMS').read_text().splitlines():
                 digest, name = line.split('  ', 1)

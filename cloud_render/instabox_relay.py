@@ -79,17 +79,33 @@ def check_request(req):
     op = req['op']
     extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'},
               'input': {'id', 'data'}, 'close': set()}
-    optional = {'start': {'codec'}, 'poll': {'reset'}}
+    extras['desktop'] = {'id', 'data'}
+    optional = {'start': {'codec', 'protocol'}, 'poll': {'reset'}}
     require(op in extras and set(req) - optional.get(op, set()) == {'op', 'session'} | extras[op],
             'invalid-request')
     require(isinstance(req['session'], str) and re.fullmatch('[0-9a-f]{32}', req['session']), 'invalid-session')
     if op == 'start':
+        require('protocol' not in req or (req['protocol'] == 'gnome' and 'codec' not in req), 'invalid-protocol')
         require('codec' not in req or req['codec'] == 'cdz1', 'invalid-codec')
         require(type(req['port']) is int and 1 <= req['port'] <= 65535, 'invalid-port')
         require(isinstance(req['pair'], str) and re.fullmatch('[A-Za-z0-9_-]{43}', req['pair']), 'invalid-pair')
     if op == 'poll':
         require('reset' not in req or req['reset'] is True, 'invalid-reset')
         require(type(req['after']) is int and 0 <= req['after'] < 2 ** 53, 'invalid-cursor')
+    if op == 'desktop':
+        require(type(req['id']) is int and 1 <= req['id'] <= 0xffffffff and
+                isinstance(req['data'], str) and 0 < len(req['data']) <= 28, 'invalid-desktop-input')
+        raw = base64.b64decode(req['data'], validate=True)
+        require(17 <= len(raw) <= 21 and HEADER.unpack_from(raw) == (b'GVGL', 1, 2, 0, len(raw) - HEADER.size)
+                and struct.unpack_from('!I', raw, HEADER.size)[0] == req['id'], 'invalid-desktop-input')
+        command = raw[16:]
+        if command[:1] in (b'M', b'L', b'R') and len(command) == 5:
+            x, y = struct.unpack_from('!HH', command, 1)
+            require(x < 800 and y < 520, 'invalid-desktop-input')
+        else:
+            require(command == b'S' or (command[:1] == b'K' and len(command) == 2 and 1 <= command[1] <= 15),
+                    'invalid-desktop-input')
+        return raw
     if op in ('click', 'input'):
         require(type(req['id']) is int and 1 <= req['id'] < 2 ** 53, 'invalid-input-id')
         return input_bytes(req['data'], click_only=op == 'click')
@@ -147,14 +163,24 @@ class Relay:
     async def receive(self):
         try:
             reader, self.writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.start['port']), 5)
-            self.writer.write(('CLRP-AUTH/1 ' + self.start['pair'] + '\n').encode('ascii'))
+            desktop = self.start.get('protocol') == 'gnome'
+            prefix = 'GNOME-AUTH/1 ' if desktop else 'CLRP-AUTH/1 '
+            self.writer.write((prefix + self.start['pair'] + '\n').encode('ascii'))
             await self.writer.drain()
             while True:
                 header = await reader.readexactly(HEADER.size)
                 magic, version, kind, flags, size = HEADER.unpack(header)
-                require(magic == b'CLRP' and version == 1 and flags == 0 and
-                        ((kind == 1 and 10 <= size <= MAX_PAYLOAD) or (kind == 3 and size == 5)), 'upstream-protocol')
-                require(self.published or kind == 1, 'upstream-protocol')
+                if desktop:
+                    require(magic == b'GVGL' and version == 1 and flags == 0 and
+                            ((kind == 1 and 72 < size <= 72 + 1024 * 1024 + 4096)
+                             or (kind in (3, 4, 5, 6) and size == {3: 5, 4: 4, 5: 44, 6: 1}[kind])),
+                            'upstream-protocol')
+                    require(self.published or kind in (1, 4, 6), 'upstream-protocol')
+                else:
+                    require(magic == b'CLRP' and version == 1 and flags == 0 and
+                            ((kind == 1 and 10 <= size <= MAX_PAYLOAD) or (kind == 3 and size == 5)),
+                            'upstream-protocol')
+                    require(self.published or kind == 1, 'upstream-protocol')
                 total = HEADER.size + size
                 async with self.changed:
                     await self.changed.wait_for(lambda: len(self.messages) < 8 and
@@ -299,12 +325,14 @@ class Relay:
             if op == 'start':
                 require(self.start['port'] == req['port'] and hmac.compare_digest(self.start['pair'], req['pair']),
                         'session-conflict')
-                require(req.get('codec') == self.start.get('codec'), 'session-conflict')
+                require(req.get('codec') == self.start.get('codec') and
+                        req.get('protocol') == self.start.get('protocol'), 'session-conflict')
                 await asyncio.wait_for(self.ready.wait(), 35)
                 require(self.published, 'upstream-unavailable')
             elif op == 'poll':
                 result = await self.poll(req['after'], req.get('reset', False))
-            elif op in ('click', 'input'):
+            elif op in ('click', 'input', 'desktop'):
+                require((op == 'desktop') == (self.start.get('protocol') == 'gnome'), 'wrong-input-protocol')
                 result = await self.send_input(req['id'], raw)
             else:
                 close = True

@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import socket
+import sys
 import threading
 import time
 import urllib.error
@@ -25,6 +26,13 @@ class BridgeError(Exception):
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+def open_provider_request(request, timeout):
+    if sys.platform == 'win32':
+        from thin_client.winhttp import open_request
+        return open_request(request, timeout)
+    return urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout)
 
 
 def json_bytes(value):
@@ -84,8 +92,10 @@ class InstaBoxAccount:
         request_headers.update(headers or {})
         request = urllib.request.Request(self.base + path, data=data, method=method, headers=request_headers)
         try:
-            with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout) as response:
-                payload = response.read(6 * 1024 * 1024)
+            with open_provider_request(request, timeout) as response:
+                payload = response.read(6 * 1024 * 1024 + 1)
+                if len(payload) > 6 * 1024 * 1024:
+                    raise ValueError('InstaBox response too large')
             return json.loads(payload) if payload else {}
         except urllib.error.HTTPError as exc:
             try:

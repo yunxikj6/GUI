@@ -128,7 +128,7 @@ func TestLaunchSequence(t *testing.T) {
 	exe := filepath.Join(repo, "windows", "launcher.exe")
 	wsl := filepath.Join(base, "System32", "wsl.exe")
 	touch(t, wsl)
-	env := []string{"Path=local", "InstaBox_Api_Key=private", "WSLENV=TERM/u:iNSTABOX_api_key/p:CLOUDWORKSPACE_RENDER_TOKEN:EDITOR", "CLOUDWORKSPACE_RENDER_TOKEN=ephemeral", "EDITOR=vi"}
+	env := []string{"Path=local", "InstaBox_Api_Key=private", "WSLENV=TERM/u:iNSTABOX_api_key/p:CLOUDWORKSPACE_RENDER_TOKEN:CLOUDWORKSPACE_GNOME_TOKEN:EDITOR", "CLOUDWORKSPACE_GNOME_TOKEN=desktop", "CLOUDWORKSPACE_RENDER_TOKEN=ephemeral", "EDITOR=vi"}
 	wantEnv := []string{"Path=local", "WSLENV=TERM/u:EDITOR", "EDITOR=vi"}
 	for _, check := range []bool{false, true} {
 		calls := 0
@@ -202,76 +202,61 @@ func TestDiagnostics(t *testing.T) {
 }
 
 func TestRenderEntry(t *testing.T) {
-	for _, args := range [][]string{{"--connect-port"}, {"--connect-port", ""}, {"--connect-port", "0"}, {"--connect-port", "65536"}, {"--connect-port", "1e1"}, {"--connect-port", "０１"}, {"--connect-port", "8", "--native"}, {"--connect-port", "9", "--distro", "Ubuntu"}, {"--connect-port", "20", "--open-app", "Claude"}, {"--instabox", "--native"}, {"--machine", "--native"}, {"--machine", "example"}, {"--instabox", "--setup-native"}} {
-		if _, err := parse(args); err == nil {
-			t.Errorf("accepted %q", args)
+	for _, flags := range [][]string{{"--connect-port"}, {"--connect-port", ""}, {"--connect-port", "0"}, {"--desktop-port", "65536"}, {"--desktop-port", "1e1"}, {"--connect-port", "０１"}, {"--cloud-app", "--desktop-port", "7"}, {"--desktop-port", "8", "--connect-port", "9"}, {"--cloud-app", "--native"}, {"--connect-port", "9", "--distro", "Ubuntu"}, {"--connect-port", "20", "--open-app", "Claude"}, {"--machine", "example"}, {"--instabox", "--setup-native"}} {
+		if _, err := parse(flags); err == nil {
+			t.Errorf("accepted %q", flags)
 		}
 	}
-	base := t.TempDir()
-	exe := filepath.Join(base, "windows", "CloudLinuxWorkspace.exe")
-	touch(t, filepath.Join(base, "thin_client", "viewer.py"))
-	touch(t, filepath.Join(base, "thin_client_entry.py"))
+	root := t.TempDir()
+	exe := filepath.Join(root, "windows", "launcher.exe")
+	embedded := filepath.Join(root, "windows", "runtime", "python.exe")
+	entry := filepath.Join(root, "thin_client_entry.py")
+	touch(t, entry)
+	touch(t, embedded)
 	for _, tc := range []struct {
-		portArg           []string
-		envPort, wantPort string
-		py, direct        bool
-		machine           string
+		flags, forwarded []string
+		mode             runMode
+		envPort          string
 	}{
-		{nil, "5900", "5900", false, false, ""},
-		{[]string{"--connect-port", "5911"}, "5900", "5911", true, false, ""},
-		{nil, "", "17324", true, true, ""},
-		{[]string{"--instabox"}, "5900", "17324", false, true, ""},
-		{[]string{"--instabox", "--connect-port", "17500", "--machine", "m_ab_12"}, "", "17500", true, true, "m_ab_12"},
+		{nil, []string{"--instabox"}, desktopRendererRun, ""},
+		{nil, []string{"--instabox"}, desktopRendererRun, "5900"},
+		{[]string{"--instabox", "--machine", "m_abc"}, []string{"--instabox", "--machine", "m_abc"}, desktopRendererRun, ""},
+		{[]string{"--desktop-port", "9"}, []string{"--instabox", "--desktop-port", "9"}, desktopRendererRun, ""},
+		{[]string{"--cloud-app"}, []string{"--instabox", "--cloud-app"}, instaboxRendererRun, ""},
+		{[]string{"--cloud-app"}, []string{"--cloud-app"}, rendererRun, "5900"},
+		{[]string{"--connect-port", "5900"}, []string{"--cloud-app", "--connect-port", "5900"}, rendererRun, ""},
+		{[]string{"--instabox", "--connect-port", "9"}, []string{"--instabox", "--cloud-app", "--connect-port", "9"}, instaboxRendererRun, ""},
 	} {
-		opt, err := parse(tc.portArg)
-		if err != nil {
-			t.Fatal(err)
+		parsed, problem := parse(tc.flags)
+		if problem != nil {
+			t.Fatal(problem)
 		}
-		env := []string{"INSTABOX_API_KEY=hidden", "PYLAUNCHER_ALLOW_INSTALL=1", "python_manager_automatic_install=true", "CLOUDWORKSPACE_RENDER_TOKEN=private"}
-		var expectedEnv []string
+		env := []string{"INSTABOX_API_KEY=i", "CLOUDWORKSPACE_GNOME_TOKEN=g", "CLOUDWORKSPACE_RENDER_TOKEN=r"}
 		if tc.envPort != "" {
-			pair := "cloudworkspace_render_port=" + tc.envPort
-			env = append(env, pair)
-			expectedEnv = append(expectedEnv, pair)
+			env = append(env, "CLOUDWORKSPACE_RENDER_PORT="+tc.envPort)
 		}
-		if tc.direct {
-			expectedEnv = append(expectedEnv, "INSTABOX_API_KEY=hidden")
-		}
-		expectedEnv = append(expectedEnv, "CLOUDWORKSPACE_RENDER_TOKEN=private", "PYTHON_MANAGER_AUTOMATIC_INSTALL=false")
-		lookup := func(name string) (string, error) {
-			if name == "py.exe" && !tc.py {
-				return "", os.ErrNotExist
+		called := false
+		problem = launchRenderer(parsed, exe, env, func(program string, args, child []string, mode runMode) runResult {
+			called = true
+			expectedArgs := append([]string{"-I", "-X", "utf8", entry}, tc.forwarded...)
+			if program != embedded || !reflect.DeepEqual(args, expectedArgs) || mode != tc.mode {
+				t.Fatalf("route %q: %s %v %d", tc.flags, program, args, mode)
 			}
-			return filepath.Join(base, name), nil
-		}
-		calls := 0
-		err = launchRenderer(opt, exe, env, lookup, func(program string, args, child []string, mode runMode) runResult {
-			calls++
-			python := "python.exe"
-			want := []string{"-E", "-s", "-X", "utf8", filepath.Join(base, "thin_client_entry.py")}
-			wantMode := rendererRun
-			if tc.direct {
-				want = append(want, "--instabox")
-				wantMode = instaboxRendererRun
+			has := func(key string) bool {
+				for _, v := range child {
+					if strings.HasPrefix(v, key+"=") {
+						return true
+					}
+				}
+				return false
 			}
-			want = append(want, "--connect-port", tc.wantPort)
-			if tc.machine != "" {
-				want = append(want, "--machine", tc.machine)
-			}
-			if tc.py {
-				python = "py.exe"
-				want = append([]string{"-3"}, want...)
-			}
-			if program != filepath.Join(base, python) || !reflect.DeepEqual(args, want) || mode != wantMode {
-				t.Fatalf("unexpected viewer invocation %v %v", program, args)
-			}
-			if !reflect.DeepEqual(child, expectedEnv) {
-				t.Fatal("unexpected viewer environment")
+			if has("CLOUDWORKSPACE_GNOME_TOKEN") != (mode == desktopRendererRun) || has("CLOUDWORKSPACE_RENDER_TOKEN") != (mode != desktopRendererRun) || has("INSTABOX_API_KEY") != (mode != rendererRun) {
+				t.Fatal("wrong credential scope")
 			}
 			return runResult{exit: 1}
 		})
-		if calls != 1 || err == nil || err.code != "cloud-render-exit" {
-			t.Fatal(calls, err)
+		if !called || problem == nil || problem.code != "cloud-render-exit" {
+			t.Fatal("unexpected result", problem)
 		}
 	}
 }

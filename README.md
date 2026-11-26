@@ -1,22 +1,22 @@
 # Cloud Linux Workspace
 
-Windows 本机运行轻量绘图客户端。应用进程、账号会话和项目文件放在云服务器上。云端从原程序的窗口取得 Skia 绘图指令。本机按显示比例重绘，并将鼠标、键盘和已确认的输入法文字送回创建窗口的云端进程。私有连接在本次会话的内存里复用字库和其他重复字节。
+在 Windows 上双击 `Start.cmd`，打开云机的 Ubuntu 桌面。Windows 的原生窗口执行 GNOME Shell 和 Mutter 生成的绘图指令，并把鼠标与键盘操作传回同一个云端会话。Ubuntu、应用进程、项目文件和账号留在云机。下载包自带绘图运行时。[下载 Windows 客户端](releases/thin-windows/cloud-workspace.zip) · [云端准备与连接](docs/thin-client.md)
 
-当前接入的是 **ChatGPT for Linux** 的登录前窗口。客户端需要 Python 3.10+ 和已有的现代浏览器。浏览器在本机加载随包的 CanvasKit，显示并缩放云端原程序的画面。Ubuntu、ChatGPT 及其登录资料保存在云侧。Claude、整个 GNOME 桌面和登录后的对话仍在开发验收范围内。[绘图客户端](thin_client/) · [云端绘图服务](cloud_render/)
+## 连接 Ubuntu 桌面
 
-![本机独立窗口显示由 InstaBox 上原版 ChatGPT 生成的登录页](docs/cloud-render-window.png)
+在具备 Ubuntu 桌面依赖的云机上运行 `python3 -m cloud_render.gnome_relay --port 17325`。在 Windows 解压完整客户端，打开 `Start.cmd`，输入 InstaBox 密钥和本次桌面配对码。服务仅监听云机回环，连接使用 InstaBox 的私有 HTTPS 通道。本机窗口支持指针移动、左右点击、导航键和 Ctrl+Esc 活动概览。x64 使用内置运行时。ARM64 需要 Windows 11 x64 仿真，实机兼容性待验证。
 
-上图来自轻量客户端。另从同一云端窗口读取原画面，用来逐像素对照。真实测试覆盖了登录前窗口，断开连接后仍可在本机缩放已收到的画面。[点击后的本机画面](docs/cloud-render-chatgpt-options.png) · [同一云端窗口对照图](docs/cloud-render-source-options.png) · [首次出现的原厂登录页](docs/cloud-render-chatgpt-welcome.png) · [断线后的本机缩放](docs/cloud-render-offline-resize.png) · [真云操作与画面测量](docs/measurements/cloud-render.json)
+两次在真实 InstaBox 上运行 Ubuntu 24.04 的 GNOME Shell，分别取得 112 和 97 帧，独立本机窗口的每帧输出都和源端一致。第二次的命令还在运行于 Wine 的 Windows 原生程序中回放，97 帧全部匹配。实测数据注明每次使用的操作系统、渲染器和显示尺寸。[GNOME 实现与逐帧结果](docs/gnome-command-stream.md)
 
-桌面绘制另有一条已在 Linux 验证的路径。原版 GNOME Shell 发出的 GPU 命令和资源可以在另一个隔离环境重绘。活动概览测试中的 11 次显示输出均与源端逐字节一致。Windows 客户端与云端完整桌面的连接仍在开发。[原版 GNOME 窗口实拍与复现方法](docs/gnome-command-stream.md)
+![真实云端 GNOME 在独立本机窗口中展开活动概览](docs/gnome-cloud-native-window.png)
 
-## 连接工作区
+## 打开云端原版 ChatGPT
 
-[下载 Windows 轻量客户端](releases/thin-windows/cloud-workspace.zip)（x64 和 ARM64）
+单独连接云端的 ChatGPT 绘图服务时，在 Windows 运行 `Start.cmd --cloud-app`。服务从原版 ChatGPT for Linux 提取 Skia 指令。本机的 Microsoft Edge 使用随包 CanvasKit 绘制原始界面，云端应用负责编辑状态、输入处理和账号。两条服务使用各自的配对码。[云端应用的安装与启动](docs/thin-client.md)
 
-在云机的图形会话中运行 `python3 -m cloud_render.service`。Windows 上解压轻量客户端并双击 `Start.cmd`，按提示输入 InstaBox 凭证和当前绘图服务的配对码。已有私有 TCP 转发时，也可以用 `Start.cmd --connect-port 端口号` 连接。[云端准备与客户端操作](docs/thin-client.md)
+在真实云机上验证了欢迎页、登录方式菜单、测试文本输入、中文输入法提交、删除和取消返回。本机与云端独立截图取自同一个原厂窗口。已测试的 11 个操作均得到确认，一次测量的操作至下一画面中位数为 0.751 秒。登录后聊天和 Claude Artifacts 仍待验收。[本机原厂界面](docs/cloud-render-window.png) · [本机中英文输入](docs/cloud-render-input.png) · [云端原窗口](docs/cloud-render-input-source.png) · [传输与交互数据](docs/measurements/cloud-render.json)
 
-当前版本支持本地重绘、缩放、鼠标主键单击、键盘导航、文本编辑与输入法确认。在原版 ChatGPT 登录前表单中，云端原程序和本机重绘窗口都显示了用户提交的测试文字。登录后的对话、Claude Artifacts、完整云桌面及 Windows 11 真机仍需验收。[本机重绘的中英文输入](docs/cloud-render-input.png) · [同一时刻的云端原窗口](docs/cloud-render-input-source.png)
+GNOME 可以把普通应用已经绘好的整窗纹理作为资源上传。桌面客户端只接入有绘图来源验证的界面。应用在 Ubuntu 窗口内的原厂绘制需要逐个接入，目前的 ChatGPT 桌面内合成仍在验收。
 
 ## 显式兼容入口
 

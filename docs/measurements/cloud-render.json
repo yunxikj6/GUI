@@ -114,8 +114,8 @@
     "The supported desktop app captures use SkPicture v110, supported Viz passes and verified fonts. Windows 11 display, focus and Microsoft IME remain unverified."
   ],
   "clientBinaries": {
-    "x64": "1e9fbfbcdf63e68f67f836ef9622d24dba92377898dd889912fbd06173b842b8",
-    "arm64": "dbe157e6570d14c896cefae0a41c1a327e7d8ba363871eccf3a728e30b10c01a"
+    "x64": "b5357cb6cafa9b340feff5b7b8ef217205c5a13dd8a6622f7d5952f0249db680",
+    "arm64": "efeffd779be3e95c28e5463c1a1e9cb86583d00fa3d74d2e5f49cc01144c4af3"
   },
   "gnomeResearch": {
     "scope": "Separate exploratory test in an isolated Ubuntu 24.04 guest. Not part of the delivered client.",
@@ -179,7 +179,7 @@
     }
   },
   "windowsCompatibility": {
-    "scope": "Debian Wine 10 and official Windows CPython 3.13.9. The x64 release PE, standalone entry and current-user Windows credential prompts were exercised.",
+    "scope": "Earlier ChatGPT-only package tested on Wine 10 with Windows CPython 3.13.9. See GNOME-specific measurements for Windows desktop rendering.",
     "interactiveWindows11": false,
     "nativeWindowsAppWindowVerified": false,
     "x64": "1e9fbfbcdf63e68f67f836ef9622d24dba92377898dd889912fbd06173b842b8",
@@ -187,10 +187,11 @@
   },
   "standalonePackage": {
     "download": "../../releases/thin-windows/cloud-workspace.zip",
-    "bytes": 5544062,
-    "sha256": "9b9fa8e57965a94c8ea31feb00762843b3f8178704bc0e0a16a68d7af88ede81",
-    "entries": 26,
-    "archiveValidation": "Every payload matched the corresponding source bytes, including both PE launchers, the frame delta decoder, input.js and the Noto Sans CJK license. Independently recomputed every SHA256SUMS entry and checked ZIP CRCs.",
+    "bytes": 18305545,
+    "sha256": "b22835a9d9b7919872acc7bf776046d0b03dc1a80b73e62d2046257af001ba65",
+    "entries": 78,
+    "archiveValidation": "Verified every SHA256SUMS entry, both native launchers and the complete private Windows runtime. This ZIP includes the GNOME command viewer and the explicit ChatGPT app mode.",
+    "runtime": "Official Windows x64 CPython 3.13.17 embeddable and MSYS2 VirGL. The ChatGPT app mode additionally uses installed Microsoft Edge and bundled CanvasKit.",
     "rendererValidation": {
       "package": "canvaskit-wasm",
       "version": "0.42.0",
@@ -198,108 +199,37 @@
       "method": "The packaged JavaScript, decompressed WebAssembly module and license matched their original tarball bytes. Verified the npm tarball SHA-512 against the pinned integrity value.",
       "upstreamManifest": "../../thin_client/vendor/CanvasKit.json"
     },
-    "extractedPackageChecks": {
-      "linuxInput": {
-        "environment": "Debian 13, private X11 display, Fcitx5 Pinyin, Chromium 156.0.8078.79, original source checkout hidden.",
-        "expectedActionsAcknowledged": 8,
-        "oneChineseCommit": true,
-        "preeditOrCancelledTextSent": false,
-        "scope": "The isolated peer acknowledged the exact action sequence and replayed a previously captured original application frame."
-      },
-      "windowsLauncher": {
-        "environment": "Debian Wine 10 with official Windows CPython 3.13, source checkout hidden.",
-        "entry": "cmd.exe, Start.cmd, x64 launcher, packaged Python viewer.",
-        "authenticatedLoopbackHandshake": true,
-        "systemCredentialPromptsCancelledWithExit130": 2,
-        "testedWindows11": false
-      },
-      "originalChatGPTInput": {
-        "platform": "Separate isolated Ubuntu and Debian processes on one Linux host. The Ubuntu process ran the signed-out, unmodified ChatGPT 26.1120.50957.",
-        "client": "Only the extracted ZIP was available to the client. X11 keyboard input opened the system Fcitx5 Pinyin candidate window.",
-        "preeditMilliseconds": 2350,
-        "originalFieldEmptyBeforeCommit": true,
-        "commits": 1,
-        "originalFieldMatchedTestText": true,
-        "acknowledgedActions": 4,
-        "formSubmitted": false
-      }
-    },
-    "previousPackageMeasurements": [
-      {
-        "sha256": "60b3e856f2286d7a5404ccc46c8852003019a9021cc7eb673fd6889ad1afcc98",
-        "bytes": 5189614,
-        "entries": 25,
-        "archiveValidation": "Verified each packaged file against source, including Windows line endings, both launcher binaries, input.js and the Noto Sans CJK license. Independently recomputed every SHA256SUMS entry and checked ZIP CRCs.",
-        "extractedPackageChecks": {
-          "linuxInput": {
-            "environment": "Debian 13, private X11 display, Fcitx5 Pinyin, Chromium 156.0.8078.79, original source checkout hidden.",
-            "expectedActionsAcknowledged": 8,
-            "oneChineseCommit": true,
-            "preeditOrCancelledTextSent": false,
-            "scope": "The isolated peer acknowledged the exact action sequence and replayed a previously captured original application frame."
-          },
-          "windowsLauncher": {
-            "environment": "Debian Wine 10 with official Windows CPython 3.13, source checkout hidden.",
-            "entry": "cmd.exe, Start.cmd, x64 launcher, packaged Python viewer.",
-            "authenticatedLoopbackHandshake": true,
-            "systemCredentialPromptsCancelledWithExit130": 2,
-            "testedWindows11": false
-          }
+    "previousChatGPTRelease": {
+      "revision": "e9f118e229fa422acb2245b18cd3727593ffd972",
+      "bytes": 5544062,
+      "entries": 26,
+      "sha256": "9b9fa8e57965a94c8ea31feb00762843b3f8178704bc0e0a16a68d7af88ede81",
+      "extractedPackageChecks": {
+        "linuxInput": {
+          "environment": "Debian 13, private X11 display, Fcitx5 Pinyin, Chromium 156.0.8078.79, original source checkout hidden.",
+          "expectedActionsAcknowledged": 8,
+          "oneChineseCommit": true,
+          "preeditOrCancelledTextSent": false,
+          "scope": "The isolated peer acknowledged the exact action sequence and replayed a previously captured original application frame."
         },
-        "cloudKeyboardTrial": {
-          "application": "Official ChatGPT 26.1120.50957 on a real InstaBox. The isolated Linux client loaded this extracted ZIP.",
-          "verified": "API key form focus, ASCII input, End, Backspace, IME preedit followed by one Chinese commit, then Ctrl+A and Delete. Source controls, original cloud window and local rendering were checked.",
-          "completed": false,
-          "lastAction": "The later Cancel click returned 409. This run did not demonstrate returning to the welcome screen.",
-          "accountLoginOrSubmit": false
-        }
-      },
-      {
-        "sha256": "81387b6bb6772b89402dfe728796f742ed03f2b2b1bd7b4b93bea4e2885643f0",
-        "bytes": 5181625,
-        "entries": 23,
-        "platform": "Final standalone ZIP extracted outside the source tree. Actual Chromium app window on isolated Linux/Xfwm4, an authenticated loopback cloud-protocol peer replaying previously captured vendor graphics.",
-        "windowLifecycle": [
-          {
-            "operation": "Alt+F4",
-            "realOSWindowGone": true,
-            "processExit": 0,
-            "cloudSocketClosed": true,
-            "secondsToProcessExit": 1.02
-          },
-          {
-            "operation": "kill-browser",
-            "realOSWindowGone": true,
-            "processExit": 0,
-            "cloudSocketClosed": true,
-            "secondsToProcessExit": 0.52
-          }
-        ]
-      },
-      {
-        "sha256": "b60fea303114516343446387c179430ac3721e81a65854d3eb2845eef3577eae",
-        "entries": 23,
-        "windowsCompatibilityCheck": "Unmodified independently unpacked standalone ZIP on Debian Wine 10. No project tree mounted, no WSL installed. Forwarded route used real package Python viewer, Windows 3.13 runtime and a recording loopback CLRP peer. Peer closed after authenticated handshake. Real system credential prompts were cancelled before any Internet access. No Windows 11 GUI rendering verified here.",
-        "privateWindowOnLinux": {
-          "image": "../cloud-render-window.png",
-          "sha256": "5f0e9dce6ba4c6a3a8b47f1f4491ff4f3e86fccd679b2ea832306d7392d80791",
-          "action": "An independent extraction connected to the existing cloud application through InstaBox. A real pointer click on Back returned to the original welcome page.",
-          "cloudReadbackAfterBack": {
-            "processId": 109662,
-            "windowId": 2097155,
-            "referenceSha256": "09fd587511b6836e847afaf393e1ae159b619bee412af297a595b5c2d30b3d18",
-            "originalWelcomeVisible": true
-          }
+        "windowsLauncher": {
+          "environment": "Debian Wine 10 with official Windows CPython 3.13, source checkout hidden.",
+          "entry": "cmd.exe, Start.cmd, x64 launcher, packaged Python viewer.",
+          "authenticatedLoopbackHandshake": true,
+          "systemCredentialPromptsCancelledWithExit130": 2,
+          "testedWindows11": false
+        },
+        "originalChatGPTInput": {
+          "platform": "Separate isolated Ubuntu and Debian processes on one Linux host. The Ubuntu process ran the signed-out, unmodified ChatGPT 26.1120.50957.",
+          "client": "Only the extracted ZIP was available to the client. X11 keyboard input opened the system Fcitx5 Pinyin candidate window.",
+          "preeditMilliseconds": 2350,
+          "originalFieldEmptyBeforeCommit": true,
+          "commits": 1,
+          "originalFieldMatchedTestText": true,
+          "acknowledgedActions": 4,
+          "formSubmitted": false
         }
       }
-    ],
-    "previousDevelopmentWindowLifecycle": {
-      "scope": "Development measurements recorded in the previous release. Package-specific close checks for the extracted archive are listed separately.",
-      "platform": "System Chromium app window on Linux with Xfwm4",
-      "altF4Seconds": 0.145,
-      "browserKilledSeconds": 0.026,
-      "reloadThenAltF4Seconds": 0.088,
-      "externalXDestroyWindow": "Forcibly destroying only the X11 surface bypassed the browser close protocol. The process and target can stay active; closing the dedicated browser process releases the connection."
     }
   },
   "nativeInput": {
@@ -607,5 +537,6 @@
       "viz_picture.py": "b42d793ec572ac434933d03e2e4946a72afdb5e49e57a25556f66fec3cc84ceb",
       "frame_delta.py": "4a0ab0dd5355836a4f2950d8e83239a0f65bac83c22a9e01a30841bb45d03115"
     }
-  }
+  },
+  "gnomeDesktopMeasurements": "gnome-private-command-stream.json"
 }

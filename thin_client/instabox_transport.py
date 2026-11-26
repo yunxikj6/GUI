@@ -18,7 +18,7 @@ import urllib.request
 
 from cloud_render.wire import Click, INPUT_TYPES, MAX_PAYLOAD, WireError, encode_message, read_message
 from cloud_render.frame_delta import DeltaError, decode_frame
-from instabox import BridgeError, NoRedirect
+from instabox import BridgeError, open_provider_request
 
 
 HELPER = Path(__file__).resolve().parents[1] / 'cloud_render' / 'instabox_relay.py'
@@ -29,10 +29,11 @@ class TransportError(OSError):
     pass
 
 
-class InstaBoxTransport:
-    def __init__(self, box, bridge):
+class InstaBoxControl:
+    """One authenticated provider helper and its session-private transfer files."""
+
+    def __init__(self, box):
         self.box = box
-        self.bridge = bridge
         self.session = secrets.token_hex(16)
         # Isolated provider exec cannot import our package. Supply only these
         # fixed product sources, identically on every idempotent control call.
@@ -50,7 +51,7 @@ class InstaBoxTransport:
                 raw = self.box.exec(['python3', '-I', '-B', '-c', self.helper], payload, timeout=45 if op == 'start' else 15)
                 break
             except BridgeError as exc:
-                if attempt or exc.code != 'network' or (self.stop.is_set() and op in ('click', 'input')):
+                if attempt or exc.code != 'network' or (self.stop.is_set() and op != 'close'):
                     raise TransportError('InstaBox 中转请求失败。') from None
         try:
             result = json.loads(raw)
@@ -66,13 +67,13 @@ class InstaBoxTransport:
         request = urllib.request.Request(self.box.base + self.box.path + '/files/content?' + query,
                                          headers={'X-API-Key': self.box.key, 'Accept': 'application/octet-stream'})
         # A redirect must never receive the account credential or return a message from another origin.
-        return urllib.request.build_opener(NoRedirect()).open(request, timeout=30)
+        return open_provider_request(request, 30)
 
-    def _message(self, result, msg_id, previous=b''):
+    def verified_bytes(self, result, msg_id, max_size=MAX_PAYLOAD + 12):
         size = result.get('size')
         digest = result.get('sha256')
         if (type(result.get('id')) is not int or result['id'] != msg_id or type(size) is not int or
-                not 12 <= size <= MAX_PAYLOAD + 12 or not isinstance(digest, str) or
+                not 12 <= size <= max_size or not isinstance(digest, str) or
                 not re.fullmatch(r'[a-f0-9]{64}', digest)):
             raise TransportError('云端绘图消息的编号、长度或摘要无效。')
         if result.get('file') is True and 'data' not in result:
@@ -88,23 +89,6 @@ class InstaBoxTransport:
                 raise TransportError('云端绘图数据编码无效。') from None
         if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
             raise TransportError('云端绘图传输内容校验失败。')
-        if 'codec' in result:
-            if (result['codec'] != 'cdz1' or type(result.get('frameSize')) is not int or
-                    not 12 <= result['frameSize'] <= MAX_PAYLOAD + 12 or
-                    not isinstance(result.get('frameSha256'), str) or
-                    not re.fullmatch(r'[a-f0-9]{64}', result['frameSha256'])):
-                raise TransportError('云端绘图复用协议无效。')
-            try:
-                data = decode_frame(data, previous)
-            except DeltaError as exc:
-                raise TransportError('未能从本次会话重建完整绘图。') from exc
-            size = result['frameSize']
-            if (len(data) != size or data[5:6] != b'\x01' or
-                    hashlib.sha256(data).hexdigest() != result['frameSha256']):
-                raise TransportError('云端重建后的完整绘图校验失败。')
-        if (data[:5] != b'CLRP\x01' or
-                data[5] not in (1, 3) or data[6:8] != b'\0\0' or int.from_bytes(data[8:12], 'big') != size - 12):
-            raise TransportError('云端绘图数据校验失败。')
         return data
 
     def _read_file(self, msg_id, size):
@@ -126,6 +110,34 @@ class InstaBoxTransport:
             if attempt or self.stop.is_set():
                 break
         raise TransportError('未能完整读取云端绘图数据。')
+
+
+class InstaBoxTransport(InstaBoxControl):
+    def __init__(self, box, bridge):
+        super().__init__(box)
+        self.bridge = bridge
+
+    def _message(self, result, msg_id, previous=b''):
+        data = self.verified_bytes(result, msg_id)
+        size = len(data)
+        if 'codec' in result:
+            if (result['codec'] != 'cdz1' or type(result.get('frameSize')) is not int or
+                    not 12 <= result['frameSize'] <= MAX_PAYLOAD + 12 or
+                    not isinstance(result.get('frameSha256'), str) or
+                    not re.fullmatch(r'[a-f0-9]{64}', result['frameSha256'])):
+                raise TransportError('云端绘图复用协议无效。')
+            try:
+                data = decode_frame(data, previous)
+            except DeltaError as exc:
+                raise TransportError('未能从本次会话重建完整绘图。') from exc
+            size = result['frameSize']
+            if (len(data) != size or data[5:6] != b'\x01' or
+                    hashlib.sha256(data).hexdigest() != result['frameSha256']):
+                raise TransportError('云端重建后的完整绘图校验失败。')
+        if (data[:5] != b'CLRP\x01' or
+                data[5] not in (1, 3) or data[6:8] != b'\0\0' or int.from_bytes(data[8:12], 'big') != size - 12):
+            raise TransportError('云端绘图数据校验失败。')
+        return data
 
     def _upstream(self):
         try:

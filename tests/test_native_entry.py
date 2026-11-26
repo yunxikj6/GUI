@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import launcher
 import native_workspace
@@ -22,7 +22,9 @@ class NativeEntry(unittest.TestCase):
                 patch.object(launcher, 'InstaBox', side_effect=AssertionError), \
                 contextlib.redirect_stderr(io.StringIO()) as err:
             for options in (['--machine', 'example'], ['--no-browser'], ['--port', '8000'],
-                            ['--connect-port', '65536'], ['--connect-port', '0', '--native']):
+                            ['--connect-port', '65536'], ['--connect-port', '0', '--native'],
+                            ['--desktop-port', '0'], ['--cloud-app', '--workbench'],
+                            ['--desktop-port', '9', '--connect-port', '8'], ['--cloud-app', '--desktop-port', '9']):
                 with self.subTest(options=options), patch.object(sys, 'argv', ['launcher.py', *options]), self.assertRaises(SystemExit) as exit:
                     launcher.main()
                 self.assertEqual(exit.exception.code, 2)
@@ -30,26 +32,33 @@ class NativeEntry(unittest.TestCase):
     def test_standalone_and_full_entry_choose_the_same_cloud_transport(self):
         from thin_client import viewer
         cases = (
-            ([], {}, ['--instabox', '--port', '17324']),
-            ([], {'CLOUDWORKSPACE_RENDER_PORT':'4040'}, ['--port','4040']),
-            (['--connect-port','5050'], {'CLOUDWORKSPACE_RENDER_PORT':'4040'}, ['--port','5050']),
-            (['--instabox'], {'CLOUDWORKSPACE_RENDER_PORT':'4040'}, ['--instabox','--port','17324']),
-            (['--instabox', '--connect-port', '6001','--machine','m_abc'], {},
-             ['--instabox','--port','6001','--machine','m_abc']),
-            (['--machine','m_abc'], {}, ['--instabox','--port','17324','--machine','m_abc']),
+            ([], {}, False, ['--instabox', '--port', '17325']),
+            ([], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, False, ['--instabox', '--port', '17325']),
+            (['--desktop-port', '4100', '--machine', 'm_abc'], {}, False, ['--instabox', '--port', '4100', '--machine', 'm_abc']),
+            (['--machine', 'm_abc'], {}, False, ['--instabox', '--port', '17325', '--machine', 'm_abc']),
+            (['--instabox'], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, False, ['--instabox', '--port', '17325']),
+            (['--cloud-app'], {}, True, ['--instabox', '--port', '17324']),
+            (['--cloud-app'], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, True, ['--port', '4040']),
+            (['--connect-port', '5050'], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, True, ['--port', '5050']),
+            (['--instabox', '--connect-port', '6001', '--machine', 'm_abc'], {}, True,
+             ['--instabox', '--port', '6001', '--machine', 'm_abc']),
         )
-        for options, env, expected in cases:
+        for options, env, app, expected in cases:
+            desktop = Mock()
+            desktop.main.return_value = 9
             with self.subTest(options=options, env=env), patch.dict(os.environ, env, clear=True), \
-                    patch.object(sys, 'argv', ['launcher.py', *options]), \
-                    patch.object(viewer, 'main', return_value=9) as view, \
+                    patch.object(sys, 'argv', ['launcher.py', *options]), patch.object(viewer, 'main', return_value=9) as view, \
+                    patch.dict(sys.modules, {'thin_client.gnome_desktop': desktop}), \
                     patch.object(launcher, 'InstaBox', side_effect=AssertionError), \
                     patch.object(launcher, 'LocalServer', side_effect=AssertionError), \
                     patch.object(native_workspace, 'start', side_effect=AssertionError):
+                target, unused = (view, desktop.main) if app else (desktop.main, view)
                 self.assertEqual(launcher.main(), 9)
-                view.assert_called_once_with(expected)
-                view.reset_mock()
+                target.assert_called_once_with(expected)
+                target.reset_mock()
                 self.assertEqual(thin_client_entry.main(options), 9)
-                view.assert_called_once_with(expected)
+                target.assert_called_once_with(expected)
+                unused.assert_not_called()
 
     def test_explicit_compatibility_flags_enter_native_dispatch_before_cloud_or_http(self):
         for options, expected in ((['--native'], (False, None, False)),
