@@ -1,0 +1,21 @@
+{
+  "provider": "InstaBox",
+  "hostUid": 1000,
+  "source": "75f4792",
+  "entry": "python3 -m cloud_render.provision --port 0 --lifetime-minutes 18",
+  "prepareSeconds": 404.125,
+  "gnomeShellSHA256": "afb135d53dd2ee5483bf03d0e60895f8d04d48be897827012f4e473e608002eb",
+  "fontSHA256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a",
+  "cloudSourceReady": true,
+  "sourceAcceptedSuper": true,
+  "mesaBytesAtAck": 6863296,
+  "blocksAtAck": 12,
+  "temporaryWorkspaceRemoved": true,
+  "passed": true,
+  "totalSeconds": 406.457,
+  "canonicalSignedPackages": 495,
+  "filesEqualCurrentTree": 11,
+  "comparedFiles": 11,
+  "matchedAllRuntimeModules": true,
+  "differencesFromShippingSource": []
+}

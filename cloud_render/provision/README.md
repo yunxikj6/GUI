@@ -13,3 +13,5 @@ python3 -m cloud_render.provision
 保持云端命令运行。按 Ctrl+C 或结束控制进程后，独立守护进程会终止本次工作进程组并回收该目录。默认生命周期为四小时，包括下载时间。可用 `--lifetime-minutes` 设定 1 至 1440 分钟。每次新启动都会重新核对软件源并创建新配对会话。
 
 [Ubuntu Archive](https://archive.ubuntu.com/ubuntu/) · [Ubuntu Security](https://security.ubuntu.com/ubuntu/) · [随附公开 APT 密钥的来源与许可证](keys/COPYRIGHT)
+
+一次 InstaBox 冷启动用时 404.125 秒，从 Canonical 签名索引解析并解包 495 个软件包。原版 GNOME 收到 Super 键，测试端读取了 12 个经校验的指令块。退出后独立检查确认临时环境已回收。[冷启动测量](../../docs/measurements/instabox-ubuntu-bootstrap.json)

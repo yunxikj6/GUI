@@ -12,7 +12,7 @@ import threading
 from cloud_render import gnome_wire as wire
 from cloud_render.instabox_relay import BATCH_BYTES, BATCH_COUNT, BATCH_INLINE
 from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer, encode_select_all, encode_text
-from .instabox_transport import InstaBoxControl, RequestOutcomeUnknown, TransportError
+from .instabox_transport import InstaBoxControl, InvalidPayload, RequestOutcomeUnknown, TransportError
 
 
 _FOCUS_REJECTED = object()
@@ -53,31 +53,31 @@ class _Provider(InstaBoxControl):
                 if self.batch:
                     items = result.get('messages')
                     if kind != 'batch' or not isinstance(items, list) or not 1 <= len(items) <= BATCH_COUNT:
-                        raise TransportError('云桌面批量绘图回执无效。')
+                        raise InvalidPayload('云桌面批量绘图回执无效。')
                     total = inline = 0
                     for index, item in enumerate(items, self.cursor + 1):
                         if (not isinstance(item, dict) or type(item.get('id')) is not int
                                 or item['id'] != index or type(item.get('size')) is not int
                                 or not 12 <= item['size'] <= wire.MAX_PACKET + wire.HEADER.size):
-                            raise TransportError('云桌面批量绘图的编号或尺寸无效。')
+                            raise InvalidPayload('云桌面批量绘图的编号或尺寸无效。')
                         total += item['size']
                         if 'data' in item:
                             if not isinstance(item['data'], str):
-                                raise TransportError('云桌面批量绘图的数据编码无效。')
+                                raise InvalidPayload('云桌面批量绘图的数据编码无效。')
                             inline += len(item['data'])
                     if total > BATCH_BYTES or inline > BATCH_INLINE:
-                        raise TransportError('云桌面批量绘图超过下载上限。')
+                        raise InvalidPayload('云桌面批量绘图超过下载上限。')
                     self.pending.extend(items)
                 else:
                     self.pending.append(result)
             item = self.pending[0]
             if item.get('kind') != 'message' or 'codec' in item:
-                raise TransportError('云桌面中转消息类型无效。')
+                raise InvalidPayload('云桌面中转消息类型无效。')
             raw = self.verified_bytes(item, self.cursor + 1, wire.MAX_PACKET + wire.HEADER.size)
             data = io.BytesIO(raw)
             message = wire.read(data, DOWNSTREAM)
             if not message or data.read(1):
-                raise TransportError('云桌面中转消息边界无效。')
+                raise InvalidPayload('云桌面中转消息边界无效。')
             self.pending.popleft()
             self.cursor += 1
             return message
@@ -86,12 +86,12 @@ class _Provider(InstaBoxControl):
     def input(self, number, message):
         ack = self._call('desktop', id=number, data=base64.b64encode(message).decode('ascii'))
         if type(ack.get('id')) is not int or ack['id'] != number:
-            raise TransportError('云桌面中转回执不匹配。')
+            raise InvalidPayload('云桌面中转回执不匹配。')
         if 'confirmed' in ack and type(ack['confirmed']) is not bool:
-            raise TransportError('原桌面操作确认无效。')
+            raise InvalidPayload('原桌面操作确认无效。')
         if ack.get('applied', True) is not True:
             if not self.search_input or ack.get('applied') is not False or not ack.get('confirmed'):
-                raise TransportError('云端输入确认无效。')
+                raise InvalidPayload('云端输入确认无效。')
             return _FOCUS_REJECTED
         return ack.get('confirmed', False)
 
@@ -192,35 +192,35 @@ class DesktopStream:
                             return
                         if kind == wire.READY:
                             if self.ready or wire.DIMENSIONS.unpack(body) != self.size:
-                                raise TransportError('云桌面尺寸或就绪状态不符。')
+                                raise InvalidPayload('云桌面尺寸或就绪状态不符。')
                             self.ready = True
                         elif kind == wire.FOCUS:
                             rev, active = wire.FOCUS_STATE.unpack(body)
                             if (not getattr(self.peer, 'search_input', False) or
                                     rev != self.focus_revision + 1 or active not in (0, 1)):
-                                raise TransportError('原桌面搜索焦点无效。')
+                                raise InvalidPayload('原桌面搜索焦点无效。')
                             self.focus_revision, self.focus_active = rev, bool(active)
                         elif kind == wire.ACK:
                             seq, applied = wire.INPUT_ACK.unpack(body)
                             if (seq != self.ordered_ack + 1 or seq > self.sent or applied not in (0, 1) or
                                     (not applied and not getattr(self.peer, 'search_input', False))):
-                                raise TransportError('原桌面未确认此次操作。')
+                                raise InvalidPayload('原桌面未确认此次操作。')
                             expected = self.early_results.pop(seq, None)
                             if expected is not None and bool(applied) != expected:
-                                raise TransportError('原桌面两次输入回执不一致。')
+                                raise InvalidPayload('原桌面两次输入回执不一致。')
                             self.ordered_ack = seq
                             if seq >= self.confirmed:
                                 self.confirmed = seq
                                 self.last_applied = bool(applied)
                         elif kind == wire.UNAVAILABLE:
                             if not 1 <= body[0] <= len(wire.UNAVAILABLE_APPS):
-                                raise TransportError('云端图面提示无效。')
+                                raise InvalidPayload('云端图面提示无效。')
                             app = wire.UNAVAILABLE_APPS[body[0] - 1]
                             if not self.unavailable or self.unavailable[-1] != app:
                                 self.unavailable.append(app)
                         else:
                             if not self.ready or self.ordered_ack != self.sent or wire.FINAL.unpack(body) != (index, total, digest.digest()):
-                                raise TransportError('云桌面绘图末尾校验失败。')
+                                raise InvalidPayload('云桌面绘图末尾校验失败。')
                             self.ended = True
                         self.changed.notify_all()
                         if self.ended:
@@ -228,7 +228,8 @@ class DesktopStream:
         except (OSError, ValueError, EOFError) as exc:
             with self.changed:
                 if not self.closed:
-                    self.problem = TransportError('云桌面传输中断或校验失败。请重新连接。')
+                    problem = InvalidPayload if isinstance(exc, ValueError) else TransportError
+                    self.problem = problem('云桌面传输中断或校验失败。请重新连接。')
                     self.problem.__cause__ = exc
                 self.changed.notify_all()
         finally:
@@ -283,7 +284,7 @@ class DesktopStream:
                     if applied is True or applied is _FOCUS_REJECTED:
                         decision = applied is True
                         if self.ordered_ack == number and self.last_applied != decision:
-                            raise TransportError('原桌面两次输入回执不一致。')
+                            raise InvalidPayload('原桌面两次输入回执不一致。')
                         if self.ordered_ack < number:
                             self.early_results[number] = decision
                         self.confirmed = number
@@ -293,6 +294,8 @@ class DesktopStream:
                     if self.confirmed != number:
                         raise TransportError('原桌面没有确认操作。')
                     return self.last_applied
+            except InvalidPayload:
+                raise
             except (OSError, ValueError):
                 with suppress(OSError):
                     self.close()

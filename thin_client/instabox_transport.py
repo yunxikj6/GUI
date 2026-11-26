@@ -29,6 +29,10 @@ class TransportError(OSError):
     pass
 
 
+class InvalidPayload(TransportError, ValueError):
+    """The remote response failed validation, even if the transport stayed open."""
+
+
 class RequestOutcomeUnknown(TransportError):
     """The provider may have accepted an input whose HTTP responses were lost."""
 
@@ -81,20 +85,20 @@ class InstaBoxControl:
         if (type(result.get('id')) is not int or result['id'] != msg_id or type(size) is not int or
                 not 12 <= size <= max_size or not isinstance(digest, str) or
                 not re.fullmatch(r'[a-f0-9]{64}', digest)):
-            raise TransportError('云端绘图消息的编号、长度或摘要无效。')
+            raise InvalidPayload('云端绘图消息的编号、长度或摘要无效。')
         if result.get('file') is True and 'data' not in result:
             data = self._read_file(msg_id, size)
         else:
             chunk = result.get('data')
             if ('file' in result or size > INLINE_LIMIT or not isinstance(chunk, str) or
                     len(chunk) != ((size + 2) // 3) * 4):
-                raise TransportError('云端绘图数据编码无效。')
+                raise InvalidPayload('云端绘图数据编码无效。')
             try:
                 data = base64.b64decode(chunk, validate=True)
             except (binascii.Error, ValueError):
-                raise TransportError('云端绘图数据编码无效。') from None
+                raise InvalidPayload('云端绘图数据编码无效。') from None
         if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
-            raise TransportError('云端绘图传输内容校验失败。')
+            raise InvalidPayload('云端绘图传输内容校验失败。')
         return data
 
     def _read_file(self, msg_id, size):
