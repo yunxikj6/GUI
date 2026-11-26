@@ -36,7 +36,7 @@ class SystemBrowserWindow:
         return self.target_id
 
 
-async def _window_identity(page, browser, target, expected_pid, executable):
+async def _window_identity(page, browser, target, expected_pid, executable, *, accepts_target=None):
     _require(_exclusive_page(page) and not page.is_closed(), 'system browser must own exactly one private page')
     processes = (await browser.send('SystemInfo.getProcessInfo'))['processInfo']
     owners = [p['id'] for p in processes if p['type'] == 'browser']
@@ -45,8 +45,10 @@ async def _window_identity(page, browser, target, expected_pid, executable):
     info = (await target.send('Target.getTargetInfo'))['targetInfo']
     tree = (await target.send('Page.getFrameTree'))['frameTree']
     document = tree['frame']
-    _require(info['type'] == 'page' and info['url'] == OFFLINE_TARGET
-             and document['url'] == 'chrome-error://chromewebdata/' and document.get('unreachableUrl') == OFFLINE_TARGET
+    attempted = document.get('unreachableUrl')
+    allowed = attempted == OFFLINE_TARGET if accepts_target is None else accepts_target(attempted)
+    _require(info['type'] == 'page' and allowed and info['url'] == attempted
+             and document['url'] == 'chrome-error://chromewebdata/'
              and not tree.get('childFrames') and not document.get('parentId')
              and info['targetId'] == document['id'] and bool(document['loaderId']),
              'capture requires the dedicated public offline document')
@@ -56,8 +58,15 @@ async def _window_identity(page, browser, target, expected_pid, executable):
     metrics = (await target.send('Page.getLayoutMetrics'))['cssVisualViewport']
     _require(metrics.get('scale', 1) == metrics.get('zoom', 1) == 1 and
              not metrics['offsetX'] and not metrics['offsetY'], 'unexpected system browser zoom or viewport')
+    # Chromium's CSS clientWidth excludes a traditional scrollbar. Viz paints
+    # the entire original viewport, including that scrollbar.
+    viewport = (await target.send('Runtime.evaluate', {
+        'expression': '[window.innerWidth,window.innerHeight,window.devicePixelRatio]', 'returnByValue': True,
+    }))['result'].get('value')
+    _require(isinstance(viewport, list) and len(viewport) == 3 and viewport[2] == 1 and
+             all(type(n) is int and 0 < n <= 8192 for n in viewport[:2]), 'invalid native browser viewport')
     return (SystemBrowserWindow(expected_pid, window['windowId'], info['targetId'], document['loaderId']),
-            (metrics['clientWidth'], metrics['clientHeight']))
+            (viewport[0], viewport[1]))
 
 
 def _published_pictures(events, renderer, tree_id):
@@ -258,6 +267,10 @@ async def capture_offline_viewport(page, sequence, *, browser_pid, executable):
     The caller owns the browser's private DevTools pipe and its isolated profile. Only
     the built-in network-error document for the fixed, query-free target is supported.
     """
+    return await _capture_owned_viewport(page, sequence, browser_pid, executable)
+
+
+async def _capture_owned_viewport(page, sequence, browser_pid, executable, *, accepts_target=None, snapshot=None):
     _require(type(browser_pid) is int and browser_pid > 0 and Path(executable).is_absolute(),
              'expected a known system-browser process and executable')
     browser = await page.context.browser.new_browser_cdp_session()
@@ -265,17 +278,21 @@ async def capture_offline_viewport(page, sequence, *, browser_pid, executable):
         target = await page.context.new_cdp_session(page)
         try:
             async with asyncio.timeout(15):
-                start = await _window_identity(page, browser, target, browser_pid, executable)
+                async def identity():
+                    return await _window_identity(page, browser, target, browser_pid, executable, accepts_target=accepts_target)
+
+                start = await identity()
                 await target.send('LayerTree.enable')
                 await target.send('DOM.enable')
                 await target.send('Overlay.enable')
                 for attempt in range(3):
-                    events = await _snapshot(target, categories=_CATEGORIES)
-                    _require(start == await _window_identity(page, browser, target, browser_pid, executable),
+                    events = (await _snapshot(target, categories=_CATEGORIES) if snapshot is None
+                              else await snapshot(target, start[0]))
+                    _require(start == await identity(),
                              'browser navigated, resized or switched windows during paint')
                     try:
                         frame = await _extract(target, events, *start, sequence)
-                        _require(start == await _window_identity(page, browser, target, browser_pid, executable),
+                        _require(start == await identity(),
                                  'browser left its original window before publication')
                         return start[0], frame
                     except (CaptureError, ValueError):

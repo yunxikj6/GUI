@@ -91,9 +91,9 @@ class OfflineWindowIdentity(unittest.IsolatedAsyncioTestCase):
         metrics = {'cssVisualViewport': {'offsetX': 0, 'offsetY': 0, 'clientWidth': 900, 'clientHeight': 633}}
         def browser_reply(method, args=None):
             return processes if method == 'SystemInfo.getProcessInfo' else {'windowId': 42, 'bounds': {'windowState': 'normal'}}
-        def target_reply(method):
+        def target_reply(method, args=None):
             return {'Target.getTargetInfo': info_response, 'Page.getFrameTree': frame_response,
-                    'Page.getLayoutMetrics': metrics}[method]
+                    'Page.getLayoutMetrics': metrics, 'Runtime.evaluate': {'result': {'value': [900, 633, 1]}}}[method]
         browser, target = Mock(), Mock()
         browser.send, target.send = AsyncMock(side_effect=browser_reply), AsyncMock(side_effect=target_reply)
         async def identity():
