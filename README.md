@@ -1,8 +1,10 @@
 # Cloud Linux Workspace
 
-在 Windows 上双击 `Start.cmd`，打开云机的 Ubuntu 桌面。Windows 的原生窗口执行 GNOME Shell 和 Mutter 生成的绘图指令，并把鼠标与键盘操作传回同一个云端会话。Ubuntu、应用进程、项目文件和账号留在云机。下载包自带绘图运行时。[下载 Windows 客户端](releases/thin-windows/cloud-workspace.zip) · [云端准备与连接](docs/thin-client.md)
+解压 Win64 客户端，双击 `Start.cmd`，先进入云端 Ubuntu 桌面，再点击 Dock 上的 ChatGPT。桌面、应用进程和输入状态由云机持有。Windows 只需要随包的绘图运行时，在本地绘制 GNOME 及应用自己的界面。现已验证 ChatGPT 登录前的窗口、菜单和编辑框。[下载原厂应用桌面客户端](releases/original-win64/cloud-workspace.zip) · [云服务器准备](cloud_render/provision/README.md) · [操作实拍](docs/interactive-original-desktop.md)
 
-## 连接 Ubuntu 桌面
+## 连接基础 Ubuntu 桌面
+
+只使用 GNOME 桌面、概览搜索和独立应用通道时，可以选用同时支持多种桌面分辨率的基础客户端。[下载基础桌面客户端](releases/thin-windows/cloud-workspace.zip)
 
 如果你的 InstaBox 是 Debian 13 amd64，可在云机的本仓库目录运行 `python3 -m cloud_render.provision`，由云机校验 Ubuntu 官方软件包，启动一次性桌面。终端显示端口后即可配对，关闭该命令会回收本次 Ubuntu 环境。[Debian 云机的空间、启动与回收](cloud_render/provision/README.md)
 
