@@ -24,7 +24,8 @@ def command_size(data):
 
 def encode_text(revision, text):
     if (type(revision) is not int or not 0 < revision <= 0xffffffff or type(text) is not str
-            or not 0 < len(text) <= MAX_TEXT or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in text)):
+            or not 0 < len(text) <= MAX_TEXT
+            or any(ord(c) < 32 or 127 <= ord(c) < 160 or c in '\u2028\u2029' for c in text)):
         raise ValueError('GNOME 搜索文本或焦点编号无效。')
     try:
         data = text.encode('utf-8')

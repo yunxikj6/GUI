@@ -252,7 +252,7 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(gnome_input.decode_input(raw), (b'T', (1, text)))
             self.assertEqual(gnome_input.command_size(raw[:3]), None)
             self.assertEqual(gnome_input.command_size(raw[:7]), len(raw))
-        for text in ('', 'a\n', '\u0085', '\udc00', '人' * 1366):
+        for text in ('', 'a\n', '\u0085', '\u2028', '\u2029', '\udc00', '人' * 1366):
             with self.assertRaises(ValueError):
                 gnome_input.encode_text(1, text)
         for malformed in (b'T', b'T' + bytes(6), b'T' + struct.pack('!IH', 1, 1) + b'\x80'):

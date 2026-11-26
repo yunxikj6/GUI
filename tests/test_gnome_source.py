@@ -10,10 +10,41 @@ import threading
 import unittest
 from contextlib import ExitStack, closing
 
-from cloud_render import gnome_app_request, gnome_input, gnome_source
+from cloud_render import gnome_app_request, gnome_input, gnome_search_input, gnome_source
 
 
 class GnomeSourceTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(socket, 'SO_PEERCRED'), 'Linux peer credentials required')
+    def test_only_original_shell_can_confirm_a_focused_commit(self):
+        with tempfile.TemporaryDirectory() as home, ExitStack() as stack:
+            channel = gnome_search_input.SearchBridge(Path(home), stack)
+            with socket.socket(socket.AF_UNIX) as outsider:
+                outsider.connect(str(Path(home) / 'text-input'))
+                self.assertFalse(channel.connect(os.getpid() + 1))
+                self.assertEqual(outsider.recv(1), b'')
+            with socket.socket(socket.AF_UNIX) as original:
+                original.connect(str(Path(home) / 'text-input'))
+                self.assertTrue(channel.connect(os.getpid()))
+                events = []
+                def notify(event, **fields):
+                    events.append((event, fields))
+                original.sendall(b'F 1')
+                channel.receive(notify)
+                original.sendall(b' 1\n')
+                channel.receive(notify)
+                def apply(_timeout):
+                    self.assertEqual(json.loads(original.recv(256)), [1, '你好'])
+                    original.sendall(b'A 1\nF 2 0\nF 3 1\n')
+                    channel.receive(notify)
+                self.assertTrue(channel.commit(1, '你好', apply))
+                self.assertFalse(channel.commit(1, '过期', apply))
+                self.assertEqual(events, [('focus', dict(revision=1, active=True)),
+                                          ('focus', dict(revision=2, active=False)),
+                                          ('focus', dict(revision=3, active=True))])
+                original.sendall(b'A 1\n')
+                with self.assertRaises(ValueError):
+                    channel.receive(notify)
+
     def test_input_is_one_exact_bounded_action(self):
         for action in (b'M', b'L', b'R'):
             for x, y in [(0, 0), (799, 519)]:

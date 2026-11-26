@@ -32,5 +32,11 @@
       "sourceAckMs": 65.5
     }
   },
-  "image": "../gnome-search-zh.png"
+  "image": "../gnome-search-zh.png",
+  "confirmedNativeBufferRun": {
+    "cjkCommitConfirmation": "ClutterTextBuffer::inserted-text on the same original focused object matched the committed UTF-8 text",
+    "originalFrames": 84,
+    "matchingReplayFrames": 84,
+    "chineseSourceAckMs": 49.5
+  }
 }

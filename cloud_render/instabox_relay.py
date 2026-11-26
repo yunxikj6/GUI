@@ -123,7 +123,7 @@ def check_request(req):
             revision, length = struct.unpack_from('!IH', command, 1)
             require(revision and 1 <= length <= MAX_TEXT and len(command) == 7 + length, 'invalid-desktop-input')
             value = command[7:].decode('utf-8')
-            require(all(ord(c) >= 32 and not 127 <= ord(c) < 160 for c in value), 'invalid-desktop-input')
+            require(all(ord(c) >= 32 and not 127 <= ord(c) < 160 and c not in '\u2028\u2029' for c in value), 'invalid-desktop-input')
         elif command[:1] in (b'M', b'L', b'R') and len(command) == 5:
             x, y = struct.unpack_from('!HH', command, 1)
             require(x < 1920 and y < 1080, 'invalid-desktop-input')
