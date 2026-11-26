@@ -13,6 +13,7 @@ PACKAGES = (
     "base-files",
     "bash",
     "dash",
+    "mawk",
     "coreutils",
     "libc-bin",
     "python3",
@@ -38,6 +39,7 @@ PACKAGES = (
     "gsettings-desktop-schemas",
     "libglib2.0-bin",
     "libgdk-pixbuf2.0-bin",
+    "librsvg2-common",
     "libgtk-3-bin",
     "dconf-gsettings-backend",
 )

@@ -132,12 +132,14 @@ def build(rows, target):
         for directory in ("etc", "dev", "proc", "run", "sys", "tmp", "var/lib/dbus", "home/workspace"):
             (target / directory).mkdir(parents=True, exist_ok=True)
         # Account and bus metadata inside the disposable guest only. The host is never a dpkg target.
-        # On Noble the dash maintainer script normally selects /bin/sh.
-        shell = target / "usr/bin/sh"
-        if not shell.exists() and not shell.is_symlink():
-            if not (target / "usr/bin/dash").is_file():
-                raise ValueError("verified Ubuntu dash is missing")
-            shell.symlink_to("dash")
+        # These alternatives normally come from maintainer scripts. The guest
+        # uses the verified Noble executables without running those scripts.
+        for alias, implementation in (("sh", "dash"), ("awk", "mawk")):
+            binary = target / "usr/bin" / alias
+            if not os.path.lexists(binary):
+                if not (binary.parent / implementation).is_file():
+                    raise ValueError("verified Ubuntu executable missing: " + implementation)
+                binary.symlink_to(implementation)
         accounts = {
             "machine-id": "",
             "passwd": f"root:x:0:0:root:/root:/bin/sh\nworkspace:x:{os.getuid()}:{os.getgid()}:Workspace:/home/workspace:/bin/sh\nmessagebus:x:100:101:Message bus:/nonexistent:/usr/sbin/nologin\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\n",
