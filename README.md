@@ -1,6 +1,6 @@
 # Cloud Linux Workspace
 
-Windows 本机运行轻量绘图客户端。应用进程、账号会话和项目文件放在云服务器上。云端从原程序正在显示的窗口取得 Skia 绘图指令，本机按显示比例重新绘制这些指令，点击则送回创建该窗口的云端进程。
+Windows 本机运行轻量绘图客户端。应用进程、账号会话和项目文件放在云服务器上。云端从原程序的窗口取得 Skia 绘图指令。本机按显示比例重绘，并将鼠标、键盘和已确认的输入法文字送回创建窗口的云端进程。私有连接在本次会话的内存里复用字库和其他重复字节。
 
 当前接入的是 **ChatGPT for Linux** 的登录前窗口。客户端需要 Python 3.10+ 和已有的现代浏览器。浏览器在本机加载随包的 CanvasKit，显示并缩放云端原程序的画面。Ubuntu、ChatGPT 及其登录资料保存在云侧。Claude、整个 GNOME 桌面和登录后的对话仍在开发验收范围内。[绘图客户端](thin_client/) · [云端绘图服务](cloud_render/)
 
@@ -14,9 +14,9 @@ Windows 本机运行轻量绘图客户端。应用进程、账号会话和项目
 
 [下载 Windows 轻量客户端](releases/thin-windows/cloud-workspace.zip)（x64 和 ARM64）
 
-在云机的图形会话中运行 `python3 -m cloud_render.service`。Windows 上解压轻量客户端并双击 `Start.cmd`，按提示输入 InstaBox 凭证和当前绘图服务的配对码。客户端通过 InstaBox 私有接口接收云端绘图并发回点击。已有私有 TCP 转发时，也可以用 `Start.cmd --connect-port 端口号` 连接。[云端准备与客户端操作](docs/thin-client.md)
+在云机的图形会话中运行 `python3 -m cloud_render.service`。Windows 上解压轻量客户端并双击 `Start.cmd`，按提示输入 InstaBox 凭证和当前绘图服务的配对码。已有私有 TCP 转发时，也可以用 `Start.cmd --connect-port 端口号` 连接。[云端准备与客户端操作](docs/thin-client.md)
 
-当前版本支持本地重绘、缩放、云端主动更新与鼠标主键单击。登录后的输入和对话、Claude Artifacts、完整 GNOME 桌面及 Windows 11 真机仍需验收。
+当前版本支持本地重绘、缩放、鼠标主键单击、键盘导航、文本编辑与输入法确认。在原版 ChatGPT 登录前表单中，云端原程序和本机重绘窗口都显示了用户提交的测试文字。登录后的对话、Claude Artifacts、完整云桌面及 Windows 11 真机仍需验收。[本机重绘的中英文输入](docs/cloud-render-input.png) · [同一时刻的云端原窗口](docs/cloud-render-input-source.png)
 
 ## 显式兼容入口
 

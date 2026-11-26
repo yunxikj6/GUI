@@ -13,12 +13,13 @@ FILES = (
     ('thin_client_entry.py', 'thin_client_entry.py'),
     ('instabox.py', 'instabox.py'),
     ('cloud_render/wire.py', 'cloud_render/wire.py'),
+    ('cloud_render/frame_delta.py', 'cloud_render/frame_delta.py'),
     ('cloud_render/instabox_relay.py', 'cloud_render/instabox_relay.py'),
 )
 CLIENT_FILES = ('viewer.py', 'app_window.py', 'instabox_transport.py', 'index.html', 'renderer.js',
-                'viewer.js', 'viewer.css', 'vendor/canvaskit.js', 'vendor/canvaskit.wasm.gz',
+                'viewer.js', 'input.js', 'viewer.css', 'vendor/canvaskit.js', 'vendor/canvaskit.wasm.gz',
                 'vendor/CanvasKit.json', 'vendor/CanvasKit-LICENSE.txt', 'vendor/DejaVu-COPYRIGHT.txt',
-                'vendor/Liberation-COPYRIGHT.txt')
+                'vendor/Liberation-COPYRIGHT.txt', 'vendor/NotoSansCJK-OFL.txt')
 WINDOWS_FILES = ('CloudLinuxWorkspace-x64.exe', 'CloudLinuxWorkspace-arm64.exe', 'Go-LICENSE.txt')
 
 

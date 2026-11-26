@@ -6,6 +6,7 @@ from pathlib import Path
 import secrets
 import socket
 import stat
+import struct
 import subprocess
 import sys
 import threading
@@ -21,6 +22,54 @@ SOURCE = Path(relay.__file__).read_text(encoding='utf-8')
 
 def frame(seq, size):
     return encode_message(Frame(seq, 120, 90, (Layer(0, 0, 120, 90, b'skiapict' + b'x' * size),)))
+
+
+class InputEnvelope(unittest.IsolatedAsyncioTestCase):
+    def test_only_bounded_valid_input_records_pass_transport_validation(self):
+        def envelope(kind, payload):
+            return relay.HEADER.pack(b'CLRP', 1, kind, 0, len(payload)) + payload
+
+        seq = struct.pack('!I', 1)
+        for kind, payload in ((5, seq), (5, seq + b'\xff'), (5, seq + b'x' * 4097),
+                              (5, bytes(4) + b'x'), (4, seq + b'\x00'), (4, seq + b'\xff\x01'),
+                              (4, seq + b'\x00\x00'), (3, seq + b'\x01')):
+            raw = envelope(kind, payload)
+            with self.subTest(kind=kind, size=len(raw)), self.assertRaises((relay.RelayError, ValueError)):
+                relay.input_bytes(base64.b64encode(raw).decode(), click_only=False)
+        text = envelope(5, seq + '正文'.encode())
+        encoded = base64.b64encode(text).decode()
+        self.assertEqual(relay.input_bytes(encoded, click_only=False), text)
+        with self.assertRaises(relay.RelayError):
+            relay.input_bytes(encoded, click_only=True)
+
+    async def test_ambiguous_input_write_cannot_be_retried_or_changed(self):
+        class Interrupted:
+            writes = []
+
+            def write(self, raw):
+                self.writes.append(raw)
+
+            async def drain(self):
+                raise ConnectionResetError()
+
+            def close(self):
+                pass
+
+        broker = relay.Relay(None, {'pair': secrets.token_urlsafe(32)})
+        broker.published = 1
+        broker.writer = Interrupted()
+        raw = b'private committed text'
+        with self.assertRaisesRegex(relay.RelayError, 'unconfirmed-input'):
+            await broker.send_input(1, raw)
+        with self.assertRaisesRegex(relay.RelayError, 'unconfirmed-input'):
+            await broker.send_input(1, raw)
+        with self.assertRaisesRegex(relay.RelayError, 'input-conflict'):
+            await broker.send_input(1, b'other')
+        with self.assertRaisesRegex(relay.RelayError, 'upstream-closed'):
+            await broker.send_input(2, b'new')
+        self.assertEqual(broker.writer.writes, [raw])
+        self.assertEqual(len(broker.input_digest), 32)
+        self.assertNotIn(raw, broker.__dict__.values())
 
 
 @unittest.skipUnless(sys.platform.startswith('linux'), 'cloud helper requires Linux')

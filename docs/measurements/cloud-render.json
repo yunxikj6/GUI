@@ -77,7 +77,8 @@
       "scopedProcessesTerminated": 23,
       "temporaryPackageProfileDependenciesRemoved": true,
       "localTemporaryPairingRemoved": true
-    }
+    },
+    "scope": "First release d652620, before the keyboard and compressed private-frame transport landed. These raw frame lengths and timings describe that earlier run."
   },
   "sameProcessCloudToClientRendering": {
     "before": {
@@ -107,10 +108,10 @@
     "sha256": "491739d77a64b242e8ac1b3dbdc9d36aca29010dd432357ca252156375426a98"
   },
   "limits": [
-    "Primary click only. No keyboard or IME protocol in this release.",
-    "Account sign-in, conversations and Artifacts were not exercised.",
-    "The certified capture path covers supported SkPicture v110 app surfaces and verified fonts. Claude and the whole GNOME desktop are separate pending surfaces.",
-    "Actual Windows 11 display, keyboard and focus remain unverified."
+    "Original application coverage on the private cross-host path is the signed-out ChatGPT Linux client, including a native form. Account sign-in, conversations and Claude Artifacts remain unverified.",
+    "Typing and IME commits stay bound to the original focus, editor contents and selection. The cloud adapter dispatches a cancellable beforeinput event synchronously (isTrusted is false), then invokes Chromium’s native editing command. Chromium’s resulting input event is trusted and can be undone. A web editor requiring a trusted beforeinput event needs separate validation.",
+    "Control sampling on animated surfaces is bounded. When the original and current hit cannot be certified and the scene has changed, the client rejects the click and the user can inspect the updated surface.",
+    "The supported desktop app captures use SkPicture v110, supported Viz passes and verified fonts. Windows 11 display, focus and Microsoft IME remain unverified."
   ],
   "clientBinaries": {
     "x64": "1e9fbfbcdf63e68f67f836ef9622d24dba92377898dd889912fbd06173b842b8",
@@ -170,7 +171,12 @@
   },
   "claudeResearch": {
     "scope": "Isolated, original, unmodified Claude Desktop 6.28899.6 with a clean profile.",
-    "result": "The application rejected the debug-enabled launch. The ChatGPT capture adapter does not attach to Claude."
+    "result": "The application rejected the debug-enabled launch. The ChatGPT capture adapter does not attach to Claude.",
+    "ordinaryGraphicsTrial": {
+      "scope": "Claude Desktop 6.28899.6 launched normally in an isolated offline X11/Wayland software-rendered test environment. Clean profile; no debug switch or account.",
+      "measured": "The real X11 window appeared. Its private virtual GPU connection submitted 1,035 bytes of initialization, no application drawing calls and no full-frame uploads. An independent desktop GL control drew successfully.",
+      "result": "This path did not supply the original Claude UI for local replay."
+    }
   },
   "windowsCompatibility": {
     "scope": "Debian Wine 10 and official Windows CPython 3.13.9. The x64 release PE, standalone entry and current-user Windows credential prompts were exercised.",
@@ -181,28 +187,425 @@
   },
   "standalonePackage": {
     "download": "../../releases/thin-windows/cloud-workspace.zip",
-    "bytes": 5181625,
-    "sha256": "81387b6bb6772b89402dfe728796f742ed03f2b2b1bd7b4b93bea4e2885643f0",
-    "entries": 23,
-    "windowsCompatibilityCheck": "Unmodified independently unpacked standalone ZIP on Debian Wine 10. No project tree mounted, no WSL installed. Forwarded route used real package Python viewer, Windows 3.13 runtime and a recording loopback CLRP peer. Peer closed after authenticated handshake. Real system credential prompts were cancelled before any Internet access. No Windows 11 GUI rendering verified here.",
-    "privateWindowOnLinux": {
-      "image": "../cloud-render-window.png",
-      "sha256": "5f0e9dce6ba4c6a3a8b47f1f4491ff4f3e86fccd679b2ea832306d7392d80791",
-      "action": "An independent extraction connected to the existing cloud application through InstaBox. A real pointer click on Back returned to the original welcome page.",
-      "cloudReadbackAfterBack": {
-        "processId": 109662,
-        "windowId": 2097155,
-        "referenceSha256": "09fd587511b6836e847afaf393e1ae159b619bee412af297a595b5c2d30b3d18",
-        "originalWelcomeVisible": true
+    "bytes": 5544062,
+    "sha256": "9b9fa8e57965a94c8ea31feb00762843b3f8178704bc0e0a16a68d7af88ede81",
+    "entries": 26,
+    "archiveValidation": "Every payload matched the corresponding source bytes, including both PE launchers, the frame delta decoder, input.js and the Noto Sans CJK license. Independently recomputed every SHA256SUMS entry and checked ZIP CRCs.",
+    "rendererValidation": {
+      "package": "canvaskit-wasm",
+      "version": "0.42.0",
+      "build": "full",
+      "method": "The packaged JavaScript, decompressed WebAssembly module and license matched their original tarball bytes. Verified the npm tarball SHA-512 against the pinned integrity value.",
+      "upstreamManifest": "../../thin_client/vendor/CanvasKit.json"
+    },
+    "extractedPackageChecks": {
+      "linuxInput": {
+        "environment": "Debian 13, private X11 display, Fcitx5 Pinyin, Chromium 156.0.8078.79, original source checkout hidden.",
+        "expectedActionsAcknowledged": 8,
+        "oneChineseCommit": true,
+        "preeditOrCancelledTextSent": false,
+        "scope": "The isolated peer acknowledged the exact action sequence and replayed a previously captured original application frame."
+      },
+      "windowsLauncher": {
+        "environment": "Debian Wine 10 with official Windows CPython 3.13, source checkout hidden.",
+        "entry": "cmd.exe, Start.cmd, x64 launcher, packaged Python viewer.",
+        "authenticatedLoopbackHandshake": true,
+        "systemCredentialPromptsCancelledWithExit130": 2,
+        "testedWindows11": false
+      },
+      "originalChatGPTInput": {
+        "platform": "Separate isolated Ubuntu and Debian processes on one Linux host. The Ubuntu process ran the signed-out, unmodified ChatGPT 26.1120.50957.",
+        "client": "Only the extracted ZIP was available to the client. X11 keyboard input opened the system Fcitx5 Pinyin candidate window.",
+        "preeditMilliseconds": 2350,
+        "originalFieldEmptyBeforeCommit": true,
+        "commits": 1,
+        "originalFieldMatchedTestText": true,
+        "acknowledgedActions": 4,
+        "formSubmitted": false
       }
     },
-    "cloudBackTestArchiveSha256": "b60fea303114516343446387c179430ac3721e81a65854d3eb2845eef3577eae",
-    "finalWindowLifecycle": {
+    "previousPackageMeasurements": [
+      {
+        "sha256": "60b3e856f2286d7a5404ccc46c8852003019a9021cc7eb673fd6889ad1afcc98",
+        "bytes": 5189614,
+        "entries": 25,
+        "archiveValidation": "Verified each packaged file against source, including Windows line endings, both launcher binaries, input.js and the Noto Sans CJK license. Independently recomputed every SHA256SUMS entry and checked ZIP CRCs.",
+        "extractedPackageChecks": {
+          "linuxInput": {
+            "environment": "Debian 13, private X11 display, Fcitx5 Pinyin, Chromium 156.0.8078.79, original source checkout hidden.",
+            "expectedActionsAcknowledged": 8,
+            "oneChineseCommit": true,
+            "preeditOrCancelledTextSent": false,
+            "scope": "The isolated peer acknowledged the exact action sequence and replayed a previously captured original application frame."
+          },
+          "windowsLauncher": {
+            "environment": "Debian Wine 10 with official Windows CPython 3.13, source checkout hidden.",
+            "entry": "cmd.exe, Start.cmd, x64 launcher, packaged Python viewer.",
+            "authenticatedLoopbackHandshake": true,
+            "systemCredentialPromptsCancelledWithExit130": 2,
+            "testedWindows11": false
+          }
+        },
+        "cloudKeyboardTrial": {
+          "application": "Official ChatGPT 26.1120.50957 on a real InstaBox. The isolated Linux client loaded this extracted ZIP.",
+          "verified": "API key form focus, ASCII input, End, Backspace, IME preedit followed by one Chinese commit, then Ctrl+A and Delete. Source controls, original cloud window and local rendering were checked.",
+          "completed": false,
+          "lastAction": "The later Cancel click returned 409. This run did not demonstrate returning to the welcome screen.",
+          "accountLoginOrSubmit": false
+        }
+      },
+      {
+        "sha256": "81387b6bb6772b89402dfe728796f742ed03f2b2b1bd7b4b93bea4e2885643f0",
+        "bytes": 5181625,
+        "entries": 23,
+        "platform": "Final standalone ZIP extracted outside the source tree. Actual Chromium app window on isolated Linux/Xfwm4, an authenticated loopback cloud-protocol peer replaying previously captured vendor graphics.",
+        "windowLifecycle": [
+          {
+            "operation": "Alt+F4",
+            "realOSWindowGone": true,
+            "processExit": 0,
+            "cloudSocketClosed": true,
+            "secondsToProcessExit": 1.02
+          },
+          {
+            "operation": "kill-browser",
+            "realOSWindowGone": true,
+            "processExit": 0,
+            "cloudSocketClosed": true,
+            "secondsToProcessExit": 0.52
+          }
+        ]
+      },
+      {
+        "sha256": "b60fea303114516343446387c179430ac3721e81a65854d3eb2845eef3577eae",
+        "entries": 23,
+        "windowsCompatibilityCheck": "Unmodified independently unpacked standalone ZIP on Debian Wine 10. No project tree mounted, no WSL installed. Forwarded route used real package Python viewer, Windows 3.13 runtime and a recording loopback CLRP peer. Peer closed after authenticated handshake. Real system credential prompts were cancelled before any Internet access. No Windows 11 GUI rendering verified here.",
+        "privateWindowOnLinux": {
+          "image": "../cloud-render-window.png",
+          "sha256": "5f0e9dce6ba4c6a3a8b47f1f4491ff4f3e86fccd679b2ea832306d7392d80791",
+          "action": "An independent extraction connected to the existing cloud application through InstaBox. A real pointer click on Back returned to the original welcome page.",
+          "cloudReadbackAfterBack": {
+            "processId": 109662,
+            "windowId": 2097155,
+            "referenceSha256": "09fd587511b6836e847afaf393e1ae159b619bee412af297a595b5c2d30b3d18",
+            "originalWelcomeVisible": true
+          }
+        }
+      }
+    ],
+    "previousDevelopmentWindowLifecycle": {
+      "scope": "Development measurements recorded in the previous release. Package-specific close checks for the extracted archive are listed separately.",
       "platform": "System Chromium app window on Linux with Xfwm4",
       "altF4Seconds": 0.145,
       "browserKilledSeconds": 0.026,
       "reloadThenAltF4Seconds": 0.088,
       "externalXDestroyWindow": "Forcibly destroying only the X11 surface bypassed the browser close protocol. The process and target can stay active; closing the dedicated browser process releases the connection."
+    }
+  },
+  "nativeInput": {
+    "scope": "Final ZIP extracted in an isolated Linux viewer. Real XTEST keyboard, Fcitx5 Pinyin and a separate signed-out official ChatGPT process in an Ubuntu guest on the same host.",
+    "localCompositionSeconds": 2.35,
+    "preeditSentToSource": false,
+    "confirmedText": "你好",
+    "commitCount": 1,
+    "sourceInputMatched": true,
+    "actionsHttpStatuses": [
+      204,
+      204,
+      204,
+      204
+    ],
+    "vendorFormSubmitted": false,
+    "applicationHandledCancellation": true,
+    "undoVerified": true,
+    "windows11": false
+  },
+  "fontAndViz": {
+    "origin": "Unmodified renderer paint traces and Chromium Viz passes. The cloud adapter maps native clip, solid-color, transparency and DstIn mask commands to portable SkPicture commands. Client uses upstream CanvasKit full 0.42.0.",
+    "sourceCollection": "Noto Sans CJK JP Regular (verified .ttc, face 0)",
+    "originalCollectionBytes": 19484784,
+    "subsetForThreeOriginalGlyphsBytes": 186800,
+    "originalGlyphIdsFor工作区": [
+      16644,
+      9980,
+      11633
+    ],
+    "test": "Independent original AWS region form in an isolated guest, not submitted",
+    "sampleText": "界面测试",
+    "referenceSize": [
+      1090,
+      760
+    ],
+    "meanAbsoluteRGBChannelError": 0.284394,
+    "exactPixelsPercent": 96.2414
+  },
+  "privateInputRoundTrip": {
+    "clientZipSha256": "9b9fa8e57965a94c8ea31feb00762843b3f8178704bc0e0a16a68d7af88ede81",
+    "scope": "Fresh extraction of Windows ZIP on a separate Linux computer. Production local CanvasKit full and private InstaBox APIs. Signed-out unmodified official ChatGPT on the actual cloud VM. No login, form submission or test value persisted.",
+    "images": {
+      "cloud-render-input.png": "9a059e483ef377348d862eee5efe0f81cc89b2b05f4f3bb6de62cf94b1cf7dcb",
+      "cloud-render-input-source.png": "eb9c15061848cf0b8f06f0c88c86e43bfec5ce673772c2af86903002994eab53"
+    },
+    "actions": [
+      {
+        "operation": "open other sign-in methods",
+        "route": "/click",
+        "httpStatus": 204,
+        "responseSeconds": 0.98
+      },
+      {
+        "operation": "open blank vendor field",
+        "route": "/click",
+        "httpStatus": 204,
+        "responseSeconds": 0.676
+      },
+      {
+        "operation": "click stable original input after 3.6s cloud animation",
+        "route": "/click",
+        "httpStatus": 204,
+        "responseSeconds": 0.662
+      },
+      {
+        "operation": "commit inert text after 3.2s focused idle",
+        "route": "/input",
+        "httpStatus": 204,
+        "responseSeconds": 0.876
+      },
+      {
+        "operation": "move cursor to end",
+        "route": "/input",
+        "httpStatus": 204,
+        "responseSeconds": 0.795
+      },
+      {
+        "operation": "delete last character",
+        "route": "/input",
+        "httpStatus": 204,
+        "responseSeconds": 0.713
+      },
+      {
+        "operation": "commit native composition after 3.6s",
+        "route": "/input",
+        "httpStatus": 204,
+        "responseSeconds": 0.734
+      },
+      {
+        "operation": "select fixture text",
+        "route": "/input",
+        "httpStatus": 204,
+        "responseSeconds": 0.751
+      },
+      {
+        "operation": "clear selection",
+        "route": "/input",
+        "httpStatus": 204,
+        "responseSeconds": 0.836
+      },
+      {
+        "operation": "cancel vendor form",
+        "route": "/click",
+        "httpStatus": 204,
+        "responseSeconds": 0.689
+      },
+      {
+        "operation": "return to welcome using visible Back",
+        "route": "/click",
+        "httpStatus": 204,
+        "responseSeconds": 0.809
+      }
+    ],
+    "allAcknowledged": true,
+    "returnedToWelcome": true,
+    "form": {
+      "nativeFocusSteps": 0,
+      "delayedClick": {
+        "beforePauseSequence": 3,
+        "afterPauseSequence": 4,
+        "requestSequence": 4,
+        "pauseSeconds": 3.6
+      },
+      "preeditSeconds": 3.6,
+      "initialSequence": 11,
+      "committedSequence": 15,
+      "preeditReachedCloud": false,
+      "nativeFieldMatchedUnsubmittedTestValue": true,
+      "cleared": true
+    },
+    "pixels": {
+      "sameRemoteXid": 2097155,
+      "sameAppPid": 125826,
+      "nativeInputMatchedFixedTestValue": true,
+      "fullFrameComparedToIndependentXGetImage": {
+        "meanAbsoluteRGBError0to255": 0.1976,
+        "percentRGBChannelsWithin10": 99.2941
+      },
+      "cjkGlyphRegionXYXY": [
+        471,
+        401,
+        512,
+        426
+      ],
+      "cjkPixelsCompared": {
+        "meanAbsoluteRGBError0to255": 5.22764,
+        "percentRGBChannelsWithin10": 83.4146
+      },
+      "binaryGlyphIntersectionOverUnion": 0.7,
+      "changedGlyphRegionPixelsInRealCloudSinceBeforeComposition": 210,
+      "cloudDarkGlyphPixels": 160,
+      "locallyDrawnDarkGlyphPixels": 112,
+      "rawCJKFrameSha256": "77cec0d69697ed37dde53f6d2de2fad05910586a136f79a35bfe5a8bd489127b",
+      "rawCJKFrameBytes": 2472965
+    },
+    "transport": {
+      "frameCount": 20,
+      "frames": [
+        {
+          "sequence": 1,
+          "locallyValidatedRawBytes": 1525280,
+          "transferredBodyBytes": 414443,
+          "bodyTransport": "file"
+        },
+        {
+          "sequence": 2,
+          "locallyValidatedRawBytes": 2288229,
+          "transferredBodyBytes": 13266,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 3,
+          "locallyValidatedRawBytes": 2286036,
+          "transferredBodyBytes": 16957,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 4,
+          "locallyValidatedRawBytes": 2286080,
+          "transferredBodyBytes": 2505,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 5,
+          "locallyValidatedRawBytes": 2286036,
+          "transferredBodyBytes": 2488,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 6,
+          "locallyValidatedRawBytes": 2286080,
+          "transferredBodyBytes": 2506,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 7,
+          "locallyValidatedRawBytes": 2286020,
+          "transferredBodyBytes": 8711,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 8,
+          "locallyValidatedRawBytes": 2286064,
+          "transferredBodyBytes": 2508,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 9,
+          "locallyValidatedRawBytes": 2286064,
+          "transferredBodyBytes": 2505,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 10,
+          "locallyValidatedRawBytes": 2286012,
+          "transferredBodyBytes": 5850,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 11,
+          "locallyValidatedRawBytes": 2286056,
+          "transferredBodyBytes": 2508,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 12,
+          "locallyValidatedRawBytes": 2286012,
+          "transferredBodyBytes": 2486,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 13,
+          "locallyValidatedRawBytes": 2286056,
+          "transferredBodyBytes": 2508,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 14,
+          "locallyValidatedRawBytes": 2472921,
+          "transferredBodyBytes": 41017,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 15,
+          "locallyValidatedRawBytes": 2472965,
+          "transferredBodyBytes": 2577,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 16,
+          "locallyValidatedRawBytes": 2471649,
+          "transferredBodyBytes": 8764,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 17,
+          "locallyValidatedRawBytes": 2286036,
+          "transferredBodyBytes": 10264,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 18,
+          "locallyValidatedRawBytes": 2286080,
+          "transferredBodyBytes": 2506,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 19,
+          "locallyValidatedRawBytes": 2288229,
+          "transferredBodyBytes": 13267,
+          "bodyTransport": "inline"
+        },
+        {
+          "sequence": 20,
+          "locallyValidatedRawBytes": 1525280,
+          "transferredBodyBytes": 17368,
+          "bodyTransport": "inline"
+        }
+      ],
+      "rawFrameBodyBytes": 44763185,
+      "transmittedFrameBodyBytes": 575004,
+      "measurement": "Verified frame body bytes, excluding API control requests, JSON/base64, HTTP and TLS overhead.",
+      "bodyReductionPercent": 98.7155
+    },
+    "responseSecondsOneRun": {
+      "median": 0.751,
+      "range": [
+        0.662,
+        0.98
+      ]
+    },
+    "cleanup": {
+      "scopedProcessesTerminatedBeforeRemoval": 19,
+      "additionalProcessesAtFinalCleanup": 0,
+      "temporaryPairingAndCloudFilesRemoved": true,
+      "independentCloudPathRecheck": "removed"
+    },
+    "cloudSourceSha256": {
+      "chatgpt_process.py": "4453e38149f35fb3f709bcda0496e32c4cfcb25f55e235b4a1334176d6430d0c",
+      "chromium_capture.py": "8cc34842ccf73fc9674f5b1946e1614910f4183b9c26642d6b27090a22a0c9c3",
+      "service.py": "ecaf5d089607c885212dd1a45764beaaf871816f7a03b76322e56a5916bc1405",
+      "skp_fonts.py": "60cd45b1e6dfa46327d535f2f9f0055ebf437f0c891a1fa74403ef8145018bfb",
+      "wire.py": "639e4714c9d7d3f05dba9d060a5c17ad9e0e66fcd7be865c8bb2b4edaae5592e",
+      "viz_picture.py": "b42d793ec572ac434933d03e2e4946a72afdb5e49e57a25556f66fec3cc84ceb",
+      "frame_delta.py": "4a0ab0dd5355836a4f2950d8e83239a0f65bac83c22a9e01a30841bb45d03115"
     }
   }
 }

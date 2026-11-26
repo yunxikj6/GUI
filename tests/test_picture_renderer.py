@@ -21,6 +21,12 @@ BROWSER = os.environ.get('CLOUD_WORKSPACE_TEST_CHROMIUM') or shutil.which('chrom
 RECTS = ('c2tpYXBpY3RuAAAAAAAgQQAAoEEAAJBBAADgQQFkYWVyMAAAABgAABUBAAAAAAAgQQAAoEEAAGBBAADgQRgAABUC'
          'AAAAAABgQQAAoEEAAJBBAADgQXRjYWYEAAAAAAAAAGNmcHQAAAAAeWFyYUgAAAAgdG5wAgAAAAAAAAAAAIBAAACAPwAA'
          'AAAAAAAAAACAPwADAAAAAAAAAACAQAAAAAAAAAAAAACAPwAAgD8AAwAAZ3VscwAAAAAgZm9l')
+# Synthetic SkPicture of an 8x8 rectangle with a SrcIn color filter at alpha
+# 30. The base CanvasKit build silently paints this record as fully opaque.
+FILTER = ('c2tpYXBpY3RuAAAAAAAAAAAAAAAAAABBAAAAQQFkYWVyGAAAABgAABUBAAAAAAAAAAAAAAAAAABBAAAAQXRjYWYW'
+          'AAAAAQAAABFTa01vZGVDb2xvckZpbHRlcmNmcHQAAAAAeWFyYVwAAAAgdG5wAQAAAAAAAAAAAIBA0dDQPeHg'
+          '4D35+Pg9AACAPwADAAIAAAAAAAAAAAAAAAABAAAAFAAAANHQ0D3h4OA9+fj4PfHw8D0FAAAAAAAAAAAAAABndW'
+          'xzAAAAACBmb2U=')
 
 
 class Assets(unittest.TestCase):
@@ -29,8 +35,8 @@ class Assets(unittest.TestCase):
         pins = json.loads((directory / 'CanvasKit.json').read_text())['upstreamFilesSha256']
         loader = (directory / 'canvaskit.js').read_bytes()
         wasm = gzip.decompress((directory / 'canvaskit.wasm.gz').read_bytes())
-        self.assertEqual(hashlib.sha256(loader).hexdigest(), pins['package/bin/canvaskit.js'])
-        self.assertEqual(hashlib.sha256(wasm).hexdigest(), pins['package/bin/canvaskit.wasm'])
+        self.assertEqual(hashlib.sha256(loader).hexdigest(), pins['package/bin/full/canvaskit.js'])
+        self.assertEqual(hashlib.sha256(wasm).hexdigest(), pins['package/bin/full/canvaskit.wasm'])
 
 
 @unittest.skipUnless(sync_playwright and BROWSER, 'requires Chromium and Playwright')
@@ -78,5 +84,9 @@ class Replay(unittest.TestCase):
             self.assertEqual(page.evaluate('renderer.position(325, 95)'), {'x': 16.5, 'y': 9.5})
             self.assertIsNone(page.evaluate('renderer.position(10, 95)'))
             self.assertEqual(requests, [])
+            page.evaluate('''value => renderer.present({width: 8, height: 8, layers: [{
+              x: 0, y: 0, width: 8, height: 8, skp: Uint8Array.from(atob(value), c => c.charCodeAt(0))
+            }]})''', FILTER)
+            self.assertEqual(page.evaluate('pixel(320, 120)[3]'), 30)
             page.evaluate('renderer.destroy()')
             browser.close()

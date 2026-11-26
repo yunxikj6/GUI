@@ -66,6 +66,38 @@ class RenderWire(unittest.TestCase):
             wire.read_message(click, expected=allowed)
         self.assertEqual(click.tell(), 12)
 
+    def test_keyboard_input_wire_bytes_and_unicode_boundaries(self):
+        golden = bytes.fromhex("434c5250 01 04 0000 00000006 00000009 01 01")
+        self.assertEqual(wire.encode_message(wire.KeyPress(9, 'Tab', wire.SHIFT)), golden)
+        self.assertEqual(wire.read_message(Fragmented(golden), wire.INPUT_TYPES), wire.KeyPress(9, 'Tab', 1))
+        for value in ('界\t面\n😀e\u0301', '😀' * 1024):
+            data = value.encode('utf-8')
+            expected = struct.pack("!4sBBHII", b"CLRP", 1, 5, 0, 4 + len(data), 9) + data
+            message = wire.TextCommit(9, value)
+            self.assertEqual(wire.encode_message(message), expected)
+            self.assertEqual(wire.read_message(Fragmented(expected), wire.INPUT_TYPES), message)
+        self.assertIs(wire.InputAck, wire.ClickAck)
+
+    def test_input_validation_rejects_invalid_commands_and_text_without_echoing_it(self):
+        for key, modifiers in [('a', 0), ('F4', 4), ('Shift+Tab', 0), ('c', 2), ('a', True),
+                               ('Tab', 255), ('Enter', 3), ([], 0)]:
+            with self.subTest(key=key, modifiers=modifiers), self.assertRaises(wire.WireError):
+                wire.KeyPress(9, key, modifiers)
+        for bad in ('x' * 4097, '😀' * 1025, '', '\x7f', '\x00', '\x0d', '\ud800'):
+            with self.assertRaises(wire.WireError):
+                wire.TextCommit(9, bad)
+        for kind, body in ((4, b'\0\0\0\x01\0\0'), (4, b'\0\0\0\x01\0\xff'),
+                           (5, b'\0\0\0\x01\xff'), (5, b'\0\0\0\x01\xed\xa0\x80')):
+            header = struct.pack('!4sBBHI', b'CLRP', 1, kind, 0, len(body))
+            with self.assertRaises(wire.WireError):
+                wire.read_message(Fragmented(header + body), expected=wire.INPUT_TYPES)
+        for kind, length in ((4, 5), (4, 7), (5, 4), (5, 4101)):
+            data = struct.pack('!4sBBHI', b'CLRP', 1, kind, 0, length)
+            stream = io.BytesIO(data + b'do not read body')
+            with self.assertRaises(wire.WireError):
+                wire.read_message(stream, expected=wire.INPUT_TYPES)
+            self.assertEqual(stream.tell(), len(data))
+
     def test_every_incomplete_message_is_rejected(self):
         stream = io.BytesIO()
         wire.write_message(stream, wire.Frame(10, 80, 60, [wire.Layer(0, 0, 80, 60, PICTURE)]))
@@ -125,7 +157,8 @@ class RenderWire(unittest.TestCase):
 class AsyncRenderWire(unittest.IsolatedAsyncioTestCase):
     async def test_reads_whole_message_and_reports_clean_end(self):
         messages = (wire.Frame(3, 20, 10, [wire.Layer(0, 0, 20, 10, PICTURE)]),
-                    wire.Click(3, 5.0, 9.25), wire.ClickAck(3, True))
+                    wire.Click(3, 5.0, 9.25), wire.ClickAck(3, True),
+                    wire.KeyPress(3, 'a', wire.CONTROL), wire.TextCommit(4, '原版'))
         reader = asyncio.StreamReader()
         reader.feed_data(b"".join(wire.encode_message(message) for message in messages))
         reader.feed_eof()

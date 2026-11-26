@@ -13,6 +13,7 @@ import struct
 
 from .skp_fonts import FontError, embed_typefaces
 from .wire import Frame, Layer, MAX_PICTURE, WireError
+from .viz_picture import compose, VizError, VizPending
 
 
 class CaptureError(RuntimeError):
@@ -25,7 +26,7 @@ class _UncommittedPicture(CaptureError):
 
 PICTURE = "cc::DisplayItemList:snapshot"
 TREE = "LayerTreeHostImpl:snapshot"
-CATEGORIES = "-*,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.layers,disabled-by-default-devtools.timeline.picture"
+CATEGORIES = "-*,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.layers,disabled-by-default-devtools.timeline.picture,disabled-by-default-viz.quads"
 MAX_TRACE_BYTES = 96 * 1024 * 1024
 
 
@@ -44,7 +45,7 @@ def _ref(layer):
     return layer["layer_id"], pictures[0]["id_ref"]
 
 
-def _decode_layer(layer, picture, width, height):
+def _placement(layer, width, height):
     if (layer.get("opacity") != 1 or layer.get("effect_tree_index") != 1
             or layer.get("clip_tree_index") not in (1, 2) or layer.get("sorting_context_id")):
         raise CaptureError("当前窗口的合成效果或裁剪尚不能完整重绘。")
@@ -61,6 +62,10 @@ def _decode_layer(layer, picture, width, height):
             or x + (vx+vw)*sx < min(width, right) - 0.01
             or y + (vy+vh)*sy < min(height, bottom) - 0.01):
         raise CaptureError("图层在窗口内部另有裁剪。")
+    return x, y, sx, sy
+
+
+def _portable(picture):
     px, py, pw, ph = picture["params"]["layer_rect"]
     data = picture["skp64"]
     if len(data) > 4*((MAX_PICTURE+2)//3):
@@ -73,7 +78,7 @@ def _decode_layer(layer, picture, width, height):
         portable = embed_typefaces(skp)
     except FontError as exc:
         raise CaptureError("当前应用的云端字体尚不能在本地精确重绘。") from exc
-    return Layer(x + px*sx, y + py*sy, pw*sx, ph*sy, portable)
+    return px, py, pw, ph, portable
 
 
 def parse_trace_frame(events, *, process_id, width, height, sequence, layer_tree_id=None):
@@ -117,12 +122,40 @@ def parse_trace_frame(events, *, process_id, width, height, sequence, layer_tree
                 pictures[_ref(layers[0])] = pending[0]
         if final["device_viewport_size"] != {"width": width, "height": height}:
             raise CaptureError("采集期间窗口像素尺寸发生变化，或显示缩放尚不支持。")
-        result = []
-        for layer in _drawn_layers(final):
-            ref = _ref(layer)
+
+        def get_picture(ref):
             if ref not in pictures:
                 raise _UncommittedPicture("当前活动窗口存在无法准确匹配绘图指令的图层。")
-            result.append(_decode_layer(layer, pictures[ref], width, height))
+            return pictures[ref]
+
+        layers = _drawn_layers(final)
+        if not layers:
+            raise _UncommittedPicture("原程序尚未提交内容。")
+        try:
+            simple = [(_ref(layer), _placement(layer, width, height)) for layer in layers]
+        except CaptureError:
+            if not final.get("frame", {}).get("render_passes"):
+                raise
+            cache = {}
+
+            def source(ref):
+                if ref not in cache:
+                    x, y, _, _, portable = _portable(get_picture(ref))
+                    cache[ref] = x, y, portable
+                return cache[ref]
+
+            try:
+                recorded = compose(final, width, height, source)
+            except VizPending as pending:
+                raise _UncommittedPicture(str(pending)) from pending
+            except VizError as viz_error:
+                raise CaptureError(str(viz_error)) from viz_error
+            return Frame(sequence, width, height, (Layer(0, 0, width, height, recorded),))
+
+        result = []
+        for ref, (x, y, sx, sy) in simple:
+            px, py, pw, ph, portable = _portable(get_picture(ref))
+            result.append(Layer(x + px*sx, y + py*sy, pw*sx, ph*sy, portable))
         return Frame(sequence, width, height, tuple(result))
     except (KeyError, TypeError, ValueError, IndexError, binascii.Error, WireError) as exc:
         raise CaptureError("Chromium 返回了无法完整重绘的图层记录。") from exc
@@ -216,7 +249,11 @@ async def capture_frame(page, sequence):
             size = page.viewport_size or {"width": viewport["clientWidth"], "height": viewport["clientHeight"]}
             await cdp.send("DOM.enable")
             await cdp.send("Overlay.enable")
-            for attempt in range(2):
+            # Cold-start animations and the first renderer commit may precede
+            # the application's first usable scene. Leave subsequent captures
+            # responsive and never select an earlier partial tree.
+            deadline = asyncio.get_running_loop().time() + (5 if sequence == 1 else 1.5)
+            while True:
                 events = await _snapshot(cdp)
                 current = await cdp.send("Page.getFrameTree")
                 if current["frameTree"]["frame"]["id"] != frame_id or not _exclusive_page(page):
@@ -225,11 +262,12 @@ async def capture_frame(page, sequence):
                     process_id, tree_id = _target(events, frame_id)
                     return parse_trace_frame(events, process_id=process_id, layer_tree_id=tree_id,
                                              width=int(size["width"]), height=int(size["height"]), sequence=sequence)
-                except _UncommittedPicture:
-                    # The first attach or a just-dispatched action may have
-                    # replaced the display list between paint and commit.
-                    if attempt:
+                except CaptureError as exc:
+                    transient = isinstance(exc, _UncommittedPicture)
+                    if (not transient and sequence != 1 or isinstance(exc.__cause__, FontError)
+                            or asyncio.get_running_loop().time() >= deadline):
                         raise
+                    await asyncio.sleep(0.1)
     except TimeoutError as exc:
         raise CaptureError("等待 Chromium 提交绘图指令超时。") from exc
     finally:

@@ -18,6 +18,22 @@ VERSION = 1
 FRAME = 1
 CLICK = 2
 CLICK_ACK = 3
+KEY_PRESS = 4
+TEXT_COMMIT = 5
+MAX_TEXT_BYTES = 4096
+SHIFT = 1
+CONTROL = 2
+# Numeric IDs are part of the wire format. Append new names at the end.
+_KEY_NAMES = ('Tab', 'Enter', 'Escape', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight',
+              'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', 'a', 'z', 'y')
+_KEY_IDS = {name: number for number, name in enumerate(_KEY_NAMES, 1)}
+_NAVIGATION = frozenset(('ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'))
+_ALLOWED_KEYS = {
+    0: _NAVIGATION | {'Tab', 'Enter', 'Escape', 'Backspace', 'Delete', 'PageUp', 'PageDown'},
+    SHIFT: _NAVIGATION | {'Tab', 'Enter', 'PageUp', 'PageDown'},
+    CONTROL: _NAVIGATION | {'Backspace', 'Delete', 'a', 'z', 'y'},
+    SHIFT | CONTROL: _NAVIGATION | {'z'},
+}
 MAX_PAYLOAD = 32 * 1024 * 1024
 MAX_PICTURE = 16 * 1024 * 1024
 MAX_LAYERS = 128
@@ -30,6 +46,8 @@ _SCENE = struct.Struct("!IHHH")    # Sequence, viewport width/height, number of 
 _LAYER = struct.Struct("!ffffI")   # Display rectangle, length of the following raw SKP.
 _CLICK = struct.Struct("!Iff")    # The scene shown at click time, logical x/y.
 _CLICK_ACK = struct.Struct("!IB")  # The scene shown at click time, applied (0 or 1).
+_KEY = struct.Struct("!IBB")
+_SEQ = struct.Struct("!I")
 
 
 class WireError(ValueError):
@@ -118,8 +136,41 @@ class ClickAck:
             raise WireError("invalid click acknowledgement status")
 
 
-Message = Frame | Click | ClickAck
-_TYPES = {FRAME: Frame, CLICK: Click, CLICK_ACK: ClickAck}
+@dataclass(frozen=True, slots=True)
+class KeyPress:
+    sequence: int
+    key: str
+    modifiers: int = 0
+
+    def __post_init__(self):
+        _sequence(self.sequence)
+        if (type(self.modifiers) is not int or type(self.key) is not str
+                or self.key not in _ALLOWED_KEYS.get(self.modifiers, ())):
+            raise WireError("invalid keyboard shortcut")
+
+
+@dataclass(frozen=True, slots=True)
+class TextCommit:
+    sequence: int
+    text: str
+
+    def __post_init__(self):
+        _sequence(self.sequence)
+        if type(self.text) is not str or not 0 < len(self.text) <= MAX_TEXT_BYTES:
+            raise WireError("invalid committed text length")
+        try:
+            size = len(self.text.encode("utf-8"))
+        except UnicodeEncodeError:
+            raise WireError("invalid Unicode in committed text") from None
+        if size > MAX_TEXT_BYTES or any((ord(c) < 32 and c not in "\t\n") or c == "\x7f" for c in self.text):
+            raise WireError("invalid committed text")
+
+
+# ACK wire bytes remain compatible with clients that only support clicks.
+InputAck = ClickAck
+INPUT_TYPES = (Click, KeyPress, TextCommit)
+Message = Frame | Click | KeyPress | TextCommit | InputAck
+_TYPES = {FRAME: Frame, CLICK: Click, CLICK_ACK: InputAck, KEY_PRESS: KeyPress, TEXT_COMMIT: TextCommit}
 
 
 def validate_click(click: Click, current_frame: Frame) -> None:
@@ -157,12 +208,25 @@ def _header(header, expected):
     if kind not in _TYPES or (expected is not None and _TYPES[kind] not in expected):
         raise WireError("unexpected message type")
     if ((kind == FRAME and length < _SCENE.size) or (kind == CLICK and length != _CLICK.size)
-            or (kind == CLICK_ACK and length != _CLICK_ACK.size)):
+            or (kind == CLICK_ACK and length != _CLICK_ACK.size) or (kind == KEY_PRESS and length != _KEY.size)
+            or (kind == TEXT_COMMIT and not _SEQ.size < length <= _SEQ.size + MAX_TEXT_BYTES)):
         raise WireError("unexpected message type or length")
     return kind, length
 
 
 def _decode(stream, kind, length):
+    if kind == KEY_PRESS:
+        sequence, modifiers, key_id = _KEY.unpack(_read(stream, length))
+        if not 1 <= key_id <= len(_KEY_NAMES):
+            raise WireError("unknown key id")
+        return KeyPress(sequence, _KEY_NAMES[key_id - 1], modifiers)
+    if kind == TEXT_COMMIT:
+        sequence, = _SEQ.unpack(_read(stream, _SEQ.size))
+        try:
+            value = _read(stream, length - _SEQ.size).decode("utf-8")
+        except UnicodeDecodeError:
+            raise WireError("invalid UTF-8 in committed text") from None
+        return TextCommit(sequence, value)
     if kind == CLICK:
         return Click(*_CLICK.unpack(_read(stream, length)))
     if kind == CLICK_ACK:
@@ -194,7 +258,7 @@ def read_message(stream: BinaryIO, expected=None) -> Message | None:
     """Read exactly one message. Return None only on EOF between messages.
 
     A message class or tuple of classes restricts direction before reading any
-    picture bytes. The viewer receives (Frame, ClickAck) and sends Click.
+    picture bytes. The viewer receives (Frame, InputAck) and sends one of INPUT_TYPES.
     """
     header = _read(stream, _HEADER.size, allow_eof=True)
     if not header:
@@ -232,6 +296,14 @@ def write_message(stream: BinaryIO, message: Message) -> None:
     if type(message) is Click:
         _write(stream, _HEADER.pack(MAGIC, VERSION, CLICK, 0, _CLICK.size))
         _write(stream, _CLICK.pack(message.sequence, message.x, message.y))
+    elif type(message) is KeyPress:
+        _write(stream, _HEADER.pack(MAGIC, VERSION, KEY_PRESS, 0, _KEY.size))
+        _write(stream, _KEY.pack(message.sequence, message.modifiers, _KEY_IDS[message.key]))
+    elif type(message) is TextCommit:
+        data = message.text.encode("utf-8")
+        _write(stream, _HEADER.pack(MAGIC, VERSION, TEXT_COMMIT, 0, _SEQ.size + len(data)))
+        _write(stream, _SEQ.pack(message.sequence))
+        _write(stream, data)
     elif type(message) is ClickAck:
         _write(stream, _HEADER.pack(MAGIC, VERSION, CLICK_ACK, 0, _CLICK_ACK.size))
         _write(stream, _CLICK_ACK.pack(message.sequence, message.applied))

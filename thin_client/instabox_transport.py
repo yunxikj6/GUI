@@ -16,7 +16,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from cloud_render.wire import Click, MAX_PAYLOAD, WireError, encode_message, read_message
+from cloud_render.wire import Click, INPUT_TYPES, MAX_PAYLOAD, WireError, encode_message, read_message
+from cloud_render.frame_delta import DeltaError, decode_frame
 from instabox import BridgeError, NoRedirect
 
 
@@ -33,20 +34,23 @@ class InstaBoxTransport:
         self.box = box
         self.bridge = bridge
         self.session = secrets.token_hex(16)
-        self.helper = HELPER.read_text(encoding='utf-8')
+        # Isolated provider exec cannot import our package. Supply only these
+        # fixed product sources, identically on every idempotent control call.
+        codec = HELPER.with_name('frame_delta.py').read_text(encoding='utf-8')
+        self.helper = codec + '\n' + HELPER.read_text(encoding='utf-8')
         self.stop = threading.Event()
         self.close_lock = threading.Lock()
         self.started = False
 
     def _call(self, op, **fields):
         payload = json.dumps({'op': op, 'session': self.session, **fields}, separators=(',', ':'))
-        # start, click, close and poll are each idempotent for the exact request.
+        # Input retries reuse the same session, input number and exact envelope.
         for attempt in range(2):
             try:
                 raw = self.box.exec(['python3', '-I', '-B', '-c', self.helper], payload, timeout=45 if op == 'start' else 15)
                 break
             except BridgeError as exc:
-                if attempt or exc.code != 'network':
+                if attempt or exc.code != 'network' or (self.stop.is_set() and op in ('click', 'input')):
                     raise TransportError('InstaBox 中转请求失败。') from None
         try:
             result = json.loads(raw)
@@ -64,7 +68,7 @@ class InstaBoxTransport:
         # A redirect must never receive the account credential or return a message from another origin.
         return urllib.request.build_opener(NoRedirect()).open(request, timeout=30)
 
-    def _message(self, result, msg_id):
+    def _message(self, result, msg_id, previous=b''):
         size = result.get('size')
         digest = result.get('sha256')
         if (type(result.get('id')) is not int or result['id'] != msg_id or type(size) is not int or
@@ -82,7 +86,23 @@ class InstaBoxTransport:
                 data = base64.b64decode(chunk, validate=True)
             except (binascii.Error, ValueError):
                 raise TransportError('云端绘图数据编码无效。') from None
-        if (len(data) != size or hashlib.sha256(data).hexdigest() != digest or data[:5] != b'CLRP\x01' or
+        if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
+            raise TransportError('云端绘图传输内容校验失败。')
+        if 'codec' in result:
+            if (result['codec'] != 'cdz1' or type(result.get('frameSize')) is not int or
+                    not 12 <= result['frameSize'] <= MAX_PAYLOAD + 12 or
+                    not isinstance(result.get('frameSha256'), str) or
+                    not re.fullmatch(r'[a-f0-9]{64}', result['frameSha256'])):
+                raise TransportError('云端绘图复用协议无效。')
+            try:
+                data = decode_frame(data, previous)
+            except DeltaError as exc:
+                raise TransportError('未能从本次会话重建完整绘图。') from exc
+            size = result['frameSize']
+            if (len(data) != size or data[5:6] != b'\x01' or
+                    hashlib.sha256(data).hexdigest() != result['frameSha256']):
+                raise TransportError('云端重建后的完整绘图校验失败。')
+        if (data[:5] != b'CLRP\x01' or
                 data[5] not in (1, 3) or data[6:8] != b'\0\0' or int.from_bytes(data[8:12], 'big') != size - 12):
             raise TransportError('云端绘图数据校验失败。')
         return data
@@ -112,12 +132,13 @@ class InstaBoxTransport:
             with self.bridge.makefile('rb') as stream:
                 number = 0
                 while not self.stop.is_set():
-                    click = read_message(stream, expected=Click)
-                    if click is None:
+                    event = read_message(stream, expected=INPUT_TYPES)
+                    if event is None:
                         break
                     number += 1
-                    data = base64.b64encode(encode_message(click)).decode('ascii')
-                    ack = self._call('click', id=number, data=data)
+                    data = base64.b64encode(encode_message(event)).decode('ascii')
+                    ack = self._call('click' if isinstance(event, Click) else 'input', id=number, data=data)
+                    del event, data
                     if type(ack.get('id')) is not int or ack['id'] != number:
                         raise TransportError('云端绘图中转的输入编号不一致。')
         except (OSError, WireError, EOFError):
@@ -128,6 +149,7 @@ class InstaBoxTransport:
     def _downstream(self):
         try:
             cursor = 0
+            previous = b''
             while not self.stop.is_set():
                 result = self._call('poll', after=cursor)
                 kind = result.get('kind')
@@ -136,7 +158,21 @@ class InstaBoxTransport:
                 elif kind == 'closed':
                     break
                 elif kind == 'message':
-                    self.bridge.sendall(self._message(result, cursor + 1))
+                    try:
+                        data = self._message(result, cursor + 1, previous)
+                    except TransportError:
+                        if result.get('codec') != 'cdz1' or self.stop.is_set():
+                            raise
+                        # Same unacknowledged frame, with no dictionary. Never
+                        # reissue an application action or accept a changed target.
+                        reset = self._call('poll', after=cursor, reset=True)
+                        data = self._message(reset, cursor + 1)
+                        if (reset.get('kind') != 'message' or len(data) != result.get('frameSize') or
+                                hashlib.sha256(data).hexdigest() != result.get('frameSha256')):
+                            raise TransportError('云端恢复的绘图与原消息不符。')
+                    self.bridge.sendall(data)
+                    if data[5] == 1:
+                        previous = data
                     cursor += 1
                 else:
                     raise TransportError('云端绘图消息类型无效。')
@@ -147,7 +183,7 @@ class InstaBoxTransport:
 
     def start(self, port, pairing):
         self.started = True  # A timed-out start may still have allocated its private directory.
-        self._call('start', port=port, pair=pairing)
+        self._call('start', port=port, pair=pairing, codec='cdz1')
         for loop in (self._upstream, self._downstream):
             threading.Thread(target=loop, daemon=True).start()
 

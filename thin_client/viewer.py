@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 from contextlib import ExitStack
 import getpass
 import hmac
 import io
+import json
 import os
 import re
 import secrets
@@ -17,7 +19,7 @@ import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from cloud_render.wire import Click, ClickAck, Frame, WireError, encode_message, read_message, validate_click, write_message
+from cloud_render.wire import Click, Frame, InputAck, KeyPress, TextCommit, WireError, encode_message, read_message, write_message
 
 
 ASSETS = Path(__file__).resolve().parent
@@ -25,11 +27,13 @@ FILES = {
     '/': ('index.html', 'text/html; charset=utf-8'),
     '/viewer.css': ('viewer.css', 'text/css; charset=utf-8'),
     '/viewer.js': ('viewer.js', 'text/javascript; charset=utf-8'),
+    '/input.js': ('input.js', 'text/javascript; charset=utf-8'),
     '/renderer.js': ('renderer.js', 'text/javascript; charset=utf-8'),
     '/vendor/canvaskit.js': ('vendor/canvaskit.js', 'text/javascript; charset=utf-8'),
     '/vendor/canvaskit.wasm.gz': ('vendor/canvaskit.wasm.gz', 'application/octet-stream'),
 }
 CLICK_BYTES = 24  # 12-byte CLRP v1 envelope followed by !Iff
+MAX_INPUT_JSON = 32 * 1024  # Allows JSON escaping of a full UTF-8 text commit.
 
 
 class Disconnected(Exception):
@@ -40,6 +44,26 @@ class Stale(Exception):
     pass
 
 
+class AppliedWithoutScene(Exception):
+    pass
+
+
+def keyboard_message(raw):
+    def fields(pairs):
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise WireError('duplicate field')
+        return result
+
+    body = json.loads(raw.decode('utf-8'), object_pairs_hook=fields)
+    if type(body) is dict:
+        if body.get('type') == 'key' and body.keys() == {'type', 'sequence', 'key', 'modifiers'}:
+            return KeyPress(body['sequence'], body['key'], body['modifiers'])
+        if body.get('type') == 'text' and body.keys() == {'type', 'sequence', 'text'}:
+            return TextCommit(body['sequence'], body['text'])
+    raise WireError('invalid input fields')
+
+
 class DisplaySession:
     def __init__(self, peer):
         self.peer = peer
@@ -48,11 +72,15 @@ class DisplaySession:
         self.disconnected = False
         self.pending = None
         self.ack = None
-        self.last_applied = None
+        self.following = None
+        self.consumed = 0
         try:
             self.frame = read_message(self.stream, expected=Frame)
             if self.frame is None:
                 raise Disconnected()
+            # Store contiguous ranges rather than individual pictures. An editor
+            # can animate for minutes without changing the original IME target.
+            self.seen = deque([(self.frame.sequence, self.frame.sequence, self.frame.width, self.frame.height)], maxlen=256)
             self.encoded = encode_message(self.frame)
             peer.settimeout(None)
             self.reader = threading.Thread(target=self._read_updates, daemon=True)
@@ -64,7 +92,7 @@ class DisplaySession:
     def _read_updates(self):
         try:
             while True:
-                message = read_message(self.stream, expected=(Frame, ClickAck))
+                message = read_message(self.stream, expected=(Frame, InputAck))
                 if message is None:
                     break
                 with self.changed:
@@ -77,12 +105,19 @@ class DisplaySession:
                             continue
                         self.encoded = encode_message(message)
                         self.frame = message
+                        size = message.width, message.height
+                        if self.seen and self.seen[-1][1] + 1 == message.sequence and self.seen[-1][2:] == size:
+                            self.seen[-1] = (self.seen[-1][0], message.sequence, *size)
+                        else:
+                            self.seen.append((message.sequence, message.sequence, *size))
+                        if self.ack is True and self.following is None:
+                            self.following = message.sequence
                     else:
                         if self.pending != message.sequence or self.ack is not None:
                             raise WireError('unexpected acknowledgement')
                         self.ack = message.applied
-                        if message.applied:
-                            self.last_applied = message.sequence
+                        self.consumed = self.frame.sequence
+                        self.seen.clear()
                     self.changed.notify_all()
         except (OSError, EOFError, WireError):
             pass
@@ -101,16 +136,28 @@ class DisplaySession:
                     return None
             return self.encoded
 
-    def click(self, event):
+    def send_input(self, event, *, wait_for_scene=False):
         with self.changed:
             if self.disconnected:
                 raise Disconnected()
-            if (self.pending is not None or event.sequence != self.frame.sequence or
-                    event.sequence == self.last_applied):
+            # An IME confirmation stays attached to its originally shown frame.
+            # Only the cloud can verify that the original edit target and
+            # selection survived paint-only updates throughout composition.
+            known = event.sequence == self.frame.sequence
+            if isinstance(event, TextCommit) and not known:
+                known = any(first <= event.sequence <= last for first, last, _, _ in self.seen)
+            if isinstance(event, Click) and not known and self.seen:
+                # The full interval must preserve geometry, including all
+                # intermediate paints. The cloud verifies the original hit.
+                first, last, _, _ = self.seen[-1]
+                known = first <= event.sequence <= last
+            if self.pending is not None or not known or event.sequence <= self.consumed:
                 raise Stale()
-            validate_click(event, self.frame)
+            if isinstance(event, Click) and (event.x >= self.frame.width or event.y >= self.frame.height):
+                raise WireError('click outside the original viewport')
             self.pending = event.sequence
             self.ack = None
+            self.following = None
             try:
                 write_message(self.stream, event)
                 self.changed.wait_for(lambda: self.ack is not None or self.disconnected, timeout=45)
@@ -118,13 +165,20 @@ class DisplaySession:
                     raise Disconnected()
                 if not self.ack:
                     raise Stale()
+                if not isinstance(event, Click) or wait_for_scene:
+                    self.changed.wait_for(lambda: self.following is not None or self.disconnected, timeout=30)
+                    if self.following is None:
+                        self.close()
+                        raise AppliedWithoutScene()
+                    return self.following
             except (OSError, EOFError, Disconnected):
-                # A click may have taken effect even if the acknowledgement was lost.
+                # An input may have taken effect even if the acknowledgement was lost.
                 self.close()
                 raise Disconnected() from None
             finally:
                 self.pending = None
                 self.ack = None
+                self.following = None
 
     def close(self):
         with self.changed:
@@ -205,11 +259,13 @@ class ViewerHandler(BaseHTTPRequestHandler):
         super().setup()
         self.connection.settimeout(15)
 
-    def send_data(self, code, data=b'', mime='text/plain; charset=utf-8'):
+    def send_data(self, code, data=b'', mime='text/plain; charset=utf-8', *, next_scene=None):
         self.send_response(code)
         self.send_header('Content-Type', mime)
         self.send_header('Content-Length', str(len(data)))
         self.send_header('Cache-Control', 'no-store')
+        if next_scene is not None:
+            self.send_header('X-Next-Scene', str(next_scene))
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
@@ -273,26 +329,39 @@ class ViewerHandler(BaseHTTPRequestHandler):
             self.server.touch_tab(self.headers.get('X-Viewer-Tab', ''), leaving=True)
             self.send_data(204)
             return
-        if self.path != '/click':
+        if self.path not in ('/click', '/input'):
             self.send_data(404)
             return
-        if (self.headers.get_all('Content-Length') != [str(CLICK_BYTES)] or
-                self.headers.get('Transfer-Encoding') or self.headers.get_content_type() != 'application/octet-stream'):
+        lengths = self.headers.get_all('Content-Length') or []
+        if (len(lengths) != 1 or not re.fullmatch(r'[1-9][0-9]{0,4}', lengths[0]) or
+                self.headers.get('Transfer-Encoding')):
             self.send_data(400)
             return
+        size = int(lengths[0])
+        mime = self.headers.get_content_type()
         try:
-            event = read_message(io.BytesIO(self.rfile.read(CLICK_BYTES)), expected=Click)
-            if event is None:
-                raise WireError('missing click')
-            self.server.session.click(event)
+            if self.path == '/click' and size == CLICK_BYTES and mime == 'application/octet-stream':
+                event = read_message(io.BytesIO(self.rfile.read(size)), expected=Click)
+                if event is None:
+                    raise WireError('missing click')
+            elif self.path == '/input' and size <= MAX_INPUT_JSON and mime == 'application/json':
+                raw = self.rfile.read(size)
+                if len(raw) != size:
+                    raise WireError('truncated input')
+                event = keyboard_message(raw)
+            else:
+                raise WireError('invalid input size or media type')
+            following = self.server.session.send_input(event, wait_for_scene=self.headers.get('X-Wait-For-Scene') == '1')
         except Stale:
             self.send_data(409)
-        except (WireError, OSError, EOFError):
+        except (ValueError, TypeError, RecursionError, OSError, EOFError):
             self.send_data(400)
         except Disconnected:
             self.send_data(503)
+        except AppliedWithoutScene:
+            self.send_data(202)
         else:
-            self.send_data(204)
+            self.send_data(204, next_scene=following)
 
 
 def open_local_viewer(url, on_closed=None):

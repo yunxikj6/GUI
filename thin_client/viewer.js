@@ -1,4 +1,5 @@
 import {createPictureRenderer} from './renderer.js';
+import {attachKeyboard} from './input.js';
 
 // The Python relay checks CLRP before publishing. Decode with DataView so byte
 // order and layer offsets do not depend on the browser's machine architecture.
@@ -56,56 +57,131 @@ async function run(token) {
   const headers = {'X-Viewer-Token': token, 'X-Viewer-Tab': tab};
   const renderer = await createPictureRenderer(canvas);
   let frame;
-  let busy = false;
   let stopped = false;
+  let active;
+  let change;
+  let generation = 0;
+  let notice = 0;
+  const pending = [];
   const abort = new AbortController();
+  const warn = message => { notice++; announce(message); };
+  const discard = () => { generation++; pending.length = 0; };
+  const wake = () => { if (change) change(); };
   const show = async response => {
     if (!response.ok) throw new Error('transport');
     const next = decodeFrame(await response.arrayBuffer());
     if (!frame || next.sequence > frame.sequence) {
       renderer.present(next);
       frame = next;
+      wake();
     }
   };
   const getFrame = (suffix = '') => fetch('/frame' + suffix, {headers, cache: 'no-store', signal: abort.signal});
   await show(await getFrame());
   announce('');
-  canvas.focus({preventScroll: true});
 
-  canvas.addEventListener('click', async event => {
-    if (event.button !== 0 || stopped || busy) return;
-    const point = renderer.position(event.clientX, event.clientY);
-    if (!point) return;
-    busy = true;
-    canvas.setAttribute('aria-busy', 'true');
-    const waiting = window.setTimeout(() => announce('正在等待云端确认点击…'), 450);
-    try {
-      const response = await fetch('/click', {
-        method: 'POST',
-        headers: {...headers, 'Content-Type': 'application/octet-stream'},
-        body: clickMessage(frame.sequence, point.x, point.y),
+  async function afterInput(expected) {
+    const end = performance.now() + 30000;
+    while (!stopped && frame.sequence < expected && performance.now() < end) {
+      await new Promise(resolve => {
+        const deadline = setTimeout(resolve, Math.max(0, end - performance.now()));
+        change = () => { clearTimeout(deadline); resolve(); };
       });
-      if (response.status === 409) {
-        await show(await getFrame());
-        announce('窗口已更新，请重新点击。');
-      } else if (response.status !== 204) {
-        throw new Error('unconfirmed');
-      } else {
-        announce(stopped ? '云端连接已断开，已保留当前画面。' : '');
-      }
-    } catch {
-      stopped = true;
-      announce('未收到云端操作确认。已保留当前画面，请重新连接后检查操作结果。');
-    } finally {
-      window.clearTimeout(waiting);
-      canvas.removeAttribute('aria-busy');
-      busy = false;
+      change = undefined;
     }
-  });
+    return !stopped && frame.sequence === expected;
+  }
 
+  async function drain() {
+    while (!stopped && pending.length) {
+      const event = pending.shift();
+      const displayed = frame.sequence;
+      const sequence = event.sequence ?? displayed;
+      active = true;
+      const originalNotice = notice;
+      canvas.setAttribute('aria-busy', 'true');
+      const waiting = setTimeout(() => {
+        if (notice === originalNotice) announce('正在等待云端确认输入…');
+      }, 450);
+      let acknowledged = false;
+      try {
+        const isClick = event.type === 'click';
+        const response = await fetch(isClick ? '/click' : '/input', {
+          method: 'POST',
+          headers: {...headers, 'X-Wait-For-Scene': '1', 'Content-Type': isClick ? 'application/octet-stream' : 'application/json'},
+          body: isClick ? clickMessage(sequence, event.x, event.y) : JSON.stringify({...event, sequence}),
+        });
+        if (response.status === 409) {
+          discard();
+          await show(await getFrame());
+          warn('云端窗口或焦点已变化，本次操作及排队的输入未执行。请确认后继续。');
+          return;
+        }
+        if (response.status === 202) {
+          acknowledged = true;
+          throw new Error('missing scene after ACK');
+        }
+        if (response.status !== 204) throw new Error('unconfirmed');
+        acknowledged = true;
+        // A frame already painted before the explicit input ACK cannot prove
+        // which target should receive the next queued keyboard event.
+        const expected = Number(response.headers.get('X-Next-Scene'));
+        if (!Number.isSafeInteger(expected) || expected <= sequence) throw new Error('invalid next scene');
+        if (!await afterInput(expected)) {
+          discard();
+          if (frame.sequence < expected) stopped = true;
+          warn('云端已接收本次操作，但下一张画面未能确认。后续输入未发送。');
+          return;
+        }
+        if (pending.length && expected !== displayed + 1) {
+          discard();
+          warn('云端已接收本次操作。期间画面发生了变化，排队的输入未发送。');
+          return;
+        }
+        if (notice === originalNotice) announce('');
+      } catch {
+        stopped = true;
+        discard();
+        warn(acknowledged ? '云端已接收操作。连接已断开，后续输入未发送。' :
+          '未收到云端操作确认。已保留当前画面，请重新连接后检查操作结果。');
+      } finally {
+        clearTimeout(waiting);
+        active = undefined;
+        canvas.removeAttribute('aria-busy');
+      }
+    }
+  }
+
+  function enqueue(event) {
+    if (stopped) { warn('云端连接已断开，此次输入未发送。'); return; }
+    if (pending.length >= 32) { warn('输入队列已满。请等云端确认后再输入。'); return; }
+    if (active && event.type === 'click') {
+      warn('请等云端确认后，再点击新画面。');
+      return;
+    }
+    generation++;
+    pending.push(event);
+    if (!active) drain();
+  }
+  const field = document.querySelector('#keyboard');
+  // A new composition can be tied only to a displayed, settled input target.
+  const anchor = () => !active && !stopped ? {sequence: frame.sequence, generation} : undefined;
+  attachKeyboard(field, canvas, enqueue, warn, anchor, () => generation);
+  canvas.addEventListener('click', event => {
+    if (event.button !== 0) return;
+    const point = renderer.position(event.clientX, event.clientY);
+    if (point) enqueue({type: 'click', ...point});
+  });
+  window.addEventListener('blur', () => {
+    const unsent = pending.length;
+    discard();
+    if (unsent) warn('本机窗口已失去焦点，排队的输入未发送。');
+  });
   window.addEventListener('pagehide', event => {
     if (!event.persisted) {
       stopped = true;
+      discard();
+      wake();
       abort.abort();
       fetch('/leave', {method: 'POST', headers, keepalive: true}).catch(() => {});
       renderer.destroy();
@@ -119,7 +195,9 @@ async function run(token) {
     } catch {
       if (!stopped) {
         stopped = true;
-        if (!busy) announce('云端连接已断开，已保留当前画面。');
+        discard();
+        wake();
+        if (!active) warn('云端连接已断开，已保留当前画面。');
       }
     }
   }

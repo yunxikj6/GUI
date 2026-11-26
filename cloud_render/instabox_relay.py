@@ -23,11 +23,16 @@ import struct
 import sys
 import time
 
+if __package__:
+    from .frame_delta import encode_frame
+
 
 HEADER = struct.Struct('!4sBBHI')
 MAX_PAYLOAD = 32 * 1024 * 1024
 INLINE = 64 * 1024
-CONTROL_LIMIT = 2048
+MAX_TEXT = 4096
+# JSON metadata plus one base64-encoded committed-text envelope.
+CONTROL_LIMIT = 6144
 REPLY_LIMIT = 96 * 1024
 IDLE = 180
 SOCKET = 'control.sock'
@@ -43,24 +48,51 @@ def require(condition, code):
         raise RelayError(code)
 
 
+def input_bytes(encoded, *, click_only):
+    # This source runs standalone inside /exec. Check transport direction,
+    # envelope structure and bounds here. The cloud app's wire decoder owns
+    # editing key and modifier semantics before dispatching to the real UI.
+    require(isinstance(encoded, str) and 0 < len(encoded) <= 4 * ((HEADER.size + 4 + MAX_TEXT + 2) // 3),
+            'invalid-input')
+    raw = base64.b64decode(encoded, validate=True)
+    require(len(raw) >= HEADER.size + 4, 'invalid-input')
+    magic, version, kind, flags, length = HEADER.unpack_from(raw)
+    require(magic == b'CLRP' and version == 1 and not flags and length == len(raw) - HEADER.size,
+            'invalid-input')
+    require(struct.unpack_from('!I', raw, HEADER.size)[0] != 0, 'invalid-input')
+    if kind == 2:
+        require(length == 12, 'invalid-click')
+        x, y = struct.unpack_from('!ff', raw, HEADER.size + 4)
+        require(math.isfinite(x) and math.isfinite(y) and 0 <= x < 8192 and 0 <= y < 8192, 'invalid-click')
+    elif not click_only and kind == 4:
+        require(length == 6 and raw[-2] <= 3 and raw[-1] > 0, 'invalid-key')
+    elif not click_only and kind == 5:
+        require(5 <= length <= MAX_TEXT + 4, 'invalid-text')
+        raw[HEADER.size + 4:].decode('utf-8', 'strict')
+    else:
+        raise RelayError('invalid-input')
+    return raw
+
+
 def check_request(req):
     require(isinstance(req, dict) and isinstance(req.get('op'), str), 'invalid-request')
     op = req['op']
-    extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'}, 'close': set()}
-    require(op in extras and set(req) == {'op', 'session'} | extras[op], 'invalid-request')
+    extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'},
+              'input': {'id', 'data'}, 'close': set()}
+    optional = {'start': {'codec'}, 'poll': {'reset'}}
+    require(op in extras and set(req) - optional.get(op, set()) == {'op', 'session'} | extras[op],
+            'invalid-request')
     require(isinstance(req['session'], str) and re.fullmatch('[0-9a-f]{32}', req['session']), 'invalid-session')
     if op == 'start':
+        require('codec' not in req or req['codec'] == 'cdz1', 'invalid-codec')
         require(type(req['port']) is int and 1 <= req['port'] <= 65535, 'invalid-port')
         require(isinstance(req['pair'], str) and re.fullmatch('[A-Za-z0-9_-]{43}', req['pair']), 'invalid-pair')
     if op == 'poll':
+        require('reset' not in req or req['reset'] is True, 'invalid-reset')
         require(type(req['after']) is int and 0 <= req['after'] < 2 ** 53, 'invalid-cursor')
-    if op == 'click':
-        require(type(req['id']) is int and 1 <= req['id'] < 2 ** 53, 'invalid-click-id')
-        require(isinstance(req['data'], str) and len(req['data']) == 32, 'invalid-click')
-        raw = base64.b64decode(req['data'], validate=True)
-        require(len(raw) == 24 and raw[:12] == HEADER.pack(b'CLRP', 1, 2, 0, 12), 'invalid-click')
-        seq, x, y = struct.unpack('!Iff', raw[12:])
-        require(seq and math.isfinite(x) and math.isfinite(y) and 0 <= x < 8192 and 0 <= y < 8192, 'invalid-click')
+    if op in ('click', 'input'):
+        require(type(req['id']) is int and 1 <= req['id'] < 2 ** 53, 'invalid-input-id')
+        return input_bytes(req['data'], click_only=op == 'click')
 
 
 def session_dir(session):
@@ -101,7 +133,7 @@ class Relay:
         self.queued_bytes = 0
         self.acked = self.published = self.offered = 0
         self.input_id = 0
-        self.input_bytes = None
+        self.input_digest = None
         self.input_flushed = False
         self.input_lock = asyncio.Lock()
         self.changed = asyncio.Condition()
@@ -110,6 +142,7 @@ class Relay:
         self.closed = False
         self.last_request = time.monotonic()
         self.controls = set()
+        self.previous = b''
 
     async def receive(self):
         try:
@@ -128,7 +161,11 @@ class Relay:
                                                 self.queued_bytes + total <= 2 * (MAX_PAYLOAD + HEADER.size))
                 index = self.published + 1
                 receipt = {'kind': 'message', 'id': index, 'size': total}
-                if total <= INLINE:
+                if self.start.get('codec') and kind == 1:
+                    # The raw frame stays private until it is acknowledged. It
+                    # can supply a standalone retry even if the viewer lost its base.
+                    receipt['frame'] = header + await asyncio.wait_for(reader.readexactly(size), 30)
+                elif total <= INLINE:
                     payload = await asyncio.wait_for(reader.readexactly(size), 30)
                     raw = header + payload
                     if kind == 3:
@@ -165,14 +202,46 @@ class Relay:
             async with self.changed:
                 self.changed.notify_all()
 
-    async def poll(self, after):
+    def offer_frame(self, head, reset):
+        if 'offer' not in head or (reset and not head.get('standalone')):
+            frame = head['frame']
+            packet = encode_frame(frame, b'' if reset else self.previous)
+            receipt = {'kind': 'message', 'id': head['id'], 'size': len(packet),
+                       'sha256': hashlib.sha256(packet).hexdigest()}
+            if packet is not frame:
+                receipt['codec'] = 'cdz1'
+                receipt['frameSha256'] = hashlib.sha256(frame).hexdigest()
+                receipt['frameSize'] = len(frame)
+            target = message_file(self.root, head['id'])
+            if len(packet) > INLINE:
+                part = target.with_suffix('.bin.part')
+                try:
+                    with part.open('xb') as file:
+                        file.write(packet)
+                    part.replace(target)
+                finally:
+                    part.unlink(missing_ok=True)
+                receipt['file'] = True
+            else:
+                receipt['data'] = base64.b64encode(packet).decode('ascii')
+                target.unlink(missing_ok=True)
+            head['offer'] = receipt
+            head['standalone'] = reset or not self.previous or packet is frame
+        return head['offer']
+
+    async def poll(self, after, reset=False):
         async with self.changed:
             require(self.acked <= after <= self.offered, 'invalid-cursor')
+            if reset:
+                require(self.start.get('codec') and after == self.acked and self.messages and
+                        self.offered == self.messages[0]['id'] and 'frame' in self.messages[0], 'invalid-reset')
             if after > self.acked:
                 head = self.messages[0]
                 require(head['id'] == after, 'invalid-cursor')
-                if head.get('file'):
+                if head.get('offer', head).get('file'):
                     message_file(self.root, after).unlink()
+                if 'frame' in head:
+                    self.previous = head['frame']
                 self.messages.popleft()
                 self.queued_bytes -= head['size']
                 self.acked = after
@@ -184,28 +253,33 @@ class Relay:
             require(after == self.acked, 'invalid-cursor')
             if self.messages:
                 self.offered = self.messages[0]['id']
+                if 'frame' in self.messages[0]:
+                    return self.offer_frame(self.messages[0], reset)
                 return self.messages[0]
             return {'kind': 'closed' if self.closed else 'wait'}
 
-    async def click(self, req):
+    async def send_input(self, index, raw):
         async with self.input_lock:
-            index, data = req['id'], req['data']
+            # Only a session-keyed fingerprint survives this request. A text
+            # commit can contain a private conversation or a pasted credential.
+            digest = hmac.digest(self.start['pair'].encode('ascii'), raw, 'sha256')
             if index == self.input_id:
-                require(hmac.compare_digest(data, self.input_bytes), 'click-conflict')
-                require(self.input_flushed, 'unconfirmed-click')
+                require(hmac.compare_digest(digest, self.input_digest), 'input-conflict')
+                require(self.input_flushed, 'unconfirmed-input')
                 return {'id': index}
-            require(index == self.input_id + 1, 'invalid-click-id')
+            require(index == self.input_id + 1, 'invalid-input-id')
             require(self.published and not self.closed, 'upstream-closed')
             # Mark consumed before writing to the transport. An interrupted write
             # has an unknown application outcome and must never be attempted twice.
-            self.input_id, self.input_bytes, self.input_flushed = index, data, False
+            self.input_id, self.input_digest, self.input_flushed = index, digest, False
             try:
-                self.writer.write(base64.b64decode(data, validate=True))
+                self.writer.write(raw)
                 await asyncio.wait_for(self.writer.drain(), 5)
                 self.input_flushed = True
             except (OSError, asyncio.TimeoutError):
+                self.closed = True
                 self.writer.close()
-                raise RelayError('unconfirmed-click') from None
+                raise RelayError('unconfirmed-input') from None
             return {'id': index}
 
     async def control(self, reader, writer):
@@ -217,7 +291,7 @@ class Relay:
             line = await asyncio.wait_for(reader.readline(), 3)
             require(len(line) <= CONTROL_LIMIT, 'invalid-request')
             req = json.loads(line)
-            check_request(req)
+            raw = check_request(req)
             require(hmac.compare_digest(self.start['session'], req['session']), 'invalid-session')
             self.last_request = time.monotonic()
             op = req['op']
@@ -225,12 +299,13 @@ class Relay:
             if op == 'start':
                 require(self.start['port'] == req['port'] and hmac.compare_digest(self.start['pair'], req['pair']),
                         'session-conflict')
+                require(req.get('codec') == self.start.get('codec'), 'session-conflict')
                 await asyncio.wait_for(self.ready.wait(), 35)
                 require(self.published, 'upstream-unavailable')
             elif op == 'poll':
-                result = await self.poll(req['after'])
-            elif op == 'click':
-                result = await self.click(req)
+                result = await self.poll(req['after'], req.get('reset', False))
+            elif op in ('click', 'input'):
+                result = await self.send_input(req['id'], raw)
             else:
                 close = True
             reply = {'ok': True, **result}
