@@ -1,0 +1,47 @@
+{
+  "environment": "Private temporary, real InstaBox instance running Ubuntu Noble GNOME Shell 46. Win64 CPython 3.13.17 and native VirGL/Win32 GDI under Wine 10. The A/B transport build used stdlib TLS with hostname and trust-chain verification. This probe called the desktop Python entry point directly, independently of the final release launcher test.",
+  "cloudFrames": 124,
+  "drawnWindowsFrames": 105,
+  "allPresentedFramesEqualCloudPrefix": true,
+  "distinctPresented": 49,
+  "actions": [
+    {
+      "kind": "M",
+      "localObservedRtt": 0.4919,
+      "cloudDispatchToAppliedSeconds": 0.015491,
+      "cloudAppliedToReturnSeconds": 0.000226
+    },
+    {
+      "kind": "L",
+      "localObservedRtt": 1.1668,
+      "cloudDispatchToAppliedSeconds": 0.112147,
+      "cloudAppliedToReturnSeconds": 0.000238
+    },
+    {
+      "kind": "K",
+      "localObservedRtt": 1.1309,
+      "cloudDispatchToAppliedSeconds": 0.027285,
+      "cloudAppliedToReturnSeconds": 0.000177
+    }
+  ],
+  "win32ClientArea": {
+    "width": 800,
+    "height": 520,
+    "rgbSha256": "f6aec2b9a6cb0703e824dba84f7c884f8411124760275c0aec25b292aa14a0a8"
+  },
+  "picture": "../ubuntu-quick-settings-win64.png",
+  "escapeClientAreaRgbSha256": "459998cfda09c3c651452584cc300bd4399e1b7ad66f02d8ad8b1ecf6144b1ec",
+  "artworkComparison": {
+    "source": "fresh isolated original Ubuntu desktop, no application clients",
+    "assetCapabilityBit": 1,
+    "rawBytes": 48482824,
+    "reducedBytes": 15305256,
+    "bytesSaved": 33177568,
+    "rawSha256": "32483f0bed984d2b1d4729c9599f9ddab87fe69935b5ddbaffa77fba965022dd",
+    "reconstructedSha256": "32483f0bed984d2b1d4729c9599f9ddab87fe69935b5ddbaffa77fba965022dd",
+    "reducedSha256": "97e37a5ac3d5dba11be4d4dc34b8346b2b655cd5c8994d43d88fe096f938b0d6",
+    "rawIndependentlyCompressed1MiB": 10107608,
+    "optimizedIndependentlyCompressed1MiB": 633283,
+    "sourcePng": "75e190117dd5f5fa1dc5f51dd06b4d48624144266fccda945a9634b4165ffdbc"
+  }
+}

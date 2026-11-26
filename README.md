@@ -6,9 +6,9 @@
 
 在具备 Ubuntu 桌面依赖的云机上运行 `python3 -m cloud_render.gnome_relay --port 17325`。在 Windows 解压完整客户端，打开 `Start.cmd`，输入 InstaBox 密钥和本次桌面配对码。服务仅监听云机回环，连接使用 InstaBox 的私有 HTTPS 通道。本机窗口支持指针移动、左右点击、导航键和 Ctrl+Esc 活动概览。可用 `--desktop-size 1920x1080` 请求全高清桌面，按默认参数启动时使用 800×520。Ubuntu 官方壁纸作为静态资源随包提供，匹配到相同源纹理时通过摘要引用。x64 使用内置运行时。ARM64 需要 Windows 11 x64 仿真，实机兼容性待验证。
 
-两次在真实 InstaBox 上运行 Ubuntu 24.04 的 GNOME Shell，分别取得 112 和 97 帧，独立本机窗口的每帧输出都和源端一致。第二次的命令还在运行于 Wine 的 Windows 原生程序中回放，97 帧全部匹配。实测数据注明每次使用的操作系统、渲染器和显示尺寸。[GNOME 实现与逐帧结果](docs/gnome-command-stream.md)
+下面是实际 Windows 程序显示云机 Ubuntu 的窗口内容。鼠标点开顶栏的快速设置，按 Escape 后菜单关闭。Win64 程序运行于 Wine 10，通过私有 HTTPS 连接真实 InstaBox。在这次传输对照测试中，本机绘出的 105 帧逐帧匹配云端原始回读。[窗口和输入记录](docs/measurements/ubuntu-quick-settings-win64.json) · [其他会话的逐帧结果](docs/gnome-command-stream.md)
 
-![真实云端 GNOME 在独立本机窗口中展开活动概览](docs/gnome-cloud-native-window.png)
+![Win64 窗口在真实云端 Ubuntu 桌面打开快速设置](docs/ubuntu-quick-settings-win64.png)
 
 ## 打开云端原版 ChatGPT
 
@@ -16,7 +16,7 @@
 
 在真实云机上验证了欢迎页、登录方式菜单、测试文本输入、中文输入法提交、删除和取消返回。本机与云端独立截图取自同一个原厂窗口。已测试的 11 个操作均得到确认，一次测量的操作至下一画面中位数为 0.751 秒。登录后聊天和 Claude Artifacts 仍待验收。[本机原厂界面](docs/cloud-render-window.png) · [本机中英文输入](docs/cloud-render-input.png) · [云端原窗口](docs/cloud-render-input-source.png) · [传输与交互数据](docs/measurements/cloud-render.json)
 
-GNOME 可以把普通应用已经绘好的整窗纹理作为资源上传。桌面客户端只接入有绘图来源验证的界面。应用在 Ubuntu 窗口内的原厂绘制需要逐个接入，已经在两个登录前状态验证了原厂页面和原厂标题栏的本机合成。实时使用时的应用接入单独验收。[原厂界面与窗口合成实测](docs/application-surface.md)
+GNOME 可以把普通应用已经绘好的整窗纹理作为资源上传。桌面客户端只接入有绘图来源验证的界面。应用在 Ubuntu 窗口内的原厂绘制需要逐个接入，已经在两个登录前状态验证了原厂页面和原厂标题栏的本机合成。目前默认桌面中的普通应用入口会提示绘图通道尚未就绪。下列记录给出了同一个原厂窗口的画面对照和在 Windows 上持续接收原始绘图的验证结果。[原厂界面与窗口合成实测](docs/application-surface.md) · [连续绘图的测量](docs/incremental-application-surface.md)
 
 ## 显式兼容入口
 
