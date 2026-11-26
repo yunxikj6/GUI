@@ -220,12 +220,24 @@ class DrawingCache:
                 (self.path / (key + '.clrp')).unlink(missing_ok=True)
 
 
+async def _reference_digest(page):
+    from playwright.async_api import TimeoutError as ScreenshotTimeout
+
+    try:
+        data = await page.screenshot(caret='initial', timeout=5000)
+    except ScreenshotTimeout:
+        # A busy compositor can miss the reference deadline while the original
+        # process and its authenticated window remain available.
+        return None
+    return business_digest(Image.open(BytesIO(data)))
+
+
 async def observe_interactive(page, out, native_layers):
     """Observe the changing original surface without recognizing pages, fields or labels."""
     cache = DrawingCache(out)
     request_path = out / 'requested-scene.json'
     last = None
-    references = attempts = 0
+    references = attempts = timeouts = 0
     retry_until = 0.0
     retry = False
     while not (out / 'controller-closed').exists() and not page.is_closed():
@@ -241,21 +253,26 @@ async def observe_interactive(page, out, native_layers):
             return
         if await geometry(page) == SUPPORTED_GEOMETRY:
             start = (out / 'owner.log').stat().st_size
-            digest = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
+            digest = await _reference_digest(page)
             references += 1
-            if not cache.find(digest):
+            missed_reference = digest is None
+            if digest is not None and not cache.find(digest):
                 publish(out / 'pending-scene.json', {'businessRgbSha256': digest, 'witnessByteStart': start})
                 attempts += 1
                 try:
                     frame = await capture_frame(page, cache.sequence + 1)
                 except CaptureError:
                     # A later physical commit may supply a supported active tree.
-                    publish(out / 'capture-counts.json', {'references': references, 'traces': attempts})
+                    publish(
+                        out / 'capture-counts.json',
+                        {'references': references, 'traces': attempts, 'referenceTimeouts': timeouts},
+                    )
                     retry = time.monotonic() < retry_until
                     await asyncio.sleep(0.1)
                     continue
-                end_digest = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
+                end_digest = await _reference_digest(page)
                 references += 1
+                missed_reference = end_digest is None
                 if (
                     digest == end_digest
                     and _exclusive_page(page)
@@ -268,7 +285,15 @@ async def observe_interactive(page, out, native_layers):
                     cache.add(digest, raw, start)
                 else:
                     retry = time.monotonic() < retry_until
-        publish(out / 'capture-counts.json', {'references': references, 'traces': attempts})
+            if missed_reference:
+                publish(out / 'pending-scene.json', {})
+                timeouts += 1
+                retry = True
+                await asyncio.sleep(0.5)
+        publish(
+            out / 'capture-counts.json',
+            {'references': references, 'traces': attempts, 'referenceTimeouts': timeouts},
+        )
 
 
 async def collect(out, *, live=False, interactive=False, pair=None):

@@ -268,6 +268,60 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(editor.focus.handle.evaluate.await_args.args[1], [command, ''])
                     editor.focus.handle.evaluate.reset_mock()
 
+    async def test_reference_deadlines_discard_incomplete_drawings_and_recover_without_new_input(self):
+        import json
+        from unittest.mock import AsyncMock, Mock, patch
+
+        from cloud_render.chatgpt_process import APP_PAGE
+        from cloud_render.wire import Frame, Layer
+        from experiments.mutter_app.capture import SUPPORTED_GEOMETRY, DrawingCache, observe_interactive
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'requested-scene.json').write_text('{"businessRgbSha256":"scene"}')
+            (root / 'owner.log').touch()
+            page = Mock()
+            page.url = APP_PAGE
+            page.is_closed.return_value = False
+            seen = []
+            original_add = DrawingCache.add
+
+            def added(cache, digest, raw, start):
+                seen.append(digest)
+                original_add(cache, digest, raw, start)
+                (root / 'controller-closed').touch()
+
+            async def backoff(seconds):
+                self.assertEqual(seconds, 0.5)
+                self.assertFalse((root / 'scenes.json').exists())
+                self.assertEqual(json.loads((root / 'pending-scene.json').read_text()), {})
+
+            with (
+                patch('experiments.mutter_app.capture._exclusive_page', return_value=True),
+                patch(
+                    'experiments.mutter_app.capture.geometry', new=AsyncMock(return_value=SUPPORTED_GEOMETRY)
+                ),
+                patch(
+                    'experiments.mutter_app.capture._reference_digest',
+                    new=AsyncMock(side_effect=[None, 'scene', None, 'scene', 'scene']),
+                ) as reference,
+                patch(
+                    'experiments.mutter_app.capture.capture_frame',
+                    new=AsyncMock(return_value=Frame(1, 1090, 760, (Layer(0, 0, 1, 1, b'skiapict'),))),
+                ) as capture,
+                patch('experiments.mutter_app.capture.encode_message', return_value=b'complete original'),
+                patch('experiments.mutter_app.capture.asyncio.sleep', new=backoff),
+                patch.object(DrawingCache, 'add', new=added),
+            ):
+                await observe_interactive(page, root, ())
+            self.assertEqual(seen, ['scene'])
+            self.assertEqual(reference.await_count, 5)
+            self.assertEqual(capture.await_count, 2)
+            self.assertEqual(
+                json.loads((root / 'capture-counts.json').read_text()),
+                {'references': 5, 'traces': 2, 'referenceTimeouts': 2},
+            )
+
     async def test_idle_original_surface_never_requests_an_application_screenshot(self):
         from unittest.mock import AsyncMock, Mock, patch
 
