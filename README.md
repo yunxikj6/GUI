@@ -1,6 +1,14 @@
 # Cloud Linux Workspace
 
-解压 Win64 客户端，双击 `Start.cmd`，先进入云端 Ubuntu 桌面，再点击 Dock 上的 ChatGPT。桌面、应用进程和输入状态由云机持有。Windows 只需要随包的绘图运行时，在本地绘制 GNOME 及应用自己的界面。现已验证 ChatGPT 登录前的窗口、菜单和编辑框。[下载原厂应用桌面客户端](releases/original-win64/cloud-workspace.zip) · [云服务器准备](cloud_render/provision/README.md) · [操作实拍](docs/interactive-original-desktop.md)
+在 Windows 解压客户端并双击 `Start.cmd`。配对后先看到原版 Ubuntu 桌面，点击 Dock 上的 ChatGPT 会在云端启动 OpenAI 的 Linux 程序。Windows 随包提供绘图运行时，在本地窗口执行 GNOME 和应用生成的绘图指令。云端保有会话、控件焦点和输入状态。[下载 Windows x64 客户端](releases/original-win64/cloud-workspace.zip) · [下载云端服务](releases/ubuntu-source/cloud-workspace-server.zip)
+
+**第一次连接**需要在云机启动绘图服务。在装好依赖的 Ubuntu 24.04 云机上，解压云端服务，进入 `cloud-workspace-server` 目录，运行以下命令。终端会提供本次会话的配对码。在 Windows 输入该码和 InstaBox 密钥即可连接。使用 Debian 13 的云机有单独的安装入口。[云服务器准备](cloud_render/provision/README.md)
+
+```sh
+python3 -m experiments.original_desktop_source --port 17326
+```
+
+当前主入口已验证原版 ChatGPT 欢迎页、登录方式和登录前表单输入。云端应用使用临时配置和隔离网络。持久登录、对话、Claude 的 Artifacts 与实体 Windows 11 上的体验仍待验证。[Win64 窗口实拍](docs/measurements/original-editing/input.png) · [桌面和应用的操作记录](docs/interactive-original-desktop.md) · [断网后在全新本机图形上下文重绘的测量](docs/measurements/original-desktop-local-redraw.json)
 
 ## 连接基础 Ubuntu 桌面
 

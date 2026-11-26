@@ -1,6 +1,6 @@
 # 从云服务器启动一次性 Ubuntu 桌面
 
-在已检出本仓库的 **Debian 13 amd64 云机** 上以普通用户运行下列命令。云机需要 Python 3.12 或更高版本、APT、dpkg-deb、可用的用户和挂载命名空间，以及至少 1.5 GiB 临时空间。Ubuntu 包的下载和解包均在这台云机完成。
+在 **Debian 13 amd64 云机** 上，以普通用户进入解压的 `cloud-workspace-server` 目录或本仓库根目录。需要连接基础桌面客户端时，运行下列命令。云机需要 Python 3.12 或更高版本、APT、dpkg-deb、可用的用户和挂载命名空间，以及至少 1.5 GiB 临时空间。Ubuntu 包的下载和解包均在这台云机完成。
 
 ```sh
 python3 -m cloud_render.provision

@@ -1,0 +1,28 @@
+{
+  "checkoutGoCommit": "3a408a50ad38873f3a2b79a26e1402134b576038",
+  "wineVersion": "wine-10.0 (Debian 10.0~repack-6)",
+  "sourceWindowsLauncherSHA256": "9f1b8a93c8bcd1c24b668dd17055ada2397009e9c3c8a658f6237e9bfe9529e5",
+  "combinedZipSHA256": "ceec7cf2251129e8060157b31c1326d8a8cdf9a3eabb9b8ffcf7f57baf96f6f1",
+  "standardZipSHA256": "35a7c4dc8e2a3b7b2558c15d8d4c404edd77643e86fa115c323d9d2ebadddf58",
+  "noOutsideNetwork": true,
+  "authenticatedArchiveExtractedNode": {
+    "size": 93944648,
+    "sha256": "86fc4785327db5f5c7558dc6156c543b433c313e813a222e088086222ab4afa6"
+  },
+  "cancelledDefaultCredentialExit": 130,
+  "defaultCancellationRemovedExtractedDirectory": true,
+  "actualCheckoutNoFlagsPython": [
+    "-I",
+    "-X",
+    "utf8",
+    "-m",
+    "experiments.original_desktop",
+    "--instabox"
+  ],
+  "originalEntrypointRejectedInvalidPairingAndCleaned": true,
+  "explicitDesktopForwardedAuthenticated": true,
+  "explicitForwardedFailureCleaned": true,
+  "passed": true,
+  "frozenReceiptCommit": "f1d31f8",
+  "scope": "Wine 10 exercising the real Windows x64 checkout Start.cmd, PE, package expansion, CREDUI, official embedded CPython and loopback handshake with outside network disabled. No external source session or physical Windows host in this test."
+}
