@@ -223,16 +223,16 @@ class _SourceLink:
             await asyncio.gather(source, draw, metadata, inputs, return_exceptions=True)
 
 
-_FEATURES = wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE
+_GNOME_FEATURES = wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE
 
 
 def _valid_features(flags):
-    return (type(flags) is int and flags >= 0 and not flags & ~_FEATURES and
+    return (type(flags) is int and flags >= 0 and not flags & ~(_GNOME_FEATURES | wire.APP_WALLPAPER) and
             (not flags & (wire.SELECT_ALL | wire.FOCUS_DELETE) or bool(flags & wire.SEARCH_INPUT)))
 
 
 class DesktopService:
-    def __init__(self, token, source_factory=open_source, *, features=_FEATURES):
+    def __init__(self, token, source_factory=open_source, *, features=_GNOME_FEATURES):
         if not callable(features) and not _valid_features(features):
             raise ValueError('invalid desktop source capabilities')
         self.features = features
@@ -279,6 +279,8 @@ class DesktopService:
                     features = offered & (wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE)
                     if features & wire.FOCUS_DELETE:
                         options['focus_delete'] = True
+                if offered & wire.APP_WALLPAPER:
+                    options['app_wallpaper'] = True
                 if offered & wire.WALLPAPER:
                     options['wallpaper'] = True
                 size = checked_size((width, height))

@@ -85,6 +85,9 @@ class _PointerDesktop:
     def move(self, x, y):
         self.transport.move(x, y)
 
+    def has_application_wallpaper(self):
+        return self.transport.has_application_wallpaper()
+
     def read(self, size):
         return self.transport.read(size)
 
@@ -125,13 +128,14 @@ class _PointerDesktop:
         self.transport.close()
 
 
-def present_original_desktop(connect, open_window, *, node='node', runtime_dir=None):
+def present_original_desktop(connect, open_window, *, node='node', runtime_dir=None, artwork=None):
     """Use the standard Win32 message loop, GPU thread and acknowledged input queue."""
     from thin_client.gnome_desktop import present_session
     from thin_client.scene_cache import SceneCache
     from thin_client.virgl_windows import replay
     state = _WindowInput()
     cache = None
+    session_wallpaper = None
 
     def native_window(title, width, height, submit):
         return open_window(title, width, height, state.events(submit))
@@ -144,7 +148,8 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
             return binding.session == nonce and binding.executable_sha256 == exe
 
         with OriginalPicturePainter(node=node) as painter:
-            source = LiveSurfaceStream(connection, session=nonce, authorize=authorized, rasterize=painter)
+            source = LiveSurfaceStream(connection, session=nonce, authorize=authorized, rasterize=painter,
+                                       wallpaper=session_wallpaper)
             if live:
                 state.reader = source
 
@@ -163,7 +168,9 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
                         state.reader = None
 
     def render(connection, present):
-        nonlocal cache
+        nonlocal cache, session_wallpaper
+        if artwork is not None and connection.has_application_wallpaper():
+            session_wallpaper = artwork
         # Cache the source records, before the local engine expands SkPictures into textures.
         cache = SceneCache(connection)
         draw(cache, present, live=True)
@@ -198,6 +205,11 @@ def main(argv=None):
     token = hidden_value('CLOUDWORKSPACE_GNOME_TOKEN', '云桌面配对码（输入隐藏）：')
     if not token or not re.fullmatch(r'[A-Za-z0-9_-]{43}',token):
         parser.error('配对码格式不正确。')
+    from cloud_render.gnome_wallpaper import decoded_asset
+    try:
+        artwork = decoded_asset(Path(__file__).resolve().parents[1] / 'thin_client/vendor/ubuntu-noble/wallpaper.rgb.xz')
+    except (OSError, ValueError, ImportError):
+        artwork = None
     if args.instabox:
         from instabox import InstaBox
         key = hidden_value('INSTABOX_API_KEY', 'InstaBox API 密钥（输入隐藏）：')
@@ -206,15 +218,17 @@ def main(argv=None):
         def start():
             box = InstaBox(key, args.machine)
             box.ensure_running()
-            return connect(box,args.port,token, size=SIZE, search_input=True, focus_delete=True)
+            return connect(box,args.port,token, size=SIZE, search_input=True, focus_delete=True,
+                           app_wallpaper=artwork is not None)
     else:
         def start():
-            return connect_forwarded(args.port,token, size=SIZE, search_input=True, focus_delete=True)
+            return connect_forwarded(args.port,token, size=SIZE, search_input=True, focus_delete=True,
+                           app_wallpaper=artwork is not None)
 
     bundled = Path(__file__).resolve().parents[1]/'thin_client/vendor/node/windows-x64/node.exe'
     node = args.node or (bundled if bundled.is_file() else 'node')
     try:
-        present_original_desktop(start, open_window, node=node, runtime_dir=args.runtime_dir)
+        present_original_desktop(start, open_window, node=node, runtime_dir=args.runtime_dir, artwork=artwork)
     except (ValueError, OSError, RuntimeError) as exc:
         detail = '请确认云端交互源、配对码、私有连接与客户端图形组件。'
         print(f'原厂桌面连接已结束（{type(exc).__name__}）。{detail}',file=sys.stderr)

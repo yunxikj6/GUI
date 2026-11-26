@@ -13,6 +13,7 @@ NODE_EXE = '86fc4785327db5f5c7558dc6156c543b433c313e813a222e088086222ab4afa6'
 MODULES = (
     'thin_client/scene_cache.py',
     'cloud_render/gnome_commands.py',
+    'cloud_render/gnome_wallpaper.py',
     'cloud_render/gnome_input.py',
     'cloud_render/gnome_wire.py',
     'cloud_render/instabox_relay.py',

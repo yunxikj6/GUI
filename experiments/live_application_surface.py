@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import hashlib
 import struct
 
-from cloud_render import gnome_commands as mesa
+from cloud_render import gnome_commands as mesa, gnome_wallpaper as artwork
 from cloud_render.wire import MAX_PAYLOAD
 from experiments.application_surface import ApplicationSurfaces, Binding, Commit, SurfaceError
 
@@ -88,7 +88,7 @@ class LiveSurfaceStream:
     checks each source-attested process/surface lifetime against the application
     this session requested. The adapter accepts no network URLs, paths or commands.
     """
-    def __init__(self, source, *, session, authorize, rasterize):
+    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None):
         self.source = source
         self.session = session
         self.authorize = authorize
@@ -99,6 +99,9 @@ class LiveSurfaceStream:
         self.last_serial = 0
         self.serial_digest = self.cached_digest = self.cached_pixels = None
         self._buffer = memoryview(b'')
+        self.wallpaper = wallpaper
+        self.artwork_references = 0
+        self._resource_tail = None
         self._failed = False
         self.guard = ApplicationSurfaces(session, lambda *_: None, self._commit_for,
                                          self._read_asset, self._render_current)
@@ -180,6 +183,34 @@ class LiveSurfaceStream:
         body = mesa._TRANSFER.pack(*layout) + pixels
         return mesa._HEADER.pack(len(body)//4, mesa.PUT) + body
 
+    def _checked_upload(self, desc, length):
+        self.guard.check_raw_upload(desc)
+        current = self.handles.get(desc[0])
+        if current is None or desc[-1] > 32 << 20 or length != 11 + (desc[-1] + 3)//4:
+            raise SurfaceError('invalid original resource upload')
+        current.received_put = True
+        return current
+
+    def _artwork_upload(self, length):
+        if (self.wallpaper is None or self.artwork_references >= artwork.MAX_REFERENCES or
+                length != (mesa._TRANSFER.size + 32)//4):
+            raise SurfaceError('unnegotiated or invalid original desktop artwork')
+        body = _exact(self.source, 4 * length)
+        desc = mesa._TRANSFER.unpack_from(body)
+        current = self._checked_upload(desc, 11 + (desc[-1] + 3)//4)
+        if tuple(current.descriptor[4:6]) != (artwork.WIDTH, artwork.HEIGHT):
+            raise SurfaceError('artwork does not match the original resource size')
+        if self.artwork_references == 0 and (type(self.wallpaper) is not bytes or
+                len(self.wallpaper) != artwork.PIXELS * 4 or hashlib.sha256(self.wallpaper).digest() != artwork.RGBX_SHA256):
+            raise SurfaceError('local original desktop artwork differs from its source')
+        head, asset = artwork.expand_reference(body, self.wallpaper)
+        # A later Wayland binding names an offset in the original source stream.
+        # The local GPU sees the exact PUT while the session cache keeps the small reference.
+        self.offset += len(head) + len(asset)
+        self.artwork_references += 1
+        self._resource_tail = memoryview(asset)
+        return head
+
     def _packet(self):
         header = _exact(self.source, mesa._HEADER.size, eof=True)
         if not header:
@@ -190,14 +221,12 @@ class LiveSurfaceStream:
             return b''
         if op in (HOLD, DRAW, REUSE):
             return self._replacement(length, op)
+        if op == artwork.REFERENCE:
+            return self._artwork_upload(length)
         if op == mesa.PUT:
             descriptor = _exact(self.source, mesa._TRANSFER.size)
             desc = mesa._TRANSFER.unpack(descriptor)
-            self.guard.check_raw_upload(desc)
-            current = self.handles.get(desc[0])
-            if current is None or desc[-1] > 32 << 20 or length != 11 + (desc[-1] + 3)//4:
-                raise SurfaceError('invalid original resource upload')
-            current.received_put = True
+            self._checked_upload(desc, length)
             body = descriptor + _exact(self.source, desc[-1])
         else:
             _, op, body = mesa._request(_Packet(self.source, header))
@@ -226,6 +255,9 @@ class LiveSurfaceStream:
             return b''
         try:
             while not self._buffer:
+                if self._resource_tail is not None:
+                    self._buffer, self._resource_tail = self._resource_tail, None
+                    break
                 packet = self._packet()
                 if packet is None:
                     return b''

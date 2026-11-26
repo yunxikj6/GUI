@@ -48,10 +48,13 @@ def put_reference(payload):
     """Match actual texels. Neither the dimensions nor a handle identify an asset."""
     if len(payload) != TRANSFER.size + PIXELS * 4:
         return None
-    desc = payload[:TRANSFER.size]
-    if not _complete_upload(desc):
+    return reference_for_upload(payload[:TRANSFER.size], memoryview(payload)[TRANSFER.size:])
+
+
+def reference_for_upload(desc, pixels):
+    if len(desc) != TRANSFER.size or len(pixels) != PIXELS * 4 or not _complete_upload(desc):
         return None
-    if hashlib.sha256(memoryview(payload)[TRANSFER.size:]).digest() != RGBX_SHA256:
+    if hashlib.sha256(pixels).digest() != RGBX_SHA256:
         return None
     return HEADER.pack((TRANSFER.size + 32) // 4, REFERENCE) + desc + RGBX_SHA256
 

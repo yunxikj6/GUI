@@ -12,6 +12,8 @@ QUERY = b'GNOME-CAPS/1 '
 FEATURES = struct.Struct('!4sI')
 FEATURE_MAGIC = b'GCFG'
 WALLPAPER = 1
+# This bit applies inside a witnessed application stream, including its logical PUT offsets.
+APP_WALLPAPER = 16
 SEARCH_INPUT = 2
 SELECT_ALL = 4
 FOCUS_DELETE = 8

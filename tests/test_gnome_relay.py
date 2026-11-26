@@ -76,11 +76,13 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.sources = []
         self.artwork = []
+        self.application_artwork = []
         self.retired = asyncio.Event()
 
         @asynccontextmanager
-        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False):
+        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
             self.artwork.append(wallpaper)
+            self.application_artwork.append(app_wallpaper)
             source = Source(size)
             if search_input:
                 source.events.feed_data(b'{"event":"focus","revision":1,"active":true}\n')
@@ -189,6 +191,26 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(asyncio.to_thread(run, private, available), 12)
             await asyncio.wait_for(self.retired.wait(), 3)
         self.assertEqual(self.artwork, [True, True, False])
+
+    async def test_application_artwork_uses_its_own_capability_on_both_transports(self):
+        def local_file(owner, index):
+            return (Path('/tmp') / ('clrp-' + owner.session) / f'msg-{index}.bin').open('rb')
+        def connect(private, enabled, expect_art):
+            with patch.object(InstaBoxControl, '_open_file', local_file):
+                stream = (transport.connect(LocalProvider(), self.port, self.token, app_wallpaper=enabled) if private
+                          else transport.connect_forwarded(self.port, self.token, app_wallpaper=enabled))
+                with stream:
+                    self.assertEqual(read_exact(stream,len(Source.content)),Source.content)
+                    self.assertEqual(stream.has_application_wallpaper(),expect_art)
+        for private in (True,False):
+            for source,local,expected in ((wire.WALLPAPER,True,False),(wire.APP_WALLPAPER,False,False),
+                                          (wire.APP_WALLPAPER,True,True)):
+                self.service.features = source
+                self.retired.clear()
+                await asyncio.wait_for(asyncio.to_thread(connect,private,local,expected),15)
+                await asyncio.wait_for(self.retired.wait(),3)
+                self.assertEqual(self.application_artwork[-1],expected)
+                self.assertFalse(self.artwork[-1])
 
     async def test_old_service_uses_original_800_stream_when_client_has_new_artwork(self):
         logins = []

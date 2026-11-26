@@ -1,0 +1,63 @@
+{
+  "original": {
+    "bytes": 77362643,
+    "maxSizeGvglBlocks": 74,
+    "gvglBytes": 12147021
+  },
+  "reference": {
+    "bytes": 44185075,
+    "maxSizeGvglBlocks": 43,
+    "gvglBytes": 2678973
+  },
+  "referencedUploads": 1,
+  "originalSha": "1fee16ff3b6c22f7a961e6849dae5f94deb4c2776b63aa8edd4c233a6fc4dcb0",
+  "firstScanout": {
+    "original": {
+      "firstScanout": {
+        "number": 1,
+        "minimumRawOffset": 38839184,
+        "deliveredGvglBytes": 9838740,
+        "maxSizeBlocks": 38
+      },
+      "firstScanoutAfterCanonicalTexture": {
+        "number": 1,
+        "minimumRawOffset": 38839184,
+        "deliveredGvglBytes": 9838740,
+        "maxSizeBlocks": 38
+      }
+    },
+    "optimized": {
+      "firstScanout": {
+        "number": 1,
+        "minimumRawOffset": 5661616,
+        "deliveredGvglBytes": 361588,
+        "maxSizeBlocks": 6
+      },
+      "firstScanoutAfterCanonicalTexture": {
+        "number": 1,
+        "minimumRawOffset": 5661616,
+        "deliveredGvglBytes": 361588,
+        "maxSizeBlocks": 6
+      }
+    }
+  },
+  "sha256OfOrderedScanoutDigests": "146b51d80312004f5d13308d0782e8deef2720da01429c78fe51a01fecd9cee6",
+  "matchingScans": 98,
+  "visibleScans": 47,
+  "identicalDesktopWindowPixels": {
+    "welcome": 1152000,
+    "alternatives": 1152000
+  },
+  "viewport": [
+    1280,
+    900
+  ],
+  "transportAccounting": "GVGL packet header, block digest and zlib level 3 at full 1 MiB blocks; excludes HTTP/TLS framing and live timeout block splits",
+  "source": "A signed-out original ChatGPT desktop paired to the standard Ubuntu Noble compositor; recorded witness-classified source, not a network latency test.",
+  "renderer": "Two separate Windows x64 native processes under Wine; same Win64 Node/CanvasKit and VirGL runtime, per-scanout matching and independent HWND readback.",
+  "freshGraphicsContextAfterDisconnect": {
+    "scanoutSha256": "a4b5bbba333a3f5f45fbcce63e69170fbceab1a25a069be367a00f1410403948",
+    "closedPeer": true,
+    "rawBytes": 4608000
+  }
+}
