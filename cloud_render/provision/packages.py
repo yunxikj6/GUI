@@ -96,12 +96,12 @@ def fetch(row, target):
             time.sleep(min(0.35 * 2**attempt, 4))
 
 
-def build(rows, target):
+def build(rows, target, *, reserve_bytes=0):
     if target.exists() or target.is_symlink():
         raise ValueError("guest target must be a new directory")
     if (
         not 0 < len(rows) < 2000
-        or shutil.disk_usage(target.parent).free < sum(r["installed_bytes"] for r in rows) + 500 * 1024**2
+        or shutil.disk_usage(target.parent).free < sum(r["installed_bytes"] for r in rows) + reserve_bytes + 500 * 1024**2
     ):
         raise ValueError("insufficient free disk or unexpected package count")
     target.mkdir(mode=0o700)

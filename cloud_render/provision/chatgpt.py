@@ -2,7 +2,6 @@
 import hashlib
 import json
 from pathlib import Path
-import shutil
 import tempfile
 import urllib.request
 import zipfile
@@ -21,6 +20,7 @@ PACKAGE = {
     "size": 501426562,
     "sha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
 }
+INSTALLED_BYTES = 1560353 * 1024  # Installed-Size in the verified vendor control file.
 EXECUTABLE_SHA256 = "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7"
 
 
@@ -51,21 +51,21 @@ def download(record, destination):
                 raise
 
 
-def install(root, local_deb):
-    # The verified control file specifies 1,560,353 KiB installed. The
-    # private archive copy quarantines changes to the operator-supplied file.
-    if shutil.disk_usage(root).free < 1560353 * 1024 + PACKAGE["size"] + 64 * 1024**2:
-        raise ValueError("云端 Ubuntu 展开后，安装原版 ChatGPT 还需要约 2.1 GiB 可用空间。")
+def stage(local_deb, directory):
+    archive = directory / "verified-chatgpt.deb"
+    with local_deb.open("rb") as supplied:
+        checked_copy(supplied, archive, PACKAGE)
+    return archive
+
+
+def install(root, archive):
+    unpack(archive, root)
+    archive.unlink()
+    with (root / "usr/lib/chatgpt/ChatGPT").open("rb") as elf:
+        if hashlib.file_digest(elf, "sha256").hexdigest() != EXECUTABLE_SHA256:
+            raise ValueError("云端应用可执行文件校验失败。")
     with tempfile.TemporaryDirectory(dir=root.parent, prefix="app-download-") as tmp:
         scratch = Path(tmp)
-        archive = scratch / "chatgpt.deb"
-        with local_deb.open("rb") as supplied:
-            checked_copy(supplied, archive, PACKAGE)
-        unpack(archive, root)
-        archive.unlink()
-        with (root / "usr/lib/chatgpt/ChatGPT").open("rb") as elf:
-            if hashlib.file_digest(elf, "sha256").hexdigest() != EXECUTABLE_SHA256:
-                raise ValueError("云端应用可执行文件校验失败。")
         site = root / "usr/local/lib/python3.12/dist-packages"
         site.mkdir(parents=True, exist_ok=True)
         for wheel in json.loads(Path(__file__).with_name("original-app-wheels.json").read_text()):
