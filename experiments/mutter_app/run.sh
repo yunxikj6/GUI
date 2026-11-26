@@ -13,7 +13,7 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
         shift 2
         (cd "$src" && python3 -m experiments.mutter_app.live open "$channel")
         channel=$(cd "$channel" && pwd -P)
-        ipc=(--bind "$channel" /work/pair)
+        ipc=(--bind "$channel" /run/cw-work/pair)
         live=$mode
     fi
     [[ $# = 1 ]] || { echo 'usage: run.sh [--live|--interactive NEW_PAIR_DIRECTORY] NEW_SOURCE_ONLY_OUTPUT_DIRECTORY' >&2; exit 2; }
@@ -38,13 +38,13 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     done
     exec bwrap --die-with-parent --unshare-user --unshare-net --unshare-pid --unshare-ipc \
         --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run --tmpfs /home --tmpfs /root "${binds[@]}" \
-        --dir /work --ro-bind "$src" /work/source --bind "$out" /work/result "${ipc[@]}" --clearenv \
+        --dir /run/cw-work --ro-bind "$src" /run/cw-work/source --bind "$out" /run/cw-work/result "${ipc[@]}" --clearenv \
         --setenv PATH /usr/local/bin:/usr/bin:/bin --setenv LANG C.UTF-8 --setenv LC_ALL C.UTF-8 \
-        --setenv HOME /work/result/home --setenv CW_PYTHON "$python" --setenv CW_LIVE "$live" --chdir /work/source \
-        -- /bin/bash /work/source/experiments/mutter_app/run.sh --inside
+        --setenv HOME /run/cw-work/result/home --setenv CW_PYTHON "$python" --setenv CW_LIVE "$live" --chdir /run/cw-work/source \
+        -- /bin/bash /run/cw-work/source/experiments/mutter_app/run.sh --inside
 fi
 
-out=/work/result
+out=/run/cw-work/result
 export XDG_RUNTIME_DIR=/tmp/cw-session
 export XDG_CURRENT_DESKTOP=ubuntu:GNOME DESKTOP_SESSION=ubuntu XDG_SESSION_TYPE=wayland
 export GNOME_SHELL_SESSION_MODE=ubuntu GSETTINGS_BACKEND=keyfile
@@ -69,12 +69,12 @@ exec /usr/bin/chatgpt --ozone-platform=wayland "$@"
 EOF
     cat >"$out/bin/chatgpt" <<'EOF'
 #!/bin/sh
-cd /work/source || exit 1
-: > /work/result/broker-started
+cd /run/cw-work/source || exit 1
+: > /run/cw-work/result/broker-started
 unset GALLIUM_DRIVER VTEST_SOCKET_NAME CW_MUTTER_WITNESS
 export WAYLAND_DISPLAY=gnome-vgpu
-case "$CW_LIVE" in interactive) set -- --interactive --pair /work/pair;; proof) set -- --live;; *) set --;; esac
-exec "$CW_PYTHON" -m experiments.mutter_app.capture /work/result "$@" > /work/result/broker.log 2>&1
+case "$CW_LIVE" in interactive) set -- --interactive --pair /run/cw-work/pair;; proof) set -- --live;; *) set --;; esac
+exec "$CW_PYTHON" -m experiments.mutter_app.capture /run/cw-work/result "$@" > /run/cw-work/result/broker.log 2>&1
 EOF
     chmod 700 "$out/bin/"{chatgpt,wayland-original}
     cat >"$XDG_RUNTIME_DIR/system.conf" <<'EOF'
@@ -120,7 +120,7 @@ if [[ $CW_LIVE != 0 ]]; then
     mode=(--live)
     raw="$XDG_RUNTIME_DIR/source-stream"
     mkfifo -m 600 "$raw"
-    "$CW_PYTHON" -m experiments.mutter_app.live stream /work/pair --source "$out" "${manual[@]}" < "$raw" 2>"$out/transport.log" &
+    "$CW_PYTHON" -m experiments.mutter_app.live stream /run/cw-work/pair --source "$out" "${manual[@]}" < "$raw" 2>"$out/transport.log" &
     transport=$!
 fi
 "$CW_PYTHON" -m experiments.gnome_command_stream record --listen "$XDG_RUNTIME_DIR/source" \
@@ -158,7 +158,7 @@ wait_for 20 dock
 if [[ $CW_LIVE = interactive ]]; then
     # No scripted launcher, pointer movement, app click or image recognition.
     # Pipe EOF represents the user's window closing.
-    "$CW_PYTHON" -m experiments.mutter_app.live input /work/pair --source "$out" --interactive 2>"$out/pointer.log" &
+    "$CW_PYTHON" -m experiments.mutter_app.live input /run/cw-work/pair --source "$out" --interactive 2>"$out/pointer.log" &
     pointer=$!
     wait -n "$pointer" "$transport" "$relay" "$shell"
     [[ -e "$out/controller-closed" ]] || { echo 'The desktop transport or source closed.' >&2; exit 1; }
@@ -167,7 +167,7 @@ else
     "$CW_PYTHON" -m experiments.mutter_app.capture --drive "$out" >"$out/input.log" 2>&1 &
     driver=$!
     if [[ $CW_LIVE = proof ]]; then
-        timeout 200 "$CW_PYTHON" -m experiments.mutter_app.live input /work/pair --source "$out" 2>"$out/click.log" &
+        timeout 200 "$CW_PYTHON" -m experiments.mutter_app.live input /run/cw-work/pair --source "$out" 2>"$out/click.log" &
         pointer=$!
     fi
     for _ in 1 2 3 4 5; do
