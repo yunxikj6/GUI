@@ -136,23 +136,28 @@ class _Resource:
                 or z + depth > max(1, resource_d >> level) * max(1, layers)):
             raise VirglError('invalid graphics transfer bounds')
 
-    def is_scanout(self, desc):
+    def is_scanout(self, desc, display_format=2):
         _, level, stride, layer_stride, x, y, z, width, height, depth, size = desc
         _, target, fmt, binds, w, h, resource_depth, layers, last, samples = self.args
-        return ((target, fmt, binds, resource_depth, layers, last, samples) == (2, 2, 138, 1, 1, 0, 0)
-                and (level, x, y, z, width, height, depth, size) == (0, 0, 0, 0, w, h, 1, w * h * 4)
-                and stride in (0, w * 4) and layer_stride in (0, size))
+        pitch = stride or w * 4
+        pitch_ok = pitch == w * 4 or (display_format == 1 and pitch == (w * 4 + 63) // 64 * 64)
+        return ((target, fmt, binds, resource_depth, layers, last, samples) == (2, display_format, 138, 1, 1, 0, 0)
+                and (level, x, y, z, width, height, depth, size) == (0, 0, 0, 0, w, h, 1, pitch * h)
+                and pitch_ok and layer_stride in (0, size))
 
 
-def _play(stream, gpu, present, *, wallpaper=None):
+def _play(stream, gpu, present, *, wallpaper=None, renderer=b'gnome-shell'):
+    if renderer not in (b'gnome-shell', b'nautilus'):
+        raise VirglError('unsupported graphics source')
+    files = renderer == b'nautilus'
     handles = {}
     resident = 0
     started = False
     for opcode, body in _requests(stream, wallpaper=wallpaper):
         if opcode == RENDERER:
-            if started or body.rstrip(b'\0') != b'gnome-shell':
-                raise VirglError('expected a single GNOME Shell context')
-            gpu.start_context()
+            if started or body.rstrip(b'\0') != renderer:
+                raise VirglError('unexpected original graphics context')
+            gpu.start_context(renderer)
             started = True
         elif not started:
             raise VirglError('expected the GNOME Shell context first')
@@ -180,9 +185,15 @@ def _play(stream, gpu, present, *, wallpaper=None):
             if resource is None:
                 raise VirglError('unknown transfer resource')
             resource.check_transfer(desc)
-            scanout = opcode == GET and resource.is_scanout(desc)
+            if files and opcode == PUT and resource.args[1:4] == (2, 1, 138):
+                raise VirglError('unexpected direct upload to the original Files window')
+            scanout = opcode == GET and resource.is_scanout(desc, 1 if files else 2)
             result = gpu.transfer(desc, body[TRANSFER.size:] if opcode == PUT else None, scanout)
             if scanout:
+                line = desc[7] * 4
+                pitch = desc[2] or line
+                if pitch != line:
+                    result = b''.join(result[i:i + line] for i in range(0, len(result), pitch))
                 present(desc[7], desc[8], result)
         elif opcode == SUBMIT:
             gpu.submit(body)
@@ -348,8 +359,8 @@ class _NativeGpu:
         _check(init(1, 0, ct.byref(self.wgl.callbacks)), 'VirGL initialization')
         cleanup.callback(finalize, 1)
 
-    def start_context(self):
-        _check(self.make_context(1, 11, b'gnome-shell'), 'VirGL context creation')
+    def start_context(self, name):
+        _check(self.make_context(1, len(name), name), 'VirGL context creation')
         self.cleanup.callback(self.destroy_context, 1)
 
     def create(self, args):
@@ -379,7 +390,7 @@ class _NativeGpu:
 
 
 def replay(stream: BinaryIO, on_scanout: Callable[[int, int, bytes], None], *, runtime_dir: Path | str | None = None,
-           wallpaper: bytes | None = None) -> None:
+           wallpaper: bytes | None = None, renderer: bytes = b'gnome-shell') -> None:
     """Incrementally replay one GNOME Shell stream until EOF.
 
     The stream, WGL context and callbacks run on the invoking thread. A blocking
@@ -394,5 +405,5 @@ def replay(stream: BinaryIO, on_scanout: Callable[[int, int, bytes], None], *, r
     with ExitStack() as cleanup:
         cleanup.callback(_RENDERER_LOCK.release)
         directory = runtime_dir if runtime_dir is not None else _MANIFEST.parent / 'vendor' / 'virgl' / 'windows-x64'
-        renderer = _NativeGpu(_runtime(directory), cleanup)
-        _play(stream, renderer, on_scanout, wallpaper=wallpaper)
+        gpu = _NativeGpu(_runtime(directory), cleanup)
+        _play(stream, gpu, on_scanout, wallpaper=wallpaper, renderer=renderer)

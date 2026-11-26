@@ -34,7 +34,7 @@ def _read(stream, size, *, allow_eof=False):
     return data
 
 
-def _request(stream):
+def _request(stream, renderer=b'gnome-shell'):
     header = _read(stream, _HEADER.size, allow_eof=True)
     if not header:
         return None
@@ -52,8 +52,8 @@ def _request(stream):
         if not 1 <= length <= 64:
             raise StreamError('invalid renderer name length')
         payload = _read(stream, length)
-        if payload.rstrip(b'\0') != b'gnome-shell':
-            raise StreamError('expected the GNOME Shell renderer')
+        if payload.rstrip(b'\0') != renderer:
+            raise StreamError('unexpected source renderer')
     elif command == SUBMIT or command in _LENGTHS:
         payload = _read(stream, length * 4)
     else:
@@ -66,12 +66,17 @@ def _request(stream):
 
 
 def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, max_bytes=_MAX_ARCHIVE,
-                  wallpaper=False):
+                  wallpaper=False, renderer=b'gnome-shell'):
     """Pump buffered requests to a dedicated GPU process.
 
     respond is the live GNOME connection during capture. scanout receives a
     resource descriptor and that local GPU's pixels, for presentation or timing.
     """
+    if renderer not in (b'gnome-shell', b'nautilus'):
+        raise StreamError('unsupported source renderer')
+    files = renderer == b'nautilus'
+    display_format = 1 if files else 2  # B8G8R8A8_UNORM or B8G8R8X8_UNORM
+    pending_front = None
     references_left = 0
     if wallpaper and recording is not None:
         from . import gnome_wallpaper
@@ -79,8 +84,11 @@ def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, ma
     total = 0
     display_targets = {}
     with gpu.makefile('rb') as result:
-        while (packet := _request(source)) is not None:
+        while (packet := _request(source, renderer)) is not None:
             header, command, payload = packet
+            if pending_front is not None and (command != WAIT or
+                    struct.unpack('<II', payload) != (pending_front[0], 1)):
+                raise StreamError('missing fence for the application display resource')
             total += len(header) + len(payload)
             if max_bytes is not None and total > max_bytes:
                 raise StreamError('session exceeds the capture limit')
@@ -91,10 +99,12 @@ def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, ma
                 # Exact 2D, level-zero BGRX display-target descriptor emitted by
                 # the supported Mutter backend. Ignore other offscreen textures.
                 display_targets.pop(handle, None)
-                if (target, fmt, binds, depth, array, level, samples) == (2, 2, 138, 1, 1, 0, 0):
+                if (target, fmt, binds, depth, array, level, samples) == (2, display_format, 138, 1, 1, 0, 0):
                     display_targets[handle] = (width, height)
             elif command == UNREF:
                 display_targets.pop(_WORD.unpack(payload)[0], None)
+            if files and command == PUT and _WORD.unpack_from(payload)[0] in display_targets:
+                raise StreamError('direct uploads to the original Files window are unsupported')
             if recording is not None:
                 reference = gnome_wallpaper.put_reference(payload) if references_left and command == PUT else None
                 if reference is None:
@@ -112,6 +122,11 @@ def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, ma
             elif command == GET:
                 desc = _TRANSFER.unpack(payload)
                 reply = _read(result, desc[-1])
+                if files and respond is not None and desc[0] in display_targets:
+                    # Mesa vtest 0 flush_frontbuffer issues GET then BUSY_WAIT,
+                    # and consumes the fence reply before reading the pixels.
+                    # The GPU writes these replies in the opposite order.
+                    pending_front = (desc[0], reply)
                 if scanout is not None and display_targets.get(desc[0]) == desc[7:9]:
                     scanout(desc, reply)
             elif command in (WAIT, VERSION):
@@ -121,7 +136,16 @@ def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, ma
             else:
                 continue
             if respond is not None:
+                if command == GET and pending_front is not None:
+                    continue
+                if pending_front is not None and reply != struct.pack('<III', 1, WAIT, 0):
+                    raise StreamError('original display fence was not completed')
                 respond(reply)
+                if pending_front is not None:
+                    respond(pending_front[1])
+                    pending_front = None
+        if pending_front is not None:
+            raise StreamError('application ended before its display fence')
 
 
 def _connect(path):

@@ -12,6 +12,35 @@ def packet(kind, payload):
 
 
 class GnomeCommands(unittest.TestCase):
+    def test_files_display_fence_precedes_pixels_only_on_the_source_return_path(self):
+        name = b'nautilus\0'
+        upload_target = packet(stream.CREATE, struct.pack('<10I', 17, 2, 1, 138, 2, 2, 1, 1, 0, 0))
+        descriptor = struct.pack('<11I', 17, 0, 8, 0, 0, 0, 0, 2, 2, 1, 16)
+        get = packet(stream.GET, descriptor)
+        wait = packet(stream.WAIT, struct.pack('<II', 17, 1))
+        startup = struct.pack('<II', len(name), stream.RENDERER) + name + upload_target
+        pixels = bytes(range(16))
+        fence = packet(stream.WAIT, struct.pack('<I', 0))
+        local, gpu = socket.socketpair()
+        with local, gpu:
+            gpu.sendall(pixels + fence)
+            recording, returned = io.BytesIO(), io.BytesIO()
+            stream.copy_commands(io.BytesIO(startup + get + wait), local, recording=recording,
+                                 respond=returned.write, renderer=b'nautilus')
+            self.assertEqual(recording.getvalue(), startup + get + wait)
+            self.assertEqual(returned.getvalue(), fence + pixels)
+        for bad in (b'', packet(stream.WAIT, struct.pack('<II', 18, 1))):
+            with self.subTest(fence=bad), self.assertRaises(stream.StreamError):
+                local, gpu = socket.socketpair()
+                with local, gpu:
+                    gpu.sendall(pixels)
+                    stream.copy_commands(io.BytesIO(startup + get + bad), local,
+                                         respond=lambda _: self.fail('unfenced data'), renderer=b'nautilus')
+        local, gpu = socket.socketpair()
+        with local, gpu, self.assertRaises(stream.StreamError):
+            stream.copy_commands(io.BytesIO(startup + packet(stream.PUT, descriptor + pixels)), local,
+                                 recording=io.BytesIO(), renderer=b'nautilus')
+
     def test_input_recording_excludes_pixels_returned_by_gpu(self):
         source_name = b'gnome-shell\0'
         startup = struct.pack('<II', len(source_name), stream.RENDERER) + source_name

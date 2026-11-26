@@ -28,8 +28,8 @@ class Gpu:
         self.submissions = []
         self.uploads = []
 
-    def start_context(self):
-        pass
+    def start_context(self, name):
+        self.renderer = name
 
     def create(self, args):
         self.resources[args[0]] = args
@@ -48,6 +48,25 @@ class Gpu:
 
 
 class StreamTests(unittest.TestCase):
+    def test_files_window_replays_locally_and_removes_per_row_padding(self):
+        args = (17, 2, 1, 138, 3, 2, 1, 1, 0, 0)
+        desc = (17, 0, 64, 0, 0, 0, 0, 3, 2, 1, 128)
+        start = msg(vr.RENDERER, b'nautilus') + msg(vr.CREATE, vr.CREATE_ARGS.pack(*args))
+        read = msg(vr.GET, vr.TRANSFER.pack(*desc))
+        class PaddedGpu(Gpu):
+            def transfer(self, desc, payload, scanout):
+                return bytes(range(128)) if scanout else None
+        gpu = PaddedGpu()
+        frames = []
+        vr._play(Chunked(start + read), gpu, lambda *args: frames.append(args), renderer=b'nautilus')
+        self.assertEqual(gpu.renderer, b'nautilus')
+        self.assertEqual(frames, [(3, 2, bytes(range(12)) + bytes(range(64, 76)))])
+        with self.assertRaises(vr.VirglError):
+            vr._play(Chunked(start + read), gpu, lambda *_: None)
+        with self.assertRaises(vr.VirglError):
+            upload = msg(vr.PUT, vr.TRANSFER.pack(*desc) + bytes(128))
+            vr._play(Chunked(start + upload), gpu, lambda *_: None, renderer=b'nautilus')
+
     def test_fragmented_inline_upload_and_only_full_display_readback(self):
         stream = bytearray(START + msg(vr.VERSION, vr.WORD.pack(0)))
         stream += msg(vr.CREATE, vr.CREATE_ARGS.pack(*DISPLAY))

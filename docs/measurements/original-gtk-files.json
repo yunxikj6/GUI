@@ -1,0 +1,32 @@
+{
+  "source": "Original Ubuntu 24.04 Files (Nautilus) in isolated server-role X11 with GSK GL. Separate Win64 CPython 3.13.17 / VirGL / Wine 10 network-isolated replay. Windows sources only received original Nautilus commands, neither source pixels nor files.",
+  "sourceExecutable": "/usr/bin/nautilus",
+  "sourceSha256": "76bd46906e2d29ec3b3c0f9139db07a39fbeaf00437845bd61533923803871d7",
+  "width": 896,
+  "height": 576,
+  "sourceFrames": 67,
+  "win64Frames": 67,
+  "matchingHashes": 67,
+  "drawingCalls": 3760,
+  "submissions": 76,
+  "textureUploads": 890,
+  "uploadBytes": 8361824,
+  "directDisplayTargetUploads": 0,
+  "completeAppSizeUploads": 0,
+  "commandBytes": 10628329,
+  "compressedCommandBytes": 801055,
+  "states": {
+    "before": {
+      "title": "Cloud project",
+      "frame": 58,
+      "visibleWin32RgbSha256": "b74a34680bf6164430c34ae455f67195fddbd4f457a03eb53c521f1548df52ef",
+      "allVisiblePixelsMatchOriginal": 516096
+    },
+    "after": {
+      "title": "Drafts",
+      "frame": 67,
+      "visibleWin32RgbSha256": "38bee55571101893dad03d146faba3dfebe90628972c82e9c5d9da3a9a2f3abc",
+      "allVisiblePixelsMatchOriginal": 516096
+    }
+  }
+}
