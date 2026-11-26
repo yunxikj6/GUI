@@ -1,0 +1,36 @@
+{
+  "scanouts": 180,
+  "held": 78,
+  "states": {
+    "before": {
+      "scanout": 163,
+      "sha256": "2239dd7ab9bf2ac97866c8dd594a9af36373320ecfc194bea4b80e97b609934e",
+      "commit": 83,
+      "hwndWidth": 1280,
+      "hwndHeight": 900,
+      "matchingLocalScanoutPixels": 1152000,
+      "totalWindowPixels": 1152000,
+      "windowPngSha256": "00181af354d71075aade23e889f8fa3a00c53fd89226a275deebdbbe8fdb11a7"
+    },
+    "after": {
+      "scanout": 171,
+      "sha256": "07e5390b01496ebfc02e150af106f5c6559fd17541438bac6bdc2cda84aff8a6",
+      "commit": 91,
+      "hwndWidth": 1280,
+      "hwndHeight": 900,
+      "matchingLocalScanoutPixels": 1152000,
+      "totalWindowPixels": 1152000,
+      "windowPngSha256": "eb59928e17a0c3c1f62a5451ab53d5826926c00cb9c3b5005ca6600727f8b846"
+    }
+  },
+  "drawings": 2,
+  "reuses": 7,
+  "unpaired": 86,
+  "windowPaints": 84,
+  "source": "Authenticated InstaBox, standalone finite command export",
+  "display": "Windows x64 Python/Node/CanvasKit/VirGL and Win32 native window under Wine 10",
+  "zipSha256": "0fca6a87c8f044cb665b905b5c980510e40e33cae65e4b768c75163e8a44dfdc",
+  "sanitizedStreamBytes": 12001495,
+  "streamSha256": "9274424814c2da0f65d32b92cc0d1a3def83cf8797d23c4955c1ebca2f527f85",
+  "removedApplicationRasterBytes": 152582560
+}
