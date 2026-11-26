@@ -8,7 +8,9 @@
 python3 -m experiments.original_desktop_source --port 17326
 ```
 
-当前主入口已验证原版 ChatGPT 欢迎页、登录方式和登录前表单输入。云端应用使用临时配置和隔离网络。持久登录、对话、Claude 的 Artifacts 与实体 Windows 11 上的体验仍待验证。[Win64 窗口实拍](docs/measurements/original-editing/input.png) · [桌面和应用的操作记录](docs/interactive-original-desktop.md) · [断网后在全新本机图形上下文重绘的测量](docs/measurements/original-desktop-local-redraw.json)
+真实 InstaBox 会话中，Windows 连入云端，点击 Dock 打开 ChatGPT，再打开原厂登录前表单。五次键盘输入均由云端确认，本机显示相同的 `orbit`。当前程序使用临时配置和隔离网络，登录后的聊天和 Claude Artifacts 仍待验证。此轮 Windows x64 客户端运行于 Wine 10，实体 Windows 11 尚待验收。[真实云桌面](docs/measurements/instabox-win64/desktop.png) · [Windows 输入后的原厂窗口](docs/measurements/instabox-win64/input.png) · [此会话的时间和确认记录](docs/measurements/instabox-win64/session.json)
+
+新版根据云端原始纹理的 SHA-256 引用本机附带的 Ubuntu 官方壁纸。同一段命令从起点到第一次桌面输出，按 1 MiB 协议块计算，传输量从 9,838,740 字节降到 361,588 字节。两个独立 Win64 进程重绘的 98 次桌面输出全部一致。[传输量与像素对照](docs/measurements/original-app-wallpaper.json) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
 
 ## 连接基础 Ubuntu 桌面
 

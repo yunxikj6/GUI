@@ -1,0 +1,81 @@
+{
+  "steps": [
+    [
+      "welcome",
+      17.605
+    ],
+    [
+      "method",
+      25.563
+    ],
+    [
+      "empty",
+      33.868
+    ],
+    [
+      "input",
+      42.46
+    ],
+    [
+      "replace",
+      49.407
+    ]
+  ],
+  "typedKeys": 7,
+  "acknowledgedKeys": 7,
+  "focusEpoch": 1,
+  "submitted": false,
+  "selectedAndReplaced": true,
+  "testing": "True Win64 Python, Node and HWND under Wine and private isolated Ubuntu source",
+  "zip": "8abed38d866a27f6bc71df4197ec8ee79ab89d65ba3b07e36fbb142251fe862d",
+  "command": "Start.cmd --forwarded --port <authenticated local forward>",
+  "zipSize": 58280832,
+  "observedWindow": {
+    "originalDesktop": true,
+    "steps": 21,
+    "displayOffset": [
+      90,
+      79
+    ],
+    "closedByUser": true
+  },
+  "windowsExitCode": 0,
+  "firstReturnedDataAtDesktopObservation": {
+    "offered": 30,
+    "negotiated": 30,
+    "width": 1280,
+    "height": 900,
+    "returnedBytes": 413061,
+    "seconds": 3.782
+  },
+  "atClose": {
+    "offered": 30,
+    "negotiated": 30,
+    "width": 1280,
+    "height": 900,
+    "returnedBytes": 18932557,
+    "seconds": 52.807
+  },
+  "timingNotes": "seconds in the wire snapshots are the last recorded arrival relative to the QA counter start; steps are relative to the native test observer start",
+  "bridge": "91657e2, authenticated loopback forwarding in an isolated validation role",
+  "capture": "Native OS display readback of a Windows HWND. Synthetic field input on a signed-out vendor form was never submitted.",
+  "screenshots": {
+    "original-app-win64-8abed38d.png": "e8a6f2eebe87f16e770904f4e6f2e2de6c47c31e6aeb6a235d6d29cb2ef9a9cb",
+    "original-app-win64-8abed38d-desktop.png": "30385e8e78c34dff1b16fa5a9bf2ee68a7b9928f6a1ebf7de104087a29cb68cd",
+    "original-app-win64-8abed38d-welcome.png": "91f88e021326e5ce8864cc2d9159e48b36282d0d25d53c7b9d9d6cce829f6570",
+    "original-app-win64-8abed38d-method.png": "25f49b46ad0abd4a489f94095a665e91960765d5780e6d1663f5e6f950e987b3",
+    "original-app-win64-8abed38d-form.png": "8331c9288038d589a414a8e6081b1a2b9a909989278255269ae89c21e374148c"
+  },
+  "source": {
+    "type": "Network-isolated Ubuntu validation, clean profile",
+    "originalAppSourceCommit": "e33fa69617f39658faeed7df9487096a97678a01",
+    "gnomeInputCommit": "631f69c7d97033d12bda1f2cc24f704854c93417",
+    "controllerClosed": true,
+    "lastAcknowledgedInput": 19,
+    "visualRevisions": 16,
+    "verifiedOriginalAppTransfers": 68,
+    "withheldTransfers": 105,
+    "shellTransfers": 1081,
+    "cursorTransfers": 2
+  }
+}

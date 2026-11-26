@@ -1,0 +1,44 @@
+{
+  "windowsArchiveSha256": "ceec7cf2251129e8060157b31c1326d8a8cdf9a3eabb9b8ffcf7f57baf96f6f1",
+  "sourceCommit": "a56ce35a84b7741bfaa3b60ae8bd8b167c8b4c62",
+  "provider": "InstaBox private HTTPS, ordinary cloud user, original Ubuntu Noble and ChatGPT",
+  "client": "Unmodified Start.cmd, Win64 CPython/Node/CanvasKit/VirGL under Wine 10. Independent Win32 client-area readback.",
+  "accountLogin": false,
+  "submitted": false,
+  "stages": [
+    {
+      "state": "desktop",
+      "secondsFromLaunch": 30.87,
+      "clientRgbSha256": "e4bf86fef1d50195dd58fe0aac9b7403ae53ec267af27f3e8edf3530170a69d8"
+    },
+    {
+      "state": "welcome",
+      "secondsFromLaunch": 49.2,
+      "clientRgbSha256": "9aefaf353027341cf2593bf3a020841621168705ea813c52697684e22394bf4a"
+    },
+    {
+      "state": "method",
+      "secondsFromLaunch": 59.81,
+      "clientRgbSha256": "a4049684d5862cb86b275ee620ef7ca664a29512aacf07f940de31837d3cda51"
+    },
+    {
+      "state": "blank-form",
+      "secondsFromLaunch": 70.21,
+      "clientRgbSha256": "e9140d54e7e650c327d5bfb7d2674cdaec2e34f82104faf6e812247ecd2edf1b"
+    }
+  ],
+  "input": {
+    "physicalKeys": 5,
+    "cloudInputSequences": [
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "cloudFocusEpoch": 1,
+    "visibleText": "orbit",
+    "windowImage": "input.png"
+  },
+  "remainingIssue": "After typing, the Cancel button could stay unresponsive while the viewer was waiting for the current application drawing to be verified."
+}
