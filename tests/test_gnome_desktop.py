@@ -19,7 +19,7 @@ class DesktopTests(unittest.TestCase):
                              side_effect=lambda start, *args, **kwargs: start()):
             self.assertEqual(gnome_desktop.main(['--forwarded', '--port', '41325', '--size', '1280x900']), 0)
         self.assertEqual([call.args[0] for call in secret.call_args_list], ['CLOUDWORKSPACE_GNOME_TOKEN'])
-        forwarded.assert_called_once_with(41325, 't' * 43, size=(1280, 900), wallpaper=True, search_input=True)
+        forwarded.assert_called_once_with(41325, 't' * 43, size=(1280, 900), wallpaper=True, search_input=True, focus_delete=True)
 
     def test_pointer_moves_coalesce_only_between_buttons_and_keys(self):
         inputs = InputQueue(3)
@@ -108,6 +108,8 @@ class DesktopTests(unittest.TestCase):
                     revision = self.text_focus()
                     self.submit(('text', revision, '你好'))
                     self.submit(('select-all', revision))
+                    self.submit(('delete-key', revision, True))
+                    self.submit(('delete-key', None, False))
                 return not sent.is_set()
 
             def set_title(self, title):
@@ -122,6 +124,7 @@ class DesktopTests(unittest.TestCase):
 
         present_session(lambda: peer, replay, Window)
         peer.commit_text.assert_called_once_with(focused, '你好')
+        peer.delete_text.assert_called_once_with(focused, backward=True)
         peer.select_all.assert_called_once_with(focused)
         first = [c[0] for c in peer.method_calls if c[0] in ('commit_text', 'select_all')]
         self.assertEqual(first, ['commit_text', 'select_all'])

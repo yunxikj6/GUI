@@ -115,6 +115,13 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
                     session.click(*args)
                 elif kind == 'key':
                     session.key(*args)
+                elif kind == 'delete-key':
+                    revision, backward = args
+                    if session.has_text_focus_protocol():
+                        if revision is not None:
+                            session.delete_text(revision, backward=backward)
+                    else:
+                        session.key('Backspace' if backward else 'Delete')
                 elif kind == 'text':
                     session.commit_text(*args)
                 elif kind == 'select-all':
@@ -285,10 +292,10 @@ def main(argv=None):
             except (OSError, ValueError, ImportError):
                 artwork = None
             if args.forwarded:
-                return connect_forwarded(args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True)
+                return connect_forwarded(args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True, focus_delete=True)
             box = InstaBox(key, args.machine)
             box.ensure_running()
-            return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True)
+            return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None, search_input=True, focus_delete=True)
 
         cache = None
 

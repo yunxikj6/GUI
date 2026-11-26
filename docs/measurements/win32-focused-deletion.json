@@ -1,0 +1,30 @@
+{
+  "environment": "Windows x64 CPython 3.13.17 through Wine 10; real Win32 HWND/IMM32",
+  "inputMethod": "Fcitx 5.1.12 XIM/Pinyin on-the-spot",
+  "target": "Isolated Ubuntu GNOME Shell and its native search field",
+  "transport": "Paired loopback, 800 × 520; test on same Linux host.",
+  "exactClientPixels": {
+    "sourceFrameSequence": 43,
+    "fullFrameSha256": "deaccedc0fc3c42f531f7d4551956d77ba6ed5568b526db98b75a9a77c0fc3cf",
+    "rgbPixels": 416000,
+    "sourceAlpha": 255
+  },
+  "preeditSeconds": 2,
+  "preeditTextOperations": 0,
+  "committedTextOperations": 1,
+  "focusedDeleteReceipts": [
+    {
+      "kind": "B",
+      "sequence": 11,
+      "applied": true
+    },
+    {
+      "kind": "D",
+      "sequence": 22,
+      "applied": true
+    }
+  ],
+  "afterFocusLossDeleteOperations": 0,
+  "nativeSearchMatchedAfterBackspaceAndForwardDelete": true,
+  "windowClosedNormally": true
+}

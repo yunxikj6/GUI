@@ -270,7 +270,10 @@ class NativeWindow:
                     return 0
                 if wp in NAVIGATION and not ctrl and get_key_state(VK_MENU) >= 0:
                     if not shift or wp == 0x09:
-                        self.on_input(('key', 'Shift+Tab' if shift else NAVIGATION[wp]))
+                        if wp in (0x08, 0x2e):
+                            self.on_input(('delete-key', self.text_focus(), wp == 0x08))
+                        else:
+                            self.on_input(('key', 'Shift+Tab' if shift else NAVIGATION[wp]))
                         return 0
         return default(hwnd, msg, wp, lp)
 
