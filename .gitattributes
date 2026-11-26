@@ -5,3 +5,4 @@ windows/launcher/*.sh text eol=lf
 windows/*.exe binary
 thin_client/vendor/DejaVu-COPYRIGHT.txt -whitespace
 thin_client/vendor/ubuntu-noble/COPYRIGHT -text -whitespace
+cloud_render/provision/keys/COPYRIGHT -text -whitespace
