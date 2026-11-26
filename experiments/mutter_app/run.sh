@@ -4,8 +4,19 @@ set -eu -o pipefail
 umask 077
 
 if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
-    [[ $# = 1 ]] || { echo 'usage: run.sh NEW_SOURCE_ONLY_OUTPUT_DIRECTORY' >&2; exit 2; }
     src=$(cd "$(dirname "$0")/../.." && pwd -P)
+    live=0
+    ipc=()
+    if [[ ( ${1:-} = --live || ${1:-} = --interactive ) && $# = 3 ]]; then
+        if [[ $1 = --interactive ]]; then mode=interactive; else mode=proof; fi
+        channel=$(realpath -m -- "$2")
+        shift 2
+        (cd "$src" && python3 -m experiments.mutter_app.live open "$channel")
+        channel=$(cd "$channel" && pwd -P)
+        ipc=(--bind "$channel" /work/pair)
+        live=$mode
+    fi
+    [[ $# = 1 ]] || { echo 'usage: run.sh [--live|--interactive NEW_PAIR_DIRECTORY] NEW_SOURCE_ONLY_OUTPUT_DIRECTORY' >&2; exit 2; }
     # mkdir, without -p, refuses to reuse or overwrite another session.
     mkdir -m 700 -- "$1"
     out=$(cd "$1" && pwd -P)
@@ -27,9 +38,9 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     done
     exec bwrap --die-with-parent --unshare-user --unshare-net --unshare-pid --unshare-ipc \
         --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run --tmpfs /home --tmpfs /root "${binds[@]}" \
-        --dir /work --ro-bind "$src" /work/source --bind "$out" /work/result --clearenv \
+        --dir /work --ro-bind "$src" /work/source --bind "$out" /work/result "${ipc[@]}" --clearenv \
         --setenv PATH /usr/local/bin:/usr/bin:/bin --setenv LANG C.UTF-8 --setenv LC_ALL C.UTF-8 \
-        --setenv HOME /work/result/home --setenv CW_PYTHON "$python" --chdir /work/source \
+        --setenv HOME /work/result/home --setenv CW_PYTHON "$python" --setenv CW_LIVE "$live" --chdir /work/source \
         -- /bin/bash /work/source/experiments/mutter_app/run.sh --inside
 fi
 
@@ -62,7 +73,8 @@ cd /work/source || exit 1
 : > /work/result/broker-started
 unset GALLIUM_DRIVER VTEST_SOCKET_NAME CW_MUTTER_WITNESS
 export WAYLAND_DISPLAY=gnome-vgpu
-exec "$CW_PYTHON" -m experiments.mutter_app.capture /work/result > /work/result/broker.log 2>&1
+case "$CW_LIVE" in interactive) set -- --interactive;; proof) set -- --live;; *) set --;; esac
+exec "$CW_PYTHON" -m experiments.mutter_app.capture /work/result "$@" > /work/result/broker.log 2>&1
 EOF
     chmod 700 "$out/bin/"{chatgpt,wayland-original}
     cat >"$XDG_RUNTIME_DIR/system.conf" <<'EOF'
@@ -76,9 +88,9 @@ EOF
     exit
 fi
 
-gpu= relay= shell= driver=
+gpu= relay= shell= driver= transport= pointer=
 cleanup() {
-    for pid in "$driver" "$shell" "$relay" "$gpu"; do
+    for pid in "$pointer" "$driver" "$shell" "$transport" "$relay" "$gpu"; do
         [[ -z $pid ]] || kill "$pid" 2>/dev/null || true
     done
 }
@@ -91,14 +103,26 @@ wait_for() {
         sleep .12
     done
 }
+# This controlled experiment supports one application surface. The independent
+# Desktop Icons NG client otherwise publishes a full desktop SHM surface.
+gsettings set org.gnome.shell disabled-extensions "['ding@rastersoft.com']"
 gsettings set org.gnome.shell favorite-apps "['chatgpt.desktop']"
 gdbus call --session --dest org.freedesktop.secrets --object-path /org/freedesktop/secrets \
     --method org.freedesktop.Secret.Service.SetAlias default /org/freedesktop/secrets/collection/session >/dev/null
 virgl_test_server --no-loop-or-fork --use-egl-surfaceless --socket-path "$XDG_RUNTIME_DIR/gpu" >"$out/gpu.log" 2>&1 &
 gpu=$!
 wait_for 8 test -S "$XDG_RUNTIME_DIR/gpu"
+manual=()
+if [[ $CW_LIVE = interactive ]]; then manual=(--interactive); fi
+raw="$out/commands.virgl"
+if [[ $CW_LIVE != 0 ]]; then
+    raw="$XDG_RUNTIME_DIR/source-stream"
+    mkfifo -m 600 "$raw"
+    "$CW_PYTHON" -m experiments.mutter_app.live stream /work/pair --source "$out" "${manual[@]}" < "$raw" 2>"$out/transport.log" &
+    transport=$!
+fi
 "$CW_PYTHON" -m experiments.gnome_command_stream record --listen "$XDG_RUNTIME_DIR/source" \
-    --gpu "$XDG_RUNTIME_DIR/gpu" > "$out/commands.virgl" 2>"$out/relay.log" &
+    --gpu "$XDG_RUNTIME_DIR/gpu" > "$raw" 2>"$out/relay.log" &
 relay=$!
 wait_for 8 test -S "$XDG_RUNTIME_DIR/source"
 env CW_MUTTER_WITNESS="$out/owner.log" GALLIUM_DRIVER=virpipe VTEST_SOCKET_NAME="$XDG_RUNTIME_DIR/source" \
@@ -121,19 +145,48 @@ dock() {
         --method org.gnome.Shell.Extensions.GetExtensionInfo ubuntu-dock@ubuntu.com 2>/dev/null | grep -q "'state': <1.0>"
 }
 wait_for 20 dock
-"$CW_PYTHON" -m experiments.mutter_app.capture --drive "$out" >"$out/input.log" 2>&1 &
-driver=$!
-for _ in 1 2 3 4 5; do
-    xdotool mousemove --window "$xid" 31 68 click 1
-    if wait_for 4 test -e "$out/broker-started" 2>/dev/null; then break; fi
-done
-wait_for 6 test -e "$out/broker-started"
-wait "$driver"
-driver=
-wait_for 50 test -s "$out/capture.json"
+if [[ $CW_LIVE = interactive ]]; then
+    # No scripted launcher, pointer movement, app click or image recognition.
+    # Pipe EOF represents the user's window closing.
+    "$CW_PYTHON" -m experiments.mutter_app.live input /work/pair --source "$out" --interactive 2>"$out/pointer.log" &
+    pointer=$!
+    wait -n "$pointer" "$transport" "$relay" "$shell"
+    [[ -e "$out/controller-closed" ]] || { echo 'The desktop transport or source closed.' >&2; exit 1; }
+    pointer=
+else
+    "$CW_PYTHON" -m experiments.mutter_app.capture --drive "$out" >"$out/input.log" 2>&1 &
+    driver=$!
+    if [[ $CW_LIVE = proof ]]; then
+        timeout 200 "$CW_PYTHON" -m experiments.mutter_app.live input /work/pair --source "$out" 2>"$out/click.log" &
+        pointer=$!
+    fi
+    for _ in 1 2 3 4 5; do
+        xdotool mousemove --window "$xid" 31 68 click 1
+        if wait_for 4 test -e "$out/broker-started" 2>/dev/null; then break; fi
+    done
+    wait_for 6 test -e "$out/broker-started"
+    wait "$driver"
+    driver=
+    if [[ $CW_LIVE = proof ]]; then
+        wait "$pointer"
+        pointer=
+        wait_for 60 test -s "$out/capture.json"
+        wait_for 60 test -s "$out/forwarded-after.json"
+        sleep 2
+    else
+        wait_for 50 test -s "$out/capture.json"
+    fi
+fi
 kill -TERM "$shell"
 wait "$shell" || true
 shell=
-wait "$relay"
-relay=
-"$CW_PYTHON" -m experiments.mutter_app.bind "$out"
+if [[ $CW_LIVE != interactive ]]; then
+    wait "$relay"
+    relay=
+    if [[ $CW_LIVE = proof ]]; then
+        wait "$transport"
+        transport=
+    else
+        "$CW_PYTHON" -m experiments.mutter_app.bind "$out"
+    fi
+fi

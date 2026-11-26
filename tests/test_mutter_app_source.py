@@ -75,3 +75,81 @@ class OriginalWindowSourceTest(unittest.TestCase):
             path.write_text('\n'.join(line for line in lines if not line.startswith('COMMIT')))
             with self.assertRaises(WitnessError):
                 read_witness(path, authority)
+
+
+class LiveMutterSourceTest(unittest.TestCase):
+    def test_unfinished_owned_scope_cannot_become_desktop(self):
+        from experiments.mutter_app.live import Journal
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'owner.log'
+            path.write_text(
+                'ACCESS 11 7 22 1 10\nSHM 1 40 9 abc\nCOGL_CREATE 1 0x10\nWIRE 1 64 5 0 0 10 9 360\n'
+            )
+            witness = Journal(path)
+            try:
+                self.assertIsNone(witness.at(64))
+                with path.open('a') as out:
+                    out.write('GL 1 12 3553\nEND 1\nORIGIN 476 UNCLASSIFIED_SHM 8 0 0 10 9 360\n')
+                kind, desc, metadata = witness.at(64)
+                self.assertEqual((kind, desc), ('SHM', [5, 0, 0, 10, 9, 360]))
+                self.assertEqual(metadata['gl'], (12, 3553))
+                self.assertEqual(witness.at(476)[0], 'UNCLASSIFIED_SHM')
+                self.assertIsNone(witness.at(64))
+            finally:
+                witness.file.close()
+
+    def test_private_channels_use_new_session_and_reject_reuse(self):
+        import json
+        import stat
+
+        from experiments.mutter_app.live import initialize
+
+        with TemporaryDirectory() as tmp:
+            channel = Path(tmp) / 'pair'
+            initialize(channel)
+            self.assertEqual(channel.stat().st_mode & 0o777, 0o700)
+            for name in ('graphics.fifo', 'input.fifo'):
+                self.assertTrue(stat.S_ISFIFO((channel / name).stat().st_mode))
+                self.assertEqual((channel / name).stat().st_mode & 0o777, 0o600)
+            self.assertEqual(
+                len(bytes.fromhex(json.loads((channel / 'session.json').read_text())['session'])), 32
+            )
+            self.assertEqual((channel / 'session.json').stat().st_mode & 0o777, 0o600)
+            with self.assertRaises(FileExistsError):
+                initialize(channel)
+
+    def test_user_moves_and_clicks_are_applied_in_order_and_eof_closes(self):
+        import json
+        import struct
+        from threading import Thread
+        from unittest.mock import patch
+
+        from experiments.mutter_app.live import initialize, receive_click
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pair = root / 'pair'
+            initialize(pair)
+            (root / 'nested-window').write_text('42')
+
+            def user_input():
+                with (pair / 'input.fifo').open('wb', buffering=0) as fd:
+                    fd.write(b'M' + struct.pack('!HH', 19, 45) + b'L' + struct.pack('!HH', 31, 68))
+
+            writer = Thread(target=user_input)
+            writer.start()
+            with patch('experiments.mutter_app.live.subprocess.run') as apply:
+                receive_click(root, pair, interactive=True)
+            writer.join(2)
+            self.assertEqual(
+                [a.args[0] for a in apply.call_args_list],
+                [
+                    ['xdotool', 'mousemove', '--window', '42', '19', '45'],
+                    ['xdotool', 'mousemove', '--window', '42', '31', '68', 'click', '1'],
+                ],
+            )
+            self.assertEqual(
+                json.loads((pair / 'last-input.json').read_text()), {'sequence': 2, 'applied': True}
+            )
+            self.assertTrue((root / 'controller-closed').is_file())

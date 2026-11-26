@@ -68,6 +68,7 @@ static struct ownership table[1024];
 static __thread struct ownership active;
 static uint64_t generation;
 static __thread int awaiting_descriptor;
+static __thread int other_shm;
 static __thread void *shmptr;
 static __thread void *pendingtex;
 static void *attached_surface[1024];
@@ -265,10 +266,12 @@ static void fence(void) {
 }
 void wl_shm_buffer_begin_access(void *s) {
     FN(enterfn, wl_shm_buffer_begin_access);
+    fence();  // flush shell-originated work before attributing this SHM access
     wl_shm_buffer_begin_access(s);
+    other_shm = 1;
     for (int i = 0; i < count; i++)
         if (table[i].shm == s) {
-            fence();
+            other_shm = 0;
             shmptr = NULL;
             pendingtex = NULL;
             active = table[i];
@@ -280,8 +283,9 @@ void wl_shm_buffer_begin_access(void *s) {
 }
 void wl_shm_buffer_end_access(void *s) {
     FN(enterfn, wl_shm_buffer_end_access);
+    fence();
+    other_shm = 0;
     if (active.shm && active.shm == s) {
-        fence();
         awaiting_descriptor = 0;
         if (pendingtex) {
             typedef int (*getgl)(void *, unsigned *, unsigned *);
@@ -336,15 +340,22 @@ ssize_t write(int fd, const void *buf, size_t count) {
     ssize_t n = syscall(SYS_write, fd, buf, count);
     saved = errno;
     if (n > 0) byte_cursor += (uint64_t)n;
-    if (n == (ssize_t)count && active.shm && count >= 8 && count <= 44) {
+    if (n == (ssize_t)count && count >= 8 && count <= 44) {
         const uint32_t *a = buf;
         if (count == 8 && a[1] == 5) {
             awaiting_descriptor = 1;
             pending_offset = offset;
         }
         if (count == 44 && awaiting_descriptor && pending_offset + 8 == offset) {
-            say("WIRE %lu %" PRIu64 " %u %u %u %u %u %u\n", active.attach, pending_offset, a[0],
-                a[4], a[5], a[7], a[8], a[10]);
+            if (active.shm) {
+                say("WIRE %lu %" PRIu64 " %u %u %u %u %u %u\n", active.attach, pending_offset, a[0],
+                    a[4], a[5], a[7], a[8], a[10]);
+            } else {
+                // A true PUT must resolve at its precise offset in the relay's
+                // independent parser. Other client SHM must not be sent as shell paint.
+                say("ORIGIN %" PRIu64 " %s %u %u %u %u %u %u\n", pending_offset,
+                    other_shm ? "UNCLASSIFIED_SHM" : "SHELL", a[0], a[4], a[5], a[7], a[8], a[10]);
+            }
             awaiting_descriptor = 0;
         }
     }

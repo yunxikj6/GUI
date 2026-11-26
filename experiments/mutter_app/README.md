@@ -32,3 +32,27 @@ python -m unittest tests.test_mutter_app_source -v
 ```
 
 此实验使用云源角色验证两种登录前画面的绘图和资源来源。真云跨机、不同分辨率、其他应用以及 Windows 11 实机应分别记录实测证据。
+
+## 同一活跃会话的交互实验
+
+源机可同时创建一对仅本用户可打开的 FIFO。每次运行使用全新的源输出目录、配对目录和会话随机数。命令流从原版 GNOME 启动时开始发送。远端须先打开 `graphics.fifo` 读端，并在独立线程打开 `input.fifo` 写端。Windows 顺序验证独立的 `session.json`、随后出现的 `binding.json` 与流内绑定。配对目录只包含这两份身份数据和两条管道。
+
+```bash
+bash experiments/mutter_app/run.sh --live "$HOME/live-pair-01" "$HOME/live-source-01"
+```
+
+源端在专用 Ubuntu 会话里关闭 Desktop Icons NG 这个附加客户端。它会产生独立的整桌图像表面。原版 Shell、Ubuntu Dock、官方壁纸与已安装的 ChatGPT 参加此次单应用实验。云源观察器对每个原始 Mesa PUT 提供字节偏移与实际同步绘图范围。接收路径会等待缺失的观察，并拒绝未经认定的其他应用 SHM。所有原应用内容纹理在源端替换为原厂绘图或等待记录。数据暂存在有界内存队列，当前会话不写本机原始图像归档。
+
+Windows 窗口接收并绘制登录页后，操作者可点击 “Sign in another way”。配对写端发送字节 `L` 加两个大端 16 位整数，坐标以 1280 × 900 的云桌面为基准。该点击在同一私有 Xvfb 上操作原版窗口。程序等待原版菜单出现，并采集、校验新绘图。`input-applied.json`、`forwarded-before.json`、`forwarded-after.json` 和 `live-source.json` 在源机记录输入、实际提交和已分类的流量。此入口限一次点击及两个已验证的未登录状态。
+
+## 手动桌面入口
+
+```bash
+bash experiments/mutter_app/run.sh --interactive "$HOME/manual-pair-01" "$HOME/manual-source-01"
+```
+
+通过同一受认证的私有转发连接两条 FIFO。Windows 用户打开查看器后，先看到原版 Ubuntu 桌面；点击左侧 Dock 的 ChatGPT 图标，再从原版欢迎页选择登录方式。手动模式在原厂窗口正常启动时观察浏览器绘制三个原生标题栏图层，无需用户移动鼠标唤起采集。启动与菜单点击都来自用户。云源持续核对原窗口的登录前状态，对实际改变的合成提交重新采集官方绘图。当前支持浅色、DPR 1、1090 × 760 的欢迎页与登录方式菜单。
+
+输入记录为 `M` 或 `L` 加两个大端 16 位桌面坐标。云端实际投递移动或左键后，在配对目录原子更新 `last-input.json`，含 `sequence` 和 `applied`。控制器关闭输入流后，源端结束本次专用会话。手动入口无需 OCR。检测合适点击位置的 XTest/OCR 在独立验收器中运行。
+
+在一次独立无网 Ubuntu 源与 Wine 下真实 Win64 窗口的双向实验中，源端观测到同一原程序的 Wayland surface 33、VirGL 资源 203。实际窗口接收一次左键 (672, 502) 后，原厂欢迎页和登录方式菜单分别通过核验。源端从 138,919,700 字节原始 Mesa 流中移除了 97,838,400 字节应用纹理。过滤流为 44,898,735 字节，携带两份原始绘图。56 个缺少配对绘图的提交进入等待，两个状态分别通过 5 和 7 个提交。该次运行是双向受控验收；本实验的 Windows 11 实机与 InstaBox 真云验证分别记录。

@@ -89,24 +89,7 @@ def drive(out):
         json.dumps({'viewportOriginInNestedWindow': [x, y], 'nestedWindow': xid})
     )
     (out / 'hover.png').unlink()
-    subprocess.run(
-        [
-            'xdotool',
-            'windowfocus',
-            '--sync',
-            xid,
-            'mousemove',
-            '--window',
-            xid,
-            str(x + 300),
-            str(y + 88),
-            'click',
-            '1',
-        ],
-        timeout=4,
-        check=True,
-    )
-    time.sleep(0.35)
+    subprocess.run(['xdotool', 'windowfocus', '--sync', xid], timeout=4, check=True)
     for dx, dy in ((300, 88), (1074, 18), (1041, 18), (300, 88)):
         subprocess.run(
             ['xdotool', 'mousemove', '--window', xid, str(x + dx), str(y + dy)], timeout=3, check=True
@@ -115,9 +98,9 @@ def drive(out):
     (out / 'hover-finished').touch()
 
 
-async def titlebar(top, page, pid, out):
-    before = await geometry(page)
-    photo = await page.screenshot()
+async def titlebar(top, page, pid, out, *, interactive=False):
+    before = None if interactive else await geometry(page)
+    photo = None if interactive else await page.screenshot()
     done = asyncio.get_running_loop().create_future()
     top.once('Tracing.tracingComplete', lambda result: done.set_result(result))
     await top.send(
@@ -129,11 +112,17 @@ async def titlebar(top, page, pid, out):
         },
     )
     try:
-        (out / '.hover.tmp').write_bytes(photo)
-        (out / '.hover.tmp').replace(out / 'hover.png')
-        async with asyncio.timeout(20):
-            while not (out / 'hover-finished').exists():
-                await asyncio.sleep(0.1)
+        if interactive:
+            # Opening the stock app changes its blank first window to the
+            # signed-out view. Observe the native browser compositor activation.
+            await page.get_by_text('Sign in another way', exact=True).wait_for(timeout=30000)
+            await asyncio.sleep(1.2)
+        else:
+            (out / '.hover.tmp').write_bytes(photo)
+            (out / '.hover.tmp').replace(out / 'hover.png')
+            async with asyncio.timeout(20):
+                while not (out / 'hover-finished').exists():
+                    await asyncio.sleep(0.1)
     finally:
         await top.send('Tracing.end')
     complete = await asyncio.wait_for(done, 15)
@@ -161,8 +150,11 @@ async def titlebar(top, page, pid, out):
             }
         )
     )
-    require(before == await geometry(page) and _exclusive_page(page), 'window changed during trace')
-    return caption_layers(events, browser_pid=pid, geometry=before)
+    final_geometry = await geometry(page)
+    require(
+        (before is None or before == final_geometry) and _exclusive_page(page), 'window changed during trace'
+    )
+    return caption_layers(events, browser_pid=pid, geometry=final_geometry)
 
 
 def _file_sha256(path):
@@ -170,7 +162,49 @@ def _file_sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-async def collect(out):
+def publish(path, value):
+    temp = path.with_name('.' + path.name)
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as output:
+        json.dump(value, output)
+    temp.replace(path)
+
+
+async def observe_interactive(page, out, native_layers):
+    """Repaint verified, signed-out states as the user's original window changes."""
+    source = out / 'drawings'
+    source.mkdir(mode=0o700)
+    observed = {}
+    sequence = 0
+    while not (out / 'controller-closed').exists() and not page.is_closed():
+        if not _exclusive_page(page) or page.url != APP_PAGE:
+            return
+        known = None
+        for label, marker in [('after', 'Amazon Bedrock'), ('before', 'Sign in another way')]:
+            if await page.get_by_text(marker, exact=True).is_visible():
+                known = label
+                break
+        if known and await geometry(page) == (1090, 760, 1, 1026, 36, 'light'):
+            start = (out / 'owner.log').stat().st_size
+            digest = business_digest(Image.open(BytesIO(await page.screenshot())))
+            if digest not in observed:
+                publish(out / 'pending-scene.json', {'businessRgbSha256': digest})
+                frame = await capture_frame(page, sequence + 1)
+                end_digest = business_digest(Image.open(BytesIO(await page.screenshot())))
+                if digest == end_digest and await geometry(page) == (1090, 760, 1, 1026, 36, 'light'):
+                    raw = encode_message(
+                        Frame(frame.sequence, frame.width, frame.height, frame.layers + native_layers)
+                    )
+                    picture = hashlib.sha256(raw).hexdigest()
+                    require(len(observed) < 32, 'signed-out scene limit reached; start a new session')
+                    (source / (picture + '.clrp')).write_bytes(raw)
+                    sequence += 1
+                    observed[digest] = {'phase': known, 'pictureSha256': picture, 'witnessByteStart': start}
+                    publish(out / 'scenes.json', observed)
+        await asyncio.sleep(0.4)
+
+
+async def collect(out, *, live=False, interactive=False):
     require(
         out.is_dir() and out.stat().st_uid == os.getuid() and not out.stat().st_mode & 0o077,
         'source output must be private',
@@ -201,15 +235,23 @@ async def collect(out):
             'binarySha256': digest,
             'target': APP_PAGE,
         }
-        await page.get_by_text('Sign in another way', exact=True).wait_for(timeout=30000)
-        await asyncio.sleep(2)
-        layers = await titlebar(browser, page, pid, out)
+        publish(out / 'identity.json', identity)
+        if not interactive:
+            await page.get_by_text('Sign in another way', exact=True).wait_for(timeout=30000)
+            await asyncio.sleep(2)
+        layers = await titlebar(browser, page, pid, out, interactive=interactive)
+        if interactive:
+            try:
+                await observe_interactive(page, out, layers)
+            finally:
+                await browser.detach()
+            return
         states = {}
         for sequence, (name, label) in enumerate(
             (('before', 'Sign in another way'), ('after', 'Amazon Bedrock')), 1
         ):
             target = page.get_by_text(label, exact=True)
-            await target.wait_for(timeout=15000)
+            await target.wait_for(timeout=0 if interactive else (180000 if live else 15000))
             await asyncio.sleep(0.8)
             require(await geometry(page) == (1090, 760, 1, 1026, 36, 'light'), 'application changed geometry')
             start_log = (out / 'owner.log').stat().st_size
@@ -228,21 +270,31 @@ async def collect(out):
                 'witnessByteStart': start_log,
                 'witnessByteEnd': (out / 'owner.log').stat().st_size,
             }
-            if name == 'before':
+            publish(out / (name + '.json'), states[name])
+            if name == 'before' and not (live or interactive):
                 await target.click()
         await browser.detach()
         (out / 'capture.json').write_text(json.dumps({'identity': identity, 'states': states}, indent=2))
+        if interactive:
+            while not (out / 'controller-closed').exists() and not page.is_closed():
+                await asyncio.sleep(0.15)
+        elif live:
+            # Keep the original native window open while the client renders the
+            # last menu commit. The dedicated session owner terminates the source.
+            await asyncio.sleep(120)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
     parser.add_argument('--drive', action='store_true')
+    parser.add_argument('--live', action='store_true')
+    parser.add_argument('--interactive', action='store_true')
     args = parser.parse_args()
     if args.drive:
         drive(args.output)
     else:
-        asyncio.run(collect(args.output))
+        asyncio.run(collect(args.output, live=args.live, interactive=args.interactive))
 
 
 if __name__ == '__main__':

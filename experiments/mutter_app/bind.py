@@ -14,11 +14,12 @@ from .capture import business_digest
 from .controls import ORIGINAL_SHA256, require
 
 
-def read_witness(path, identity):
+def read_witness(path, identity, *, other_uploads=None):
     require(path.stat().st_size <= 16 << 20, 'source witness file too large')
     peers, roles, top, labels, commits = {}, [], {}, {}, set()
     shas, textures, uploads = {}, {}, {}
     cogl = set()
+    cursors = set()
     with path.open('rb') as f:
         for line in f:
             fields = line.decode('ascii').split()
@@ -33,6 +34,13 @@ def read_witness(path, identity):
                 c, t, label = fields
                 require((int(c), int(t)) not in labels, 'app ID changed')
                 labels[int(c), int(t)] = label
+            elif name == 'CURSOR':
+                cursors.add(tuple(map(int, fields)))
+            elif name == 'ORIGIN' and other_uploads is not None:
+                offset, origin, *desc = fields
+                require(origin == 'SHELL', 'unexpected unclassified client SHM in this single-app experiment')
+                require(int(offset) not in other_uploads, 'duplicate shell observation')
+                other_uploads[int(offset)] = list(map(int, desc))
             elif name == 'COMMIT':
                 commits.add(tuple(map(int, fields)))
             elif name == 'PEER':
@@ -70,6 +78,18 @@ def read_witness(path, identity):
         peer = peers.get(serial)
         require(peer is not None, 'wire contains unknown attach')
         if peer[-2] != surface or peer[0] != client:
+            if other_uploads is not None:
+                require(
+                    peer[:5] == expected[:5]
+                    and (client, peer[-2]) in cursors
+                    and (client, pid, peer[-2], serial) in commits
+                    and desc[3] <= 128
+                    and desc[4] <= 128
+                    and desc[5] <= 128 * 128 * 4
+                    and offset not in other_uploads,
+                    'unexpected secondary app surface',
+                )
+                other_uploads[offset] = desc
             continue
         require(
             peer[:-1] == expected
@@ -86,7 +106,8 @@ def read_witness(path, identity):
 
 def resolve(directory):
     capture = json.loads((directory / 'capture.json').read_text())
-    role, markers = read_witness(directory / 'owner.log', capture['identity'])
+    other_uploads = {}
+    role, markers = read_witness(directory / 'owner.log', capture['identity'], other_uploads=other_uploads)
     rows, states = [], capture['states']
     require(set(states) == {'before', 'after'}, 'signed-out capture requires two authenticated states')
     for label, state in states.items():
@@ -123,6 +144,10 @@ def resolve(directory):
                     payload
                 )
                 if offset not in markers:
+                    require(
+                        other_uploads.pop(offset, None) == [handle, x, y, w, h, size],
+                        'missing explicit source classification for other texture upload',
+                    )
                     if handle in live:
                         unknown.add((handle, live[handle][0]))
                     continue
@@ -173,7 +198,7 @@ def resolve(directory):
                     row['businessRgbSha256'] = business_digest(image)
                 rows.append(row)
     require(
-        not markers and len(keys) == 1 and keys.isdisjoint(unknown),
+        not markers and not other_uploads and len(keys) == 1 and keys.isdisjoint(unknown),
         'unmapped write or an unwitnessed transfer to this resource lifetime',
     )
     for name, state in states.items():
