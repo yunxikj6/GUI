@@ -29,6 +29,9 @@ MODULES = (
     'experiments/rasterize_application_frame.cjs',
     'experiments/mutter_app/controls.py',
 )
+# These dependencies occupy existing slots in the verified Windows base archive.
+# Copy their source revision together with their callers while preserving ZIP order.
+BASE_SOURCE_MODULES = {'thin_client/instabox_transport.py', 'thin_client/virgl_windows.py'}
 START = r"""@echo off
 setlocal
 if not defined PROCESSOR_ARCHITECTURE exit /b 2
@@ -63,6 +66,8 @@ def build(base, base_sha, node_zip, output):
     if output.resolve() == base.resolve():
         raise ValueError('the independent feature may not replace its input archive')
     with zipfile.ZipFile(base) as previous, zipfile.ZipFile(node_zip) as node:
+        if not BASE_SOURCE_MODULES.issubset(previous.namelist()):
+            raise ValueError('incomplete Windows desktop base archive')
         folder = 'node-v'+NODE_VERSION+'-win-x64/'
         binary = node.read(folder+'node.exe')
         if hashlib.sha256(binary).hexdigest() != NODE_EXE:
@@ -74,7 +79,8 @@ def build(base, base_sha, node_zip, output):
                     if (name.startswith('windows/runtime/') or name.startswith('thin_client/')
                             or name.startswith('cloud_render/') or name == 'instabox.py'):
                         if name not in MODULES:
-                            _entry(archive, name, previous.read(name))
+                            data = (ROOT/name).read_bytes() if name in BASE_SOURCE_MODULES else previous.read(name)
+                            _entry(archive, name, data)
                 for name in MODULES:
                     _entry(archive, name, (ROOT/name).read_bytes())
                 prefix = 'thin_client/vendor/node/windows-x64/'
