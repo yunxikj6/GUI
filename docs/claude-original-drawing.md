@@ -1,6 +1,6 @@
 # 在 Windows 重绘 Claude Desktop 的原版窗口
 
-此工具从 Linux 版 Claude Desktop 自带的开发者工具导入一帧已经提交的绘图，然后在 Windows 本地画出原版文字、路径、按钮和图层变换。当前验证范围是已退出账户时的离线提示窗口。它用于检查原版界面的绘制质量。持续导出后续帧、向 Claude 回传输入以及登录后的对话和 Artifacts 仍待验证。
+此工具从 Linux 版 Claude Desktop 自带的开发者工具导入已经提交的绘图，然后在 Windows 本地画出原版文字、路径、按钮和图层变换。当前验证范围是已退出账户时的离线提示窗口。它用于检查原版界面的绘制质量。一次保存可以包含多次真实操作的重绘。边录边显示、向 Claude 回传输入以及登录后的对话和 Artifacts 仍待验证。
 
 ## 在云端导出
 
@@ -45,3 +45,18 @@ node .\experiments\rasterize_application_frame.cjs .\thin_client\vendor .\claude
 | 原厂 Linux 客户区与独立采集的 Win32 窗口 | 950,551 / 960,000 | 0.196083 |
 
 Windows 验收环境在 Wine 中运行 Windows x64 Python、Node 24.22.3 和 Win32 窗口程序。CanvasKit 的 RGBA 输出 SHA-256 为 `f73fd41a51c4d773ce025b79db82d61e61b6f948ccb0024c310b891a71a0379c`。源客户区和接收窗口的截图仅供测试比较。查看器的输入只有 CLRP。
+
+
+## 从一次录制导出操作前后的画面
+
+在同一段 Performance 录制内操作原窗口，然后停止并保存一次。以下命令列出该录制中具有完整提交与呈现关系的原厂帧编号。每个编号对应一个原厂状态，具体编号随录制变化。
+
+```sh
+python -m cloud_render.claude_trace Trace.json.gz --list-activations
+python -m cloud_render.claude_trace Trace.json.gz before.clrp --activation 530
+python -m cloud_render.claude_trace Trace.json.gz after.clrp --activation 540
+```
+
+主线程的 `Commit.frameSeqId` 与 `PipelineReporter.frame_sequence` 对应。导入器在同一合成线程及同一局部异步轨道里匹配完成的 `Activation`，再用 `ActivateLayerTree.frameId` 核对活动树的 `source_frame_number`。每个改变的显示列表都必须来自该次提交内对应的 `UpdateLayer`。只有相邻的已确认状态、图层号、图源引用和尺寸完全相同时才可沿用上一状态的绘图。遇到缺失的激活或图层归属时，导入器清空连续状态。每次生成 CLRP 仍验证支持的矢量指令和资源。
+
+本次离线窗口录制有 14 次目标激活。其中 11 次保留了完整关联并可以分别导出。另 3 次缺少用于核对的合成轨道区间。两个独立的 Windows x64 客户区在编号 530 和 540 之间有 2,918 个像素改变，变化的包围框为 `[520,454]..[639,522]`。其中 2,805 个位于 Reload 按钮内，其余变化集中在重试指示器周围。两幅图共用一次原厂导出，分别由 Windows 本地执行原始文字、路径和矩阵指令。这项复验只涉及无账号窗口的一段已结束录制。

@@ -21,7 +21,7 @@ _DOCUMENT = 'file:///usr/lib/claude-desktop/resources/app.asar/.vite/renderer/ma
 # Skia v110 SkPictureFlat.h: only these fixed-size vector commands are admitted.
 # Includes clips, paths, glyph runs and 2D matrices. A bitmap never qualifies.
 _VECTOR_SIZES = {3: 28, 4: 60, 12: 24, 14: 12, 21: 24, 22: 56, 28: 4,
-                 30: 4, 32: 12, 35: 12, 45: 20, 68: 68}
+                 30: 4, 32: 12, 35: 12, 45: 20, 52: 8, 68: 68}
 _CONCAT44 = 68
 _MAX_EVENTS = 250_000
 _MAX_PICTURES = 512
@@ -90,9 +90,11 @@ def _vector_picture(snapshot):
         word = commands.u32()
         opcode, size = word >> 24, word & 0xffffff
         _require(_VECTOR_SIZES.get(opcode) == size, '此图层使用了尚不支持的绘图指令。')
-        depth += (opcode == _Draw.SAVE) - (opcode == _Draw.RESTORE)
+        payload = commands.take(size - 4)
+        if opcode == _Draw.SAVE_LAYER:
+            _require(payload == bytes(4), '此独立图层使用了额外的合成效果。')
+        depth += (opcode in (_Draw.SAVE, _Draw.SAVE_LAYER)) - (opcode == _Draw.RESTORE)
         _require(0 <= depth <= 64, '图层绘制状态堆栈无效。')
-        commands.take(size - 4)
     _require(depth == 0, '图层绘制状态未闭合。')
     reader.expect(b'tcaf')
     _require(reader.u32() == 4 and reader.u32() == 0, '图层含有尚不支持的画笔类型。')
@@ -215,12 +217,19 @@ def _draw_layer(recording, layer, snapshot):
     recording.op(_Draw.RESTORE)
 
 
-def import_scene(events):
+def import_scene(events, *, activation=None):
     _require(isinstance(events, list) and 0 < len(events) <= _MAX_EVENTS,
              '性能记录为空或事件数量过多。')
     try:
         owned, tree_id = _main_tree(events)
-        tree, layers, pictures = _checkpoint(owned, tree_id)
+        if activation is None:
+            tree, layers, pictures = _checkpoint(owned, tree_id)
+        else:
+            from .claude_activation import activations
+            _require(type(activation) is int and activation >= 0, '原厂活动帧编号无效。')
+            scene = next((scene for seq, scene in activations(owned, tree_id) if seq == activation), None)
+            _require(scene is not None, '该状态缺少原窗口完整提交与呈现的关联记录。')
+            tree, layers, pictures = scene
         viewport = tree['device_viewport_size']
         width, height = viewport['width'], viewport['height']
         _require(all(type(n) is int and 1 <= n <= MAX_VIEWPORT for n in (width, height)),
@@ -236,9 +245,7 @@ def import_scene(events):
         raise ClaudeTraceError('文件缺少完整、受支持的原版绘图记录。') from exc
 
 
-def convert(source, output):
-    if source.resolve() == output.resolve() or (output.exists() and source.samefile(output)):
-        raise ClaudeTraceError('请为 CLRP 文件指定独立的输出路径。')
+def _read_events(source):
     _require(source.stat().st_size <= MAX_TRACE_BYTES, '性能记录超过大小上限。')
     with source.open('rb') as f:
         compressed = f.read(2) == b'\x1f\x8b'
@@ -251,7 +258,15 @@ def convert(source, output):
     _require(len(data) <= MAX_TRACE_BYTES, '解压后的性能记录超过大小上限。')
     parsed = json.loads(data)
     _require(isinstance(parsed, dict), '需要开发者工具的 Performance JSON 导出。')
-    result = encode_message(import_scene(parsed.get('traceEvents')))
+    events = parsed.get('traceEvents')
+    _require(isinstance(events, list) and 0 < len(events) <= _MAX_EVENTS, '事件数量无效。')
+    return events
+
+
+def convert(source, output, *, activation=None):
+    if source.resolve() == output.resolve() or (output.exists() and source.samefile(output)):
+        raise ClaudeTraceError('请为 CLRP 文件指定独立的输出路径。')
+    result = encode_message(import_scene(_read_events(source), activation=activation))
     tmp = None
     try:
         with tempfile.NamedTemporaryFile(dir=output.parent, delete=False) as f:
@@ -266,11 +281,26 @@ def convert(source, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
-    parser.add_argument('output', type=Path)
+    parser.add_argument('output', nargs='?', type=Path)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--activation', type=int, help='native compositor source frame number')
+    group.add_argument('--list-activations', action='store_true',
+                       help='list explicitly associated native frame IDs in this export')
     args = parser.parse_args()
     try:
-        convert(args.trace, args.output)
-    except (OSError, EOFError, ValueError, RecursionError, zlib.error) as exc:
+        if args.list_activations:
+            if args.output is not None:
+                parser.error('--list-activations takes no output file')
+            from .claude_activation import activations
+            owned, tree_id = _main_tree(_read_events(args.trace))
+            for sequence, _ in activations(owned, tree_id):
+                print(sequence)
+        else:
+            if args.output is None:
+                parser.error('an output CLRP path is required')
+            convert(args.trace, args.output, activation=args.activation)
+    except (OSError, EOFError, ValueError, TypeError, KeyError, IndexError, AttributeError, CaptureError,
+            RecursionError, zlib.error) as exc:
         parser.exit(1, f'导入失败。{exc}\n')
 
 
