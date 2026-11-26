@@ -548,9 +548,9 @@
   },
   "cloudSourcePackage": {
     "download": "../../releases/ubuntu-source/cloud-workspace-server.zip",
-    "sourceCommit": "70766250b77141730844cf3733820616c33691f7",
-    "bytes": 163716,
-    "sha256": "26871981545143a34b3aa7cccdf0941d94cae2df18289be874b2b97e61c60966",
-    "filesMatchingReviewedGitBlobs": 51
+    "sourceCommit": "88650aebd9e091ae3acd94dd31747f83a968ce5e",
+    "bytes": 168965,
+    "sha256": "59bb2989d69d72e14cd9a0b98ee29c01fa37669004e224c19d36bfca46f57671",
+    "filesMatchingReviewedGitBlobs": 52
   }
 }

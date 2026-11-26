@@ -1,0 +1,67 @@
+{
+  "clientZipSha256": "ceec7cf2251129e8060157b31c1326d8a8cdf9a3eabb9b8ffcf7f57baf96f6f1",
+  "cloudSourceRevision": "a56ce35a84b7741bfaa3b60ae8bd8b167c8b4c62",
+  "paidCloudProvider": "InstaBox",
+  "host": "Windows x64 CPython under Wine 10, genuine Win32 HWND",
+  "cloud": "Debian 13 with isolated Ubuntu 24.04 and official ChatGPT package SHA verified against signed vendor index",
+  "originalElfSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "entry": "cmd.exe /d /c Start.cmd (without arguments), original TLS verification",
+  "localSize": [
+    1280,
+    900
+  ],
+  "sourcePort": 17326,
+  "pointerSourceSequences": [
+    2,
+    4,
+    6
+  ],
+  "stagesSecondsFromStart": {
+    "desktop": 30.87,
+    "welcome": 49.2,
+    "method": 59.81,
+    "blank-form": 70.21
+  },
+  "field": {
+    "visible": true,
+    "verifiedBy": "local OS GetDC/GetDIBits and OCR",
+    "ocr": "orbit|",
+    "input": "orbit",
+    "sourceSequences": [
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "focusEpoch": 1,
+    "submitted": false
+  },
+  "snapshotPngSha256": {
+    "desktop": "29d026e4ddee78d43df080f986f2f255d432d3de207b67b99e0f6492ce8c21df",
+    "welcome": "f5638c895dc1d2b49494364ba68ddf4fdd4433d0254dbcea1e31e35bc52cc522",
+    "method": "57f49b71a77e4176efc9d5175acdcc8194b98f51ca36e0875f6809c883daadd1",
+    "blank-form": "93068fc1168ea7b2e4b8240b9b99b958c70900366ace4e1cc9b78da696baf90d",
+    "verified-visible-edit": "15a988361dad263b933754c85f9ddf1b8991f138bab669dca19bb53b9f327ca8",
+    "hover-4": "d0614d7b421adc138aee1fe0deaae14340c6a8a28514403e1cedb9c46b93650b"
+  },
+  "cancel": {
+    "passed": false,
+    "attempts": 2,
+    "lastSourceSequence": 12,
+    "buttonAreaDifferenceDuringFirstUnacknowledgedClick": 0.0,
+    "reason": "source did not acknowledge an unambiguous click on Cancel"
+  },
+  "service": {
+    "entry": "python3 -m experiments.original_desktop_source --port 17326 --lifetime 600",
+    "release": "a56ce35a84b7741bfaa3b60ae8bd8b167c8b4c62",
+    "accountLogin": false,
+    "testingStartedReady": true,
+    "startupSeconds": 1.203,
+    "exit": 1,
+    "originalServiceCleanedItsOwnWorkspace": true,
+    "sourceAndRendererPrivate": true,
+    "seconds": 155.9
+  },
+  "upstreamInformation": "All business UI and controls were rendered by original cloud application; no login, credentials, or user data used."
+}
