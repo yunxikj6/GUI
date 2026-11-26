@@ -77,12 +77,14 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         self.sources = []
         self.artwork = []
         self.application_artwork = []
+        self.picture_deltas = []
         self.retired = asyncio.Event()
 
         @asynccontextmanager
-        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
+        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
             self.artwork.append(wallpaper)
             self.application_artwork.append(app_wallpaper)
+            self.picture_deltas.append(picture_delta)
             source = Source(size)
             if search_input:
                 source.events.feed_data(b'{"event":"focus","revision":1,"active":true}\n')
@@ -211,6 +213,29 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(self.retired.wait(),3)
                 self.assertEqual(self.application_artwork[-1],expected)
                 self.assertFalse(self.artwork[-1])
+
+    async def test_picture_delta_requires_both_peers_independently_of_wallpaper(self):
+        def local_file(owner, index):
+            return (Path('/tmp') / ('clrp-' + owner.session) / f'msg-{index}.bin').open('rb')
+
+        def run(private, requested, expected):
+            options = dict(picture_delta=requested, app_wallpaper=True)
+            with patch.object(InstaBoxControl, '_open_file', local_file):
+                peer = (transport.connect(LocalProvider(), self.port, self.token, **options) if private
+                        else transport.connect_forwarded(self.port, self.token, **options))
+                with peer:
+                    self.assertEqual(read_exact(peer, len(Source.content)), Source.content)
+                    self.assertEqual((peer.has_picture_delta(), peer.has_application_wallpaper()), expected)
+
+        delta, art = wire.APP_PICTURE_DELTA, wire.APP_WALLPAPER
+        for private in (True, False):
+            for features, requested in ((art, True), (delta, False), (delta, True), (delta | art, True)):
+                expected = (requested and bool(features & delta), bool(features & art))
+                self.service.features = features
+                self.retired.clear()
+                await asyncio.wait_for(asyncio.to_thread(run, private, requested, expected), 15)
+                await asyncio.wait_for(self.retired.wait(), 3)
+                self.assertEqual((self.picture_deltas[-1], self.application_artwork[-1]), expected)
 
     async def test_old_service_uses_original_800_stream_when_client_has_new_artwork(self):
         logins = []

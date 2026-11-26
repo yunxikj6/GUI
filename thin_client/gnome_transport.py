@@ -21,7 +21,7 @@ DOWNSTREAM = {wire.BLOCK, wire.ACK, wire.READY, wire.END, wire.UNAVAILABLE, wire
 
 
 class _Provider(InstaBoxControl):
-    def __init__(self, box, port, pairing, size, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
+    def __init__(self, box, port, pairing, size, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
         super().__init__(box)
         self.cursor = 0
         self.pending = deque()
@@ -32,11 +32,14 @@ class _Provider(InstaBoxControl):
                 dimensions['selectAll'] = True
                 if focus_delete:
                     dimensions['focusDelete'] = True
+            if picture_delta:
+                dimensions['pictureDelta'] = True
             if app_wallpaper:
                 dimensions['appWallpaper'] = True
             if wallpaper:
                 dimensions['wallpaper'] = True
             started = self._call('start', port=port, pair=pairing, protocol='gnome', **dimensions)
+            self.picture_delta = picture_delta and started.get('pictureDelta') is True
             self.app_wallpaper = app_wallpaper and started.get('appWallpaper') is True
             self.search_input = started.get('searchInput') is True and search_input
             self.can_select_all = self.search_input and started.get('selectAll') is True
@@ -111,9 +114,11 @@ class _Provider(InstaBoxControl):
 
 
 class _Forward:
-    def __init__(self, port, pairing, size, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
+    def __init__(self, port, pairing, size, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
         flags = 0
         requested = (wire.WALLPAPER if wallpaper else 0) | ((wire.SEARCH_INPUT | wire.SELECT_ALL) if search_input else 0)
+        if picture_delta:
+            requested |= wire.APP_PICTURE_DELTA
         if app_wallpaper:
             requested |= wire.APP_WALLPAPER
         if focus_delete and search_input:
@@ -128,6 +133,7 @@ class _Forward:
                         flags = offered & requested
         if not flags & wire.SEARCH_INPUT:
             flags &= ~(wire.SELECT_ALL | wire.FOCUS_DELETE)
+        self.picture_delta = bool(flags & wire.APP_PICTURE_DELTA)
         self.app_wallpaper = bool(flags & wire.APP_WALLPAPER)
         self.search_input = bool(flags & wire.SEARCH_INPUT)
         self.can_select_all = bool(flags & wire.SELECT_ALL)
@@ -330,6 +336,9 @@ class DesktopStream:
             return False
         return self._input(encode_select_all(revision & 0xffffffff))
 
+    def has_picture_delta(self):
+        return bool(getattr(self.peer, 'picture_delta', False))
+
     def has_application_wallpaper(self):
         return bool(getattr(self.peer, 'app_wallpaper', False))
 
@@ -392,11 +401,11 @@ def _credentials(port, pairing):
         raise ValueError('云桌面端口或配对码无效。')
 
 
-def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
+def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
     _credentials(port, pairing)
-    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper, search_input or focus_delete, focus_delete, app_wallpaper), size=size)
+    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper, search_input or focus_delete, focus_delete, app_wallpaper, picture_delta), size=size)
 
 
-def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
+def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
     _credentials(port, pairing)
-    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper, search_input or focus_delete, focus_delete, app_wallpaper), size=size)
+    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper, search_input or focus_delete, focus_delete, app_wallpaper, picture_delta), size=size)

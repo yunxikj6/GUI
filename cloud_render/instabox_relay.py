@@ -91,7 +91,7 @@ def check_request(req):
     extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'},
               'input': {'id', 'data'}, 'close': set()}
     extras['desktop'] = {'id', 'data'}
-    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper', 'appWallpaper', 'searchInput', 'selectAll', 'focusDelete'}, 'poll': {'reset', 'batch'}}
+    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper', 'appWallpaper', 'pictureDelta', 'searchInput', 'selectAll', 'focusDelete'}, 'poll': {'reset', 'batch'}}
     require(op in extras and set(req) - optional.get(op, set()) == {'op', 'session'} | extras[op],
             'invalid-request')
     require(isinstance(req['session'], str) and re.fullmatch('[0-9a-f]{32}', req['session']), 'invalid-session')
@@ -102,7 +102,7 @@ def check_request(req):
                 require(req[field] is True and req.get('searchInput') is True, 'invalid-capabilities')
         if 'searchInput' in req:
             require(req.get('protocol') == 'gnome' and req['searchInput'] is True, 'invalid-capabilities')
-        for field in ('wallpaper', 'appWallpaper'):
+        for field in ('wallpaper', 'appWallpaper', 'pictureDelta'):
             if field in req:
                 require(req.get('protocol') == 'gnome' and req[field] is True, 'invalid-capabilities')
         if 'width' in req or 'height' in req:
@@ -214,6 +214,8 @@ class Relay:
     async def receive(self):
         try:
             requested = int(self.start.get('wallpaper') is True) | (2 if self.start.get('searchInput') is True else 0)
+            if self.start.get('pictureDelta'):
+                requested |= 32
             if self.start.get('appWallpaper'):
                 requested |= 16
             if self.start.get('selectAll'):
@@ -434,6 +436,7 @@ class Relay:
                         desktop_size(req) == desktop_size(self.start) and
                         req.get('wallpaper') == self.start.get('wallpaper') and
                         req.get('appWallpaper') == self.start.get('appWallpaper') and
+                        req.get('pictureDelta') == self.start.get('pictureDelta') and
                         req.get('searchInput') == self.start.get('searchInput') and
                         req.get('selectAll') == self.start.get('selectAll') and
                         req.get('focusDelete') == self.start.get('focusDelete'), 'session-conflict')
@@ -447,6 +450,8 @@ class Relay:
                         result['selectAll'] = True
                     if self.features & 8:
                         result['focusDelete'] = True
+                    if self.features & 32:
+                        result['pictureDelta'] = True
                     if self.features & 16:
                         result['appWallpaper'] = True
             elif op == 'poll':

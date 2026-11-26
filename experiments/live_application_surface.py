@@ -9,14 +9,15 @@ from dataclasses import dataclass
 import hashlib
 import struct
 
-from cloud_render import gnome_commands as mesa, gnome_wallpaper as artwork
+from cloud_render import frame_delta, gnome_commands as mesa, gnome_wallpaper as artwork
 from cloud_render.wire import MAX_PAYLOAD
 from experiments.application_surface import ApplicationSurfaces, Binding, Commit, SurfaceError
 
 # Extension records use byte lengths. Ordinary packets retain Mesa vtest framing.
-BIND, HOLD, DRAW, REUSE = range(0x534B5201, 0x534B5205)
+BIND, HOLD, DRAW, REUSE, DRAW_DELTA = range(0x534B5201, 0x534B5206)
 _IDENTITY = struct.Struct('<Q32s32sI32sIII')
 _POINT = struct.Struct('<QQ')
+DRAW_PREFIX_BYTES = _POINT.size + mesa._TRANSFER.size + 32
 _MAX_ASSET = MAX_PAYLOAD + 12
 _MAX_HANDLES = 4096
 
@@ -88,7 +89,7 @@ class LiveSurfaceStream:
     checks each source-attested process/surface lifetime against the application
     this session requested. The adapter accepts no network URLs, paths or commands.
     """
-    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None):
+    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None, picture_delta=False):
         self.source = source
         self.session = session
         self.authorize = authorize
@@ -99,6 +100,7 @@ class LiveSurfaceStream:
         self.last_serial = 0
         self.serial_digest = self.cached_digest = self.cached_pixels = None
         self._buffer = memoryview(b'')
+        self.picture_delta = picture_delta
         self.wallpaper = wallpaper
         self.artwork_references = 0
         self._resource_tail = None
@@ -142,7 +144,8 @@ class LiveSurfaceStream:
     def _replacement(self, length, op):
         fixed = _POINT.size + mesa._TRANSFER.size
         if ((op == HOLD and length != fixed) or (op == REUSE and length != fixed + 32)
-                or (op == DRAW and not fixed + 32 < length <= fixed + 32 + _MAX_ASSET)):
+                or (op == DRAW_DELTA and not self.picture_delta)
+                or (op in (DRAW, DRAW_DELTA) and not DRAW_PREFIX_BYTES < length <= DRAW_PREFIX_BYTES + _MAX_ASSET)):
             raise SurfaceError('invalid drawing record length')
         offset, serial = _POINT.unpack(_exact(self.source, _POINT.size))
         desc = mesa._TRANSFER.unpack(_exact(self.source, mesa._TRANSFER.size))
@@ -167,8 +170,13 @@ class LiveSurfaceStream:
         digest = _exact(self.source, 32)
         if self.serial_digest is not None and self.serial_digest != digest:
             raise SurfaceError('conflicting drawing for one application commit')
-        if op == DRAW:
-            picture = _exact(self.source, length - fixed - 32)
+        if op in (DRAW, DRAW_DELTA):
+            picture = _exact(self.source, length - DRAW_PREFIX_BYTES)
+            if op == DRAW_DELTA:
+                try:
+                    picture = frame_delta.decode_frame(picture, self.picture or b'')
+                except frame_delta.DeltaError as exc:
+                    raise SurfaceError('invalid original drawing delta') from exc
             if hashlib.sha256(picture).digest() != digest:
                 raise SurfaceError('original drawing digest mismatch')
             self.picture, self.digest = picture, digest
@@ -219,7 +227,7 @@ class LiveSurfaceStream:
         if op == BIND:
             self._register(length)
             return b''
-        if op in (HOLD, DRAW, REUSE):
+        if op in (HOLD, DRAW, DRAW_DELTA, REUSE):
             return self._replacement(length, op)
         if op == artwork.REFERENCE:
             return self._artwork_upload(length)

@@ -14,6 +14,8 @@ FEATURE_MAGIC = b'GCFG'
 WALLPAPER = 1
 # This bit applies inside a witnessed application stream, including its logical PUT offsets.
 APP_WALLPAPER = 16
+# An independently negotiated delta uses only the previous witnessed application picture.
+APP_PICTURE_DELTA = 32
 SEARCH_INPUT = 2
 SELECT_ALL = 4
 FOCUS_DELETE = 8

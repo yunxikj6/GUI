@@ -3,17 +3,19 @@ import argparse
 import asyncio
 from contextlib import asynccontextmanager
 import errno
+import hashlib
 import json
 import os
 from pathlib import Path
 import stat
+import zlib
 
-from cloud_render import gnome_commands as mesa, gnome_wallpaper as artwork
+from cloud_render import frame_delta, gnome_commands as mesa, gnome_wallpaper as artwork
 from cloud_render.gnome_input import decode_input
-from cloud_render.gnome_wire import FOCUS_STATE, SEARCH_INPUT, SELECT_ALL, FOCUS_DELETE, APP_WALLPAPER
+from cloud_render.gnome_wire import FOCUS_STATE, SEARCH_INPUT, SELECT_ALL, FOCUS_DELETE, APP_WALLPAPER, APP_PICTURE_DELTA
 from cloud_render.gnome_relay import DesktopService, TOKEN
 from experiments.application_surface import SurfaceError
-from experiments.live_application_surface import BIND, DRAW, HOLD, REUSE, binding_record
+from experiments.live_application_surface import BIND, DRAW, DRAW_DELTA, DRAW_PREFIX_BYTES, HOLD, REUSE, binding_record
 from experiments.original_desktop_protocol import SIZE, approved_binding, source_hello
 
 
@@ -55,13 +57,39 @@ def supported_editor_features(channel):
     return definition['flags']
 
 
+def _compact_drawing(body, previous):
+    picture = memoryview(body)[DRAW_PREFIX_BYTES:]
+    digest = body[DRAW_PREFIX_BYTES-32:DRAW_PREFIX_BYTES]
+    if not 0 < len(picture) <= frame_delta.MAX_FRAME or hashlib.sha256(picture).digest() != digest:
+        raise SurfaceError('original drawing digest or size mismatch')
+    patch = frame_delta.encode_frame(picture, previous)
+    if patch is not picture:
+        # Keep the original if its ordinary GVGL deflate is about as small.
+        # A clear savings lets us stop the comparison before the rest is deflated.
+        cutoff = len(patch) + 256 + len(patch) // 100
+        compressor = zlib.compressobj(3)
+        produced = 0
+        for pos in range(0, len(picture), 65536):
+            produced += len(compressor.compress(picture[pos:pos+65536]))
+            if produced > cutoff:
+                break
+        else:
+            produced += len(compressor.flush())
+        if produced > cutoff:
+            header = mesa._HEADER.pack(DRAW_PREFIX_BYTES + len(patch), DRAW_DELTA)
+            return header + body[:DRAW_PREFIX_BYTES] + patch, picture
+    return mesa._HEADER.pack(len(body), DRAW) + body, picture
+
+
 class _Graphics:
     """Forward only whole, session-bound records from the source's private FIFO."""
-    def __init__(self, channel, reader, config, eof, *, app_wallpaper=False):
+    def __init__(self, channel, reader, config, eof, *, app_wallpaper=False, picture_delta=False):
         self.channel, self.reader, self.eof = channel, reader, eof
         self.buffer = memoryview(source_hello(config))
         self.task = None
         self.app_wallpaper = app_wallpaper
+        self.picture_delta = picture_delta
+        self.previous_picture = b''
         self.bound_handle = None
         self.artwork_references = 0
 
@@ -82,6 +110,7 @@ class _Graphics:
             independent = approved_binding(_metadata(self.channel/'binding.json'))
             if binding_record(offset, independent) != header + body:
                 raise SurfaceError('graphics binding and independent Wayland witness disagree')
+            self.previous_picture = b''
             self.bound_handle = independent.handle
             return header + body
         if op in (DRAW, HOLD, REUSE):
@@ -113,7 +142,14 @@ class _Graphics:
         else:
             raise SurfaceError('unsupported application-aware GNOME command')
         body = await self.reader.readexactly(size)
+        if op == DRAW and self.picture_delta:
+            handle_at = DRAW_PREFIX_BYTES - 32 - mesa._TRANSFER.size
+            if len(body) <= DRAW_PREFIX_BYTES or mesa._WORD.unpack_from(body, handle_at)[0] != self.bound_handle:
+                raise SurfaceError('original drawing outside an active application binding')
+            packet, self.previous_picture = await asyncio.to_thread(_compact_drawing, body, self.previous_picture)
+            return packet
         if op == mesa.UNREF and mesa._WORD.unpack(body)[0] == self.bound_handle:
+            self.previous_picture = b''
             self.bound_handle = None
         return header + body
 
@@ -242,7 +278,7 @@ class _Peer:
 
 
 @asynccontextmanager
-async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False):
+async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
     if size != SIZE or wallpaper or (focus_delete and not search_input):
         raise SurfaceError('unsupported application desktop configuration')
     _private(channel, stat.S_ISDIR)
@@ -263,7 +299,7 @@ async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input
         def eof():
             finished.set()
             events.feed_eof()
-        graphics = _Graphics(channel, reader, config, eof, app_wallpaper=app_wallpaper)
+        graphics = _Graphics(channel, reader, config, eof, app_wallpaper=app_wallpaper, picture_delta=picture_delta)
         pointer = _Pointer(channel, events, editing=search_input, focus_delete=focus_delete)
         opening = asyncio.create_task(pointer.open())
         def opened(task):
@@ -306,7 +342,7 @@ async def serve(channel, port, token):
             if asyncio.get_running_loop().time() >= deadline:
                 raise SurfaceError('application source did not initialize')
             await asyncio.sleep(.05)
-        return supported_editor_features(channel) | APP_WALLPAPER
+        return supported_editor_features(channel) | APP_WALLPAPER | APP_PICTURE_DELTA
 
     service = DesktopService(token, source, features=capabilities)
     closing = False

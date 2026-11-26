@@ -85,6 +85,9 @@ class _PointerDesktop:
     def move(self, x, y):
         self.transport.move(x, y)
 
+    def has_picture_delta(self):
+        return getattr(self.transport, 'has_picture_delta', lambda: False)()
+
     def has_application_wallpaper(self):
         return self.transport.has_application_wallpaper()
 
@@ -136,6 +139,7 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
     state = _WindowInput()
     cache = None
     session_wallpaper = None
+    picture_delta = False
 
     def native_window(title, width, height, submit):
         return open_window(title, width, height, state.events(submit))
@@ -149,7 +153,7 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
 
         with OriginalPicturePainter(node=node) as painter:
             source = LiveSurfaceStream(connection, session=nonce, authorize=authorized, rasterize=painter,
-                                       wallpaper=session_wallpaper)
+                                       wallpaper=session_wallpaper, picture_delta=picture_delta)
             if live:
                 state.reader = source
 
@@ -168,7 +172,8 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
                         state.reader = None
 
     def render(connection, present):
-        nonlocal cache, session_wallpaper
+        nonlocal cache, session_wallpaper, picture_delta
+        picture_delta = connection.has_picture_delta()
         if artwork is not None and connection.has_application_wallpaper():
             session_wallpaper = artwork
         # Cache the source records, before the local engine expands SkPictures into textures.
@@ -219,11 +224,11 @@ def main(argv=None):
             box = InstaBox(key, args.machine)
             box.ensure_running()
             return connect(box,args.port,token, size=SIZE, search_input=True, focus_delete=True,
-                           app_wallpaper=artwork is not None)
+                           app_wallpaper=artwork is not None, picture_delta=True)
     else:
         def start():
             return connect_forwarded(args.port,token, size=SIZE, search_input=True, focus_delete=True,
-                           app_wallpaper=artwork is not None)
+                           app_wallpaper=artwork is not None, picture_delta=True)
 
     bundled = Path(__file__).resolve().parents[1]/'thin_client/vendor/node/windows-x64/node.exe'
     node = args.node or (bundled if bundled.is_file() else 'node')
