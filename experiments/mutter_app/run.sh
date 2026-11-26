@@ -165,8 +165,13 @@ if [[ $CW_LIVE = interactive ]]; then
     # Pipe EOF represents the user's window closing.
     "$CW_PYTHON" -m experiments.mutter_app.live input /run/cw-work/pair --source "$out" --interactive 2>"$out/pointer.log" &
     pointer=$!
-    wait -n "$pointer" "$transport" "$relay" "$shell"
-    [[ -e "$out/controller-closed" ]] || { echo 'The desktop transport or source closed.' >&2; exit 1; }
+    wait -n "$pointer" "$transport" "$relay" "$shell" || true
+    wait_for 2 test -e "$out/controller-closed" || { echo 'The desktop transport or source closed.' >&2; exit 1; }
+    if [[ -n ${CW_APP_PROFILE:-} && -f "$out/broker-started" ]]; then
+        # Closing the compositor first can interrupt Chromium's per-profile
+        # writes even after the controller has disconnected.
+        wait_for 25 test -e "$out/app-profile-closed"
+    fi
     pointer=
 else
     "$CW_PYTHON" -m experiments.mutter_app.capture --drive "$out" >"$out/input.log" 2>&1 &

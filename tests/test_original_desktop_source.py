@@ -38,6 +38,13 @@ exec 4>"$2/graphics.fifo"
 exec 5<"$2/input.fifo"
 cat <&5 >/dev/null
 touch "$3/controller-closed"
+if test -e "$base/simulate-app"; then
+    touch "$3/broker-started"
+    if test -e "$base/flush-app"; then
+        sleep 3.25
+        touch "$3/app-profile-closed"
+    fi
+fi
 """
 
 
@@ -159,6 +166,29 @@ class OriginalDesktopSourceTests(unittest.TestCase):
         self.assertTrue((profile / 'unrelated').is_file())
         with _own_profile(moved, marker_name=DESKTOP_PROFILE_MARKER) as fd:
             self.assertEqual(os.fstat(fd).st_ino, inode.st_ino)
+
+    def test_disconnect_waits_for_persistent_vendor_close_and_reports_missing_flush(self):
+        profile = self.repo / 'data'
+        (self.app / 'simulate-app').touch()
+        for accepted in (False, True):
+            with self.subTest(accepted=accepted):
+                if accepted:
+                    (self.app / 'flush-app').touch()
+                proc = self.start('--port', '0', '--profile', str(profile))
+                port = self.port(proc)
+                with socket.create_connection(('127.0.0.1', port), timeout=5) as pair:
+                    pair.sendall(wire.AUTH_SIZE + self.token.encode() + b'\n' + wire.SESSION.pack(1280, 900, 0))
+                    incoming = pair.makefile('rb')
+                    self.addCleanup(incoming.close)
+                    kind, payload = wire.read(incoming, (wire.READY,))
+                    self.assertEqual(wire.DIMENSIONS.unpack(payload), (1280, 900))
+                    incoming.close()
+                _, stderr = proc.communicate(timeout=14)
+                self.assertEqual(proc.returncode, 0 if accepted else 1, stderr)
+                if not accepted:
+                    self.assertIn('未确认配置保存', stderr.decode())
+                self.verify_cleanup()
+                (self.app / 'pid').unlink()
 
     @unittest.skipUnless(shutil.which('bwrap'), 'bubblewrap directory-fd mounts')
     def test_mount_uses_the_validated_inode_when_the_path_is_replaced(self):

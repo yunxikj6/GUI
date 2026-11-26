@@ -58,9 +58,13 @@ async def _session(workspace, port, token, profile_fd=None):
             # Closing a paired connection also closes both private FIFOs. Allow
             # the original source to acknowledge that EOF and release its session.
             try:
-                await asyncio.wait_for(asyncio.shield(exited), 3)
+                await asyncio.wait_for(asyncio.shield(exited), 30 if profile_fd is not None else 3)
             except asyncio.TimeoutError:
+                if profile_fd is not None:
+                    raise RuntimeError("云端原厂应用未能及时完成配置保存和退出。") from None
                 return 0
+        if profile_fd is not None and (source / "broker-started").is_file() and not (source / "app-profile-closed").is_file():
+            raise RuntimeError("云端原厂应用未确认配置保存和退出。")
         if proc.returncode or not (source / "controller-closed").is_file():
             raise RuntimeError("原厂桌面源意外退出，请检查云机的 Ubuntu、ChatGPT、GNOME 及运行依赖。")
         return 0

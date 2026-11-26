@@ -367,6 +367,9 @@ def main():
         drive(args.output)
     else:
         asyncio.run(collect(args.output, live=args.live, interactive=args.interactive, pair=args.pair))
+        if args.interactive and os.environ.get('CW_APP_PROFILE'):
+            # collect() has left the vendor's persistent browser context.
+            (args.output / 'app-profile-closed').touch()
 
 
 if __name__ == '__main__':

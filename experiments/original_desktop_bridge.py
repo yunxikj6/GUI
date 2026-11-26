@@ -315,9 +315,10 @@ async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input
             tasks = [task for task in (opening, focus, graphics.task) if task]
             for task in tasks:
                 task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # Deliver input EOF even if service shutdown cancels this task.
             pointer.close()
             transport.close()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def serve(channel, port, token):
@@ -330,11 +331,14 @@ async def serve(channel, port, token):
         nonlocal claimed
         if claimed:
             raise SurfaceError('the private application session has ended')
-        async with interactive_fifos(channel, **options) as endpoint:
-            claimed = True
-            try:
+        try:
+            async with interactive_fifos(channel, **options) as endpoint:
+                claimed = True
                 yield endpoint
-            finally:
+        finally:
+            if claimed:
+                # The serving task may now cancel authenticated sockets. Release
+                # the source FIFOs before allowing it to initiate that shutdown.
                 finished.set()
     async def capabilities():
         deadline = asyncio.get_running_loop().time() + 45

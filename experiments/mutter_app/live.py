@@ -76,6 +76,23 @@ class LiveInput:
         del self.pending[:size]
         return out
 
+    def drain_disconnected(self, timeout):
+        # The original compositor still uses its GPU until the session owner
+        # stops it. Keep its upstream reader alive after the viewer has left.
+        self.pending.clear()
+        deadline = time.monotonic() + timeout
+        while not self.finished:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError('original compositor did not stop after disconnect')
+            try:
+                block = self.blocks.get(timeout=remaining)
+            except queue.Empty:
+                raise RuntimeError('original compositor did not stop after disconnect') from None
+            if isinstance(block, Exception):
+                raise block
+            self.finished = block is None
+
 
 class Journal:
     """Match explicit socket-offset classifications and completed Mutter SHM/GL scopes."""
@@ -373,6 +390,7 @@ def stream(out, channel, *, interactive=False):
         if not interactive:
             raise
         wait_for((out / 'controller-closed').is_file, 'graphics connection lost while input was open', 2)
+        reader.drain_disconnected(30)
         result = {'controllerClosed': True, 'lastRevision': inspector.revision}
     publish(out / 'live-source.json', dict(result, classification=inspector.counts))
 
