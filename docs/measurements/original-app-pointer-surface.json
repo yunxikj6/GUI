@@ -104,6 +104,28 @@
       "pictures": [
         "5a7e0ff17c1e5dc1cea144bf625454726312ec49c3edc2a7329b5717f8c1b81d",
         "f761a9efb48ac57e403e4fa57d2a90497c5b81791eaa8681e8eee2731b35be23"
+      ],
+      "recordedLayerCheck": [
+        {
+          "wireSha256": "5a7e0ff17c1e5dc1cea144bf625454726312ec49c3edc2a7329b5717f8c1b81d",
+          "frameSequence": 10,
+          "pictureLayerSha256": [
+            "6fe5a30e2b5f21978273025c9699633181ce0dbd808a28e368248013dd999512",
+            "093be95b3e6a1641d2531edfcc200f1668d5b63a8159b360bea1043bbad25e96",
+            "b41a1710394ee45dfd3fb353a9edf452af4b888385a301120a3b051370ca2f4d",
+            "0e3423ff6bdc1942e5f9e5d28170a00ef299ec4e885ccbbec975c02eb64adca4"
+          ]
+        },
+        {
+          "wireSha256": "f761a9efb48ac57e403e4fa57d2a90497c5b81791eaa8681e8eee2731b35be23",
+          "frameSequence": 11,
+          "pictureLayerSha256": [
+            "e04252c22f5d3710ce37b5873d618dca49a24ca2df1d9ae14a6ec21f838751e1",
+            "093be95b3e6a1641d2531edfcc200f1668d5b63a8159b360bea1043bbad25e96",
+            "b41a1710394ee45dfd3fb353a9edf452af4b888385a301120a3b051370ca2f4d",
+            "0e3423ff6bdc1942e5f9e5d28170a00ef299ec4e885ccbbec975c02eb64adca4"
+          ]
+        }
       ]
     },
     "finalSourceReport": {
@@ -219,6 +241,36 @@
       "original-app-pointer/cancelled-on-new-intent.png": "7c04417ea38513ffa7f70ad61b6d6d15bd266a54b79a1747bfd6eb039a16690d",
       "original-app-pointer/new-physical-intention.json": "c383b6a426ef403439c2099dcf1a8103a7a53033056775613822cffdad01d2eb",
       "original-app-pointer/observed.json": "a3bea7968ed47ed6c0eb6d6865c01464874bb8275f30c4606a042afa491ab757"
+    },
+    "caretPhaseFidelity": {
+      "observedOriginalBusinessRegionHashes": [
+        "3597f7c1f3ea878cf61cb5df4c234b482e4bdcd53dbe32bb00d545f181a70b87",
+        "76a279193b7c80387039677bcb32ba33add1ccec1cb115c5c0852d7cc04b3242"
+      ],
+      "recordedLayerCheck": [
+        {
+          "wireSha256": "38a4e703831d0f540b917aa33ea300725b602475e01ae01ea94f4c005178c1e8",
+          "frameSequence": 11,
+          "pictureLayerSha256": [
+            "6fe5a30e2b5f21978273025c9699633181ce0dbd808a28e368248013dd999512",
+            "093be95b3e6a1641d2531edfcc200f1668d5b63a8159b360bea1043bbad25e96",
+            "b41a1710394ee45dfd3fb353a9edf452af4b888385a301120a3b051370ca2f4d",
+            "0e3423ff6bdc1942e5f9e5d28170a00ef299ec4e885ccbbec975c02eb64adca4"
+          ]
+        },
+        {
+          "wireSha256": "4cdeba266778c9fd432a70f8f2a06e76dde3681819d84a5c094af2b7eb943c57",
+          "frameSequence": 12,
+          "pictureLayerSha256": [
+            "6fe5a30e2b5f21978273025c9699633181ce0dbd808a28e368248013dd999512",
+            "093be95b3e6a1641d2531edfcc200f1668d5b63a8159b360bea1043bbad25e96",
+            "b41a1710394ee45dfd3fb353a9edf452af4b888385a301120a3b051370ca2f4d",
+            "0e3423ff6bdc1942e5f9e5d28170a00ef299ec4e885ccbbec975c02eb64adca4"
+          ]
+        }
+      ],
+      "samePictureLayerBytesAndPlacement": true,
+      "result": "The two recorded source surfaces passed the PNG bracketing check. The paint commands and all layer placement were identical. Only the frame sequence changed. This session demonstrates the input and return to the original menu. It does not establish faithful display of both caret states."
     }
   }
 }
