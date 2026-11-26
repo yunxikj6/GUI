@@ -545,5 +545,12 @@
     "sha256": "ceec7cf2251129e8060157b31c1326d8a8cdf9a3eabb9b8ffcf7f57baf96f6f1",
     "entries": 93,
     "source": "Original GNOME Shell plus source-identified ChatGPT rendering commands, Win64 CanvasKit and VirGL; signed-out window tests."
+  },
+  "cloudSourcePackage": {
+    "download": "../../releases/ubuntu-source/cloud-workspace-server.zip",
+    "sourceCommit": "70766250b77141730844cf3733820616c33691f7",
+    "bytes": 163716,
+    "sha256": "26871981545143a34b3aa7cccdf0941d94cae2df18289be874b2b97e61c60966",
+    "filesMatchingReviewedGitBlobs": 51
   }
 }
