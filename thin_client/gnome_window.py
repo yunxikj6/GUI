@@ -70,9 +70,13 @@ cursor = function(user, 'LoadCursorW', w.HANDLE, w.HINSTANCE, c.c_void_p)
 set_title = function(user, 'SetWindowTextW', w.BOOL, w.HWND, w.LPCWSTR)
 get_key_state = function(user, 'GetKeyState', c.c_short, c.c_int)
 get_focus = function(user, 'GetFocus', w.HWND)
+set_capture = function(user, 'SetCapture', w.HWND, w.HWND)
+get_capture = function(user, 'GetCapture', w.HWND)
+release_capture = function(user, 'ReleaseCapture', w.BOOL)
 move_window = function(user, 'SetWindowPos', w.BOOL, w.HWND, w.HWND, *([c.c_int] * 4), w.UINT)
 WM_PAINT, WM_CLOSE, WM_DESTROY, WM_SIZE = 15, 16, 2, 5
-WM_MOUSEMOVE, WM_LBUTTONUP, WM_RBUTTONUP = 0x200, 0x202, 0x205
+WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONUP = 0x200, 0x201, 0x202, 0x205
+WM_CANCELMODE, WM_CAPTURECHANGED = 0x001f, 0x0215
 WM_KEYDOWN, WM_KEYUP, WM_DPICHANGED = 0x100, 0x101, 0x02e0
 WM_KILLFOCUS, WM_CHAR = 0x0008, 0x0102
 WM_IME_STARTCOMPOSITION, WM_IME_ENDCOMPOSITION, WM_IME_COMPOSITION = 0x010d, 0x010e, 0x010f
@@ -142,6 +146,8 @@ class NativeWindow:
         self.text_focus = lambda: None
         self._text = TextInput(lambda: self.text_focus(), on_input)
         self._space_as_key = False
+        self.track_button_pair = False
+        self._on_painted = None
         self._pixels = None
         self._lock = threading.Lock()
         self._posted = False
@@ -168,6 +174,13 @@ class NativeWindow:
         show(self.hwnd, 5)
 
     def _window_proc(self, hwnd, msg, wp, lp):
+        if self.track_button_pair:
+            if msg in (WM_SIZE, WM_DPICHANGED):
+                self.on_input(('viewport-changing',))
+            elif msg in (WM_KILLFOCUS, WM_DESTROY, WM_CANCELMODE, WM_CAPTURECHANGED):
+                self.on_input(('pointer-cancel',))
+                if msg in (WM_KILLFOCUS, WM_CANCELMODE) and get_capture() == hwnd:
+                    release_capture()
         if msg in (WM_KILLFOCUS, WM_DESTROY):
             self._text.reset()
             self._space_as_key = False
@@ -186,22 +199,28 @@ class NativeWindow:
         if msg == WM_PAINT:
             ps = PaintStruct()
             dc = begin(hwnd, c.byref(ps))
+            completed = None
             try:
                 rect = w.RECT()
                 get_rect(hwnd, c.byref(rect))
                 fill(dc, c.byref(rect), stock(4))
                 with self._lock:
-                    frame = self._pixels
+                    frame, callback = self._pixels, self._on_painted
                 if frame and rect.right and rect.bottom:
                     ox, oy, width, height = viewport(rect.right, rect.bottom, self.width, self.height)
                     if blit(dc, ox, oy, width, height, 0, 0, self.width, self.height,
                             c.c_char_p(frame), c.byref(self._info), 0, 0x00CC0020) in (0, -1):
                         raise c.WinError(c.get_last_error())
                     self.paint_count += 1
+                    if callback and (ps.rect.left, ps.rect.top, ps.rect.right, ps.rect.bottom) == (
+                            0, 0, rect.right, rect.bottom):
+                        completed = callback
             except Exception as exc:
                 self.error = exc
             finally:
-                end(hwnd, c.byref(ps))
+                presented = end(hwnd, c.byref(ps))
+            if completed and presented:
+                completed()
             return 0
         if msg == WM_DPICHANGED:
             rect = c.cast(lp, c.POINTER(w.RECT)).contents
@@ -232,7 +251,8 @@ class NativeWindow:
                 elif get_focus() == hwnd:
                     self._text.character(wp)
                 return 0
-            if msg in (WM_MOUSEMOVE, WM_LBUTTONUP, WM_RBUTTONUP):
+            if (msg in (WM_MOUSEMOVE, WM_LBUTTONUP, WM_RBUTTONUP)
+                    or (self.track_button_pair and msg == WM_LBUTTONDOWN)):
                 x, y = c.c_short(lp & 0xffff).value, c.c_short((lp >> 16) & 0xffff).value
                 rect = w.RECT()
                 if get_rect(hwnd, c.byref(rect)):
@@ -242,9 +262,17 @@ class NativeWindow:
                         py = source_coordinate(y - oy, height, self.height)
                         if msg == WM_MOUSEMOVE:
                             self.on_input(('move', px, py))
+                        elif msg == WM_LBUTTONDOWN:
+                            set_capture(hwnd)
+                            if get_capture() == hwnd:
+                                self.on_input(('press', px, py))
                         else:
                             button = 'left' if msg == WM_LBUTTONUP else 'right'
                             self.on_input(('click', px, py, button))
+                    elif self.track_button_pair:
+                        self.on_input(('pointer-cancel',))
+                if self.track_button_pair and msg == WM_LBUTTONUP and get_capture() == hwnd:
+                    release_capture()
                 return 0
             if msg == WM_KEYUP and wp in (0x5b, 0x5c):
                 self.on_input(('super',))
@@ -281,13 +309,14 @@ class NativeWindow:
         if not self.closed:
             set_title(self.hwnd, title)
 
-    def present(self, pixels):
+    def present(self, pixels, *, on_painted=None):
         if len(pixels) != self.width * self.height * 4:
             raise ValueError('incomplete local scanout')
         with self._lock:
             if self.closed:
                 return False
             self._pixels = bytes(pixels)
+            self._on_painted = on_painted
             if not self._posted:
                 self._posted = True
                 if not post(self.hwnd, PRESENT, 0, 0):

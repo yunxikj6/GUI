@@ -162,43 +162,88 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                                         encode_text(1,'图文'), encode_select_all(1),
                                         encode_delete(1,backward=True), encode_delete(1,backward=False)])
 
-    def test_desktop_pointer_captures_current_view_and_discards_a_stale_click(self):
-        from types import SimpleNamespace
+    def test_click_requires_full_native_paint_and_a_matching_down_and_up(self):
         state = _WindowInput()
-        reader = SimpleNamespace(can_present=True, binding=None, digest=None)
+        reader = SimpleNamespace(can_present=True, binding=None, digest=None, commit=None)
         state.reader = reader
-        state.presented(reader)
         events = []
         dispatch = state.events(events.append)
-        dispatch(('click', 20, 30, 'left'))
-        self.assertEqual(events, [('click',20,30,'left',(None,None))])
+        press, release = ('press', 20, 30), ('click', 20, 30, 'left')
+        first = state.offer(reader, b'original desktop')
+        dispatch(press)
+        state.painted(first)
+        dispatch(release)
+        self.assertFalse(events)
+        dispatch(press)
+        dispatch(release)
+        self.assertEqual(events, [(*release, (first, 0))])
+
+        dispatch(press)
+        newer = state.offer(reader, b'compositor moved the same application')
+        dispatch(release)
+        state.painted(newer)
+        dispatch(release)
+        self.assertEqual(len(events), 1)
+        # Redirecting a gesture from an older drawing to an otherwise valid new one is disallowed.
+        dispatch(press)
+        reader.commit = 2
+        current = state.offer(reader, b'compositor moved the same application')
+        state.painted(current)
+        dispatch(release)
+        self.assertEqual(len(events), 1)
+
+        for interrupted in (('pointer-cancel',), ('move', 30, 30)):
+            dispatch(press)
+            dispatch(interrupted)
+            dispatch(release)
+            self.assertEqual(sum(e[0] == 'click' for e in events), 1)
+        dispatch(('move', 30, 30))
+        self.assertEqual(events.count(('move', 30, 30)), 1)
         reader.can_present = False
         self.assertIsNone(state.ticket())
-        dispatch(('click', 20, 30, 'left'))
-        dispatch(('key', 'Enter'))
-        dispatch(('move', 20, 30))
-        self.assertEqual(len(events), 2)
-        self.assertEqual(events[-1], ('move',20,30))
-        self.assertIn('点击未发送',state.pop_input_notice())
+        dispatch(press)
+        dispatch(release)
+        self.assertIn('点击未发送', state.pop_input_notice())
         self.assertIsNone(state.pop_input_notice())
+
+    def test_repeated_full_paints_share_one_ticket_and_hold_is_read_only(self):
+        state = _WindowInput()
+        reader = SimpleNamespace(can_present=True, binding=object(), digest=b'skp', commit=7)
+        state.reader = reader
+        first = state.offer(reader, b'original')
+        state.painted(first)
+        self.assertIs(state.offer(reader, b'original'), first)
+        reader.can_present = False
+        self.assertIsNone(state.offer(reader, b'unverified'))
+        self.assertIsNone(state.ticket())
+        reader.can_present = True
+        fresh = state.offer(reader, b'original')
+        state.painted(first)  # A delayed paint acknowledges only its own surface.
+        self.assertIsNone(state.ticket())
+        state.painted(fresh)
+        self.assertEqual(state.ticket(), (fresh, 0))
+        state.events(lambda _: None)(('viewport-changing',))
+        self.assertIsNone(state.ticket())
+        state.painted(fresh)
+        self.assertEqual(state.ticket(), (fresh, 1))
 
     def test_text_is_bound_to_visible_original_application_and_source_focus(self):
         state = _WindowInput()
-        reader = SimpleNamespace(binding=None, digest=None, can_present=True)
+        reader = SimpleNamespace(binding=None, digest=None, commit=None, can_present=True)
         state.reader = reader
         actual = []
         upstream = SimpleNamespace(text_focus=lambda: 99,
             commit_text=lambda revision, value: actual.append((revision,value)) or True,
             select_all=lambda revision: actual.append(revision) or True)
         desktop = _PointerDesktop(upstream, state)
-        state.presented(reader)
+        state.painted(state.offer(reader, b'scanout'))
         self.assertIsNone(desktop.text_focus())
         reader.binding, reader.digest = object(), b'original'
         self.assertIsNone(desktop.text_focus())
-        state.presented(reader)
+        state.painted(state.offer(reader, b'scanout'))
         self.assertEqual(desktop.text_focus(),99)
         reader.can_present = False
-        state.presented(reader)
+        self.assertIsNone(state.offer(reader, b'held'))
         self.assertTrue(desktop.commit_text(99,'文字'))
         self.assertFalse(desktop.select_all(98))
         self.assertIn('焦点',desktop.pop_input_notice())

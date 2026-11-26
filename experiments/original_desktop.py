@@ -1,5 +1,6 @@
 """Open the paired Ubuntu session in a native Win64 window with original app painting."""
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 import re
 import sys
@@ -10,33 +11,65 @@ from experiments.original_desktop_protocol import SIZE, read_hello
 from experiments.persistent_application_painter import OriginalPicturePainter
 
 
+@dataclass(eq=False, frozen=True)
+class _View:
+    # Identity also distinguishes distinct desktop geometry for the same app drawing.
+    binding: object
+    digest: bytes | None
+    commit: object
+
+
 class _WindowInput:
     """A down/up pair in a waiting or subsequently changed view cannot change focus."""
     def __init__(self):
         self.lock = threading.Lock()
         self.reader = None
-        self.visible = None
-        self.last_binding = None
+        self.offered = self.visible = None
+        self.offered_pixels = None
+        self.press = None
+        self.geometry_revision = 0
+        self.position = None
         self.notice = None
 
-    def presented(self, stream):
+    def offer(self, stream, pixels):
         with self.lock:
             if not stream.can_present:
-                self.visible = None
-                return False
-            self.last_binding = stream.binding
-            self.visible = (stream.binding, stream.digest)
-            return True
+                self.offered = self.offered_pixels = None
+                return None
+            if (self.offered is None or not self._matches(stream, self.offered)
+                    or self.offered_pixels != pixels):
+                self.offered = _View(stream.binding, stream.digest, stream.commit)
+                self.offered_pixels = pixels
+            return self.offered
+
+    @staticmethod
+    def _matches(reader, view):
+        return (view.binding == reader.binding and view.digest == reader.digest
+                and view.commit == reader.commit)
+
+    def painted(self, view):
+        # Called on the HWND thread after a successful full-client WM_PAINT.
+        with self.lock:
+            self.visible = view
+
+    def _ticket(self):
+        if (self.reader is not None and self.reader.can_present and self.visible is not None
+                and self.visible is self.offered and self._matches(self.reader, self.visible)):
+            return (self.visible, self.geometry_revision)
 
     def ticket(self):
         with self.lock:
-            if (self.reader is not None and self.reader.can_present and
-                    (self.reader.binding, self.reader.digest) == self.visible):
-                return self.visible
+            return self._ticket()
 
     def rejected_click(self):
         with self.lock:
-            self.notice = '画面正在更新，刚才的点击未发送。请确认画面后再点击。'
+            if self.reader is None or not self.reader.can_present:
+                reason = '正在确认云端原窗口的新画面'
+            elif self._ticket() is None:
+                reason = '本机窗口尚未显示当前画面'
+            else:
+                reason = '按下与松开时的画面或位置已变化'
+            self.notice = reason + '，刚才的点击未发送。'
 
     def rejected_edit(self):
         with self.lock:
@@ -51,22 +84,41 @@ class _WindowInput:
         # During an animation the last verified window can stay on screen.
         # The source's focus epoch independently binds editing to its control.
         with self.lock:
-            return (self.reader is not None and self.last_binding is not None and
-                    self.reader.binding == self.last_binding)
+            return (self.reader is not None and self.visible is not None and self.visible.binding is not None
+                    and self.reader.binding == self.visible.binding)
 
     def events(self, submit):
         def handle(event):
-            if event[0] == 'move':
+            kind = event[0]
+            if kind in ('pointer-cancel', 'viewport-changing'):
+                with self.lock:
+                    self.press = None
+                    if kind == 'viewport-changing':
+                        self.visible = self.position = None
+                        self.geometry_revision += 1
+            elif kind == 'press':
+                with self.lock:
+                    self.press = (event[1:3], self._ticket())
+            elif kind == 'move':
+                with self.lock:
+                    position = event[1:3]
+                    if position == self.position:
+                        return
+                    self.position = position
+                    if self.press and position != self.press[0]:
+                        self.press = None
                 submit(event)
-            elif event[0] in ('text', 'select-all', 'delete-key'):
+            elif kind in ('text', 'select-all', 'delete-key'):
                 if self.has_displayed_application():
                     submit(event)
                 else:
                     self.rejected_edit()
-            elif event[0] == 'click' and event[3] == 'left':
-                original = self.ticket()
-                if original is not None:
-                    submit((*event, original))
+            elif kind == 'click' and event[3] == 'left':
+                with self.lock:
+                    press, self.press = self.press, None
+                    ticket = self._ticket()
+                if press is not None and ticket is not None and press == (event[1:3], ticket):
+                    submit((*event, ticket))
                 else:
                     self.rejected_click()
         return handle
@@ -77,7 +129,7 @@ class _PointerDesktop:
         self.transport, self.state = transport, state
 
     def click(self, x, y, button, displayed):
-        if self.state.ticket() == displayed:
+        if displayed is not None and self.state.ticket() == displayed:
             self.transport.click(x, y, button)
         else:
             self.state.rejected_click()
@@ -146,7 +198,9 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
     picture_delta = False
 
     def native_window(title, width, height, submit):
-        return open_window(title, width, height, state.events(submit))
+        window = open_window(title, width, height, state.events(submit))
+        window.track_button_pair = True
+        return window
 
     def draw(connection, present, *, live):
         nonce, exe = read_hello(connection)
@@ -162,11 +216,13 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
                 state.reader = source
 
             def display(width, height, pixels):
-                allowed = state.presented(source) if live else source.can_present
-                if allowed:
-                    present(width, height, pixels)
-                    if live:
+                if live:
+                    view = state.offer(source, pixels)
+                    if view is not None:
+                        present(width, height, pixels, on_painted=lambda: state.painted(view))
                         cache.presented(width, height, pixels)
+                elif source.can_present:
+                    present(width, height, pixels)
 
             try:
                 replay(source, display, runtime_dir=runtime_dir)

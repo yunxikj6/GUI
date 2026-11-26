@@ -129,13 +129,15 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
         except Exception as exc:
             fail(exc)
 
-    def present(width, height, pixels):
+    def present(width, height, pixels, *, on_painted=None):
         with lock:
             if stop.is_set():
                 raise InterruptedError('窗口已关闭。')
             if (width, height) != size:
                 raise ValueError('云端桌面的尺寸与当前会话不匹配。')
-            if not window.present(pixels):
+            posted = (window.present(pixels, on_painted=on_painted) if on_painted is not None
+                      else window.present(pixels))
+            if not posted:
                 raise InterruptedError('本机窗口已关闭。')
             got_scene.set()
 
