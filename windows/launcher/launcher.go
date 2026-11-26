@@ -18,7 +18,7 @@ import (
 const limit = 64 * 1024
 const help = `Cloud Linux Workspace
 
-默认打开完整云端 GNOME 桌面
+源码目录默认打开整合原厂应用的云端 GNOME 桌面
 
   --instabox        使用 InstaBox 私有连接
   --desktop-size SIZE  新会话尺寸，可选 800x520、1280x900、1920x1080
@@ -324,13 +324,19 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 	if root == "" {
 		return fail("package-layout", "找不到客户端入口。请完整解压发行 ZIP 后打开 Start.cmd。")
 	}
-	root, cleanup, problem := packagedClient(root)
+	original := opt == (options{}) && !regular(filepath.Join(root, "windows", "runtime", "python.exe"))
+	root, cleanup, problem := packagedClient(root, original)
 	if problem != nil {
 		return problem
 	}
 	defer cleanup()
 	interpreter := filepath.Join(root, "windows", "runtime", "python.exe")
-	args := []string{"-I", "-X", "utf8", filepath.Join(root, "thin_client_entry.py")}
+	args := []string{"-I", "-X", "utf8"}
+	if original {
+		args = append(args, "-m", "experiments.original_desktop")
+	} else {
+		args = append(args, filepath.Join(root, "thin_client_entry.py"))
+	}
 	mode := rendererRun
 	tokenKey := "CLOUDWORKSPACE_RENDER_TOKEN"
 	if direct {
@@ -371,6 +377,9 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 		return &failure{"render-cancelled", "已取消连接。", 130}
 	}
 	if result.exit != 0 {
+		if original {
+			return &failure{"cloud-render-exit", "无法打开原厂应用桌面。请核对云端原厂桌面服务、InstaBox 连接及本次配对码。", result.exit}
+		}
 		return &failure{"cloud-render-exit", "无法打开云端窗口。请核对云机、服务端口及相应会话的配对码。可在解压后的客户端目录用 windows\\runtime\\python.exe thin_client_entry.py 加相同参数查看详情。", result.exit}
 	}
 	return nil

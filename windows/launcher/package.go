@@ -13,17 +13,32 @@ import (
 	"strings"
 )
 
-// The small source checkout carries the self-contained release once. Extract that
-// exact release to an invocation-private directory when launching from the checkout.
-func packagedClient(root string) (string, func(), *failure) {
+const originalNode = "thin_client/vendor/node/windows-x64/node.exe"
+
+// A source checkout expands the release selected for this invocation. A portable
+// client already has its isolated Python runtime and can run in place.
+func packagedClient(root string, original bool) (string, func(), *failure) {
 	if regular(filepath.Join(root, "windows", "runtime", "python.exe")) {
 		return root, func() {}, nil
 	}
-	zipFile := filepath.Join(root, "releases", "thin-windows", "cloud-workspace.zip")
+	packageDir, entry := "thin-windows", "thin_client_entry.py"
+	if original {
+		packageDir, entry = "original-win64", "experiments/original_desktop.py"
+	}
+	zipFile := filepath.Join(root, "releases", packageDir, "cloud-workspace.zip")
 	receipt, err := os.ReadFile(filepath.Join(root, "docs", "measurements", "cloud-render.json"))
-	var release struct{ StandalonePackage struct{ SHA256 string } }
-	if err != nil || json.Unmarshal(receipt, &release) != nil || len(release.StandalonePackage.SHA256) != 64 {
+	var release struct {
+		StandalonePackage, OriginalDesktopPackage struct{ SHA256 string }
+	}
+	if err != nil || json.Unmarshal(receipt, &release) != nil {
 		return "", nil, fail("package-layout", "缺少内置 Windows 运行时或发行记录，请重新完整解压客户端 ZIP。")
+	}
+	expected := release.StandalonePackage.SHA256
+	if original {
+		expected = release.OriginalDesktopPackage.SHA256
+	}
+	if len(expected) != 64 {
+		return "", nil, fail("package-layout", "缺少所选 Windows 发行包的 SHA-256 记录。")
 	}
 	f, err := os.Open(zipFile)
 	if err != nil {
@@ -35,7 +50,7 @@ func packagedClient(root string) (string, func(), *failure) {
 		return "", nil, fail("package-layout", "客户端发行 ZIP 的大小或文件类型异常。")
 	}
 	sum := sha256.New()
-	if _, err = io.Copy(sum, f); err != nil || hex.EncodeToString(sum.Sum(nil)) != release.StandalonePackage.SHA256 {
+	if _, err = io.Copy(sum, f); err != nil || hex.EncodeToString(sum.Sum(nil)) != expected {
 		return "", nil, fail("package-integrity", "客户端发行 ZIP 与此提交的 SHA-256 不一致，请重新下载。")
 	}
 	folder, err := os.MkdirTemp("", "cloud-workspace-")
@@ -44,18 +59,22 @@ func packagedClient(root string) (string, func(), *failure) {
 	}
 	cleanup := func() { os.RemoveAll(folder) }
 	archive, err := zip.NewReader(f, info.Size())
-	if err != nil || extractClient(archive, folder) != nil || !regular(filepath.Join(folder, "windows", "runtime", "python.exe")) || !regular(filepath.Join(folder, "thin_client_entry.py")) {
+	if err != nil || extractClient(archive, folder, original) != nil || !regular(filepath.Join(folder, "windows", "runtime", "python.exe")) || !regular(filepath.Join(folder, filepath.FromSlash(entry))) || original && !regular(filepath.Join(folder, filepath.FromSlash(originalNode))) {
 		cleanup()
 		return "", nil, fail("package-layout", "无法解压完整的 Windows 客户端。")
 	}
 	return folder, cleanup, nil
 }
 
-func extractClient(archive *zip.Reader, root string) error {
+func extractClient(archive *zip.Reader, root string, original bool) error {
 	var total uint64
 	for _, entry := range archive.File {
 		name := filepath.FromSlash(entry.Name)
-		if !fs.ValidPath(entry.Name) || !filepath.IsLocal(name) || strings.ContainsAny(entry.Name, "\\:") || !entry.Mode().IsRegular() || entry.UncompressedSize64 > 64<<20 || total+entry.UncompressedSize64 > 256<<20 {
+		maxMember := uint64(64 << 20)
+		if original && entry.Name == originalNode {
+			maxMember = 96 << 20
+		}
+		if !fs.ValidPath(entry.Name) || !filepath.IsLocal(name) || strings.ContainsAny(entry.Name, "\\:") || !entry.Mode().IsRegular() || entry.UncompressedSize64 > maxMember || total+entry.UncompressedSize64 > 256<<20 {
 			return errors.New("invalid archive member")
 		}
 		total += entry.UncompressedSize64
