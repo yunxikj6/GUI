@@ -8,6 +8,8 @@ Windows 本机运行轻量绘图客户端。应用进程、账号会话和项目
 
 上图来自轻量客户端。另从同一云端窗口读取原画面，用来逐像素对照。真实测试覆盖了登录前窗口，断开连接后仍可在本机缩放已收到的画面。[点击后的本机画面](docs/cloud-render-chatgpt-options.png) · [同一云端窗口对照图](docs/cloud-render-source-options.png) · [首次出现的原厂登录页](docs/cloud-render-chatgpt-welcome.png) · [断线后的本机缩放](docs/cloud-render-offline-resize.png) · [真云操作与画面测量](docs/measurements/cloud-render.json)
 
+桌面绘制另有一条已在 Linux 验证的路径。原版 GNOME Shell 发出的 GPU 命令和资源可以在另一个隔离环境重绘。活动概览测试中的 11 次显示输出均与源端逐字节一致。Windows 客户端与云端完整桌面的连接仍在开发。[原版 GNOME 窗口实拍与复现方法](docs/gnome-command-stream.md)
+
 ## 连接工作区
 
 [下载 Windows 轻量客户端](releases/thin-windows/cloud-workspace.zip)（x64 和 ARM64）

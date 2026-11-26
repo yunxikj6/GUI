@@ -119,7 +119,28 @@
   "gnomeResearch": {
     "scope": "Separate exploratory test in an isolated Ubuntu 24.04 guest. Not part of the delivered client.",
     "compositor": "GNOME Shell 46.0, Mutter 46.2",
-    "observed": "An independent Mesa virgl renderer received 24 command submissions including 236 draws, 16 shaders and 84 2D textures from GNOME Shell. The original implementation still returns the completed pixels to X11. Network resource transfer and direct local presentation are pending."
+    "observed": "An independent Mesa virgl renderer received 24 command submissions including 236 draws, 16 shaders and 84 2D textures from GNOME Shell. The original implementation still returns the completed pixels to X11. Network resource transfer and direct local presentation are pending.",
+    "independentCommandReplay": {
+      "scope": "Isolated Ubuntu 24.04 source on Linux. Replay in a separate Linux sandbox that could read only the drawing stream and renderer dependencies. Same physical host, no cloud GNOME service or Windows GNOME presenter tested.",
+      "implementation": "../../experiments/gnome_command_stream.py",
+      "protocol": "Mesa virpipe, vtest inline-resource mode. Source recording contains GPU/resource requests only. A dedicated local virgl/llvmpipe process independently recreated each scanout.",
+      "commandStreamBytes": 8123980,
+      "commandStreamSha256": "f0f175971464317da95b26f548d94930eae297f386d958b01b3db81876f876ba",
+      "drawCalls": 400,
+      "resourceUploads": 734,
+      "wholeScreenResourceUploads": 0,
+      "size": [
+        800,
+        520
+      ],
+      "sourceScanouts": 11,
+      "bitIdenticalLocalScanouts": 11,
+      "distinctScanouts": 9,
+      "lastScanoutBGRAsha256": "d3f06a6e5bc4fce0d49ab5e7bc6d057d860b42c42c34c60ba488c62df7567dd5",
+      "nativeWindow": "An Xfwm-managed 800x520 client window presented all 11 independently regenerated scanouts. X11 readback matched their RGB values 11/11.",
+      "image": "../gnome-command-window.png",
+      "imageSha256": "52283e30ed3429528cd72e9f5f0f819eba83c612afb3957a62b514779ecc60df"
+    }
   },
   "claudeResearch": {
     "scope": "Isolated, original, unmodified Claude Desktop 6.28899.6 with a clean profile.",
