@@ -19,6 +19,7 @@ PACKAGES = (
     "python3",
     "gnome-shell",
     "ubuntu-session",
+    "ubuntu-settings",
     "gnome-shell-extension-ubuntu-dock",
     "ubuntu-wallpapers-noble",
     "yaru-theme-gnome-shell",
