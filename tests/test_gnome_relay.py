@@ -87,7 +87,7 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
                 def apply(data):
                     source.applied.append(data)
                     seq = len(source.applied)
-                    source.events.feed_data(json.dumps(dict(event='input', sequence=seq, applied=seq == 1)).encode() + b'\n')
+                    source.events.feed_data(json.dumps(dict(event='input', sequence=seq, applied=seq in (1, 3))).encode() + b'\n')
                 source.write = apply
             self.sources.append(source)
             try:
@@ -234,8 +234,10 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
                         self.assertFalse(stream.commit_text(previous, '旧会话'))
                     self.assertTrue(stream.commit_text(revision, '搜索😀'))
                     self.assertFalse(stream.commit_text(revision, '已失焦'))
+                    self.assertTrue(stream.select_all(revision))
+                    self.assertFalse(stream.select_all(revision))
                     if private:
-                        self.assertEqual(provider.calls, [1, 1, 2, 2])
+                        self.assertEqual(provider.calls, [1, 1, 2, 2, 3, 3, 4, 4])
                     return revision
 
         last = None
@@ -244,7 +246,23 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
             last = await asyncio.wait_for(asyncio.to_thread(exercise, private, last), 15)
             await asyncio.wait_for(self.retired.wait(), 3)
             self.assertEqual([gnome_input.decode_input(data)[1] for data in self.sources[-1].applied],
-                             [(1, '搜索😀'), (1, '已失焦')])
+                             [(1, '搜索😀'), (1, '已失焦'), (1,), (1,)])
+
+    async def test_text_only_peer_cannot_send_selection_without_negotiation(self):
+        reader, writer = await asyncio.open_connection('127.0.0.1', self.port)
+        writer.write(wire.AUTH_SIZE + self.token.encode() + b'\n' + wire.SESSION.pack(800, 520, wire.SEARCH_INPUT))
+        await writer.drain()
+        while True:
+            kind, _ = await wire.read_async(reader, transport.DOWNSTREAM)
+            if kind == wire.READY:
+                break
+        writer.write(wire.packet(wire.INPUT, wire.SEQUENCE.pack(1) + gnome_input.encode_select_all(1)))
+        await writer.drain()
+        while await asyncio.wait_for(wire.read_async(reader, transport.DOWNSTREAM), 3):
+            pass
+        self.assertEqual(self.sources[-1].applied, [])
+        writer.close()
+        await writer.wait_closed()
 
     def test_unicode_input_length_and_framing(self):
         for text in ('中文', '👩‍💻', 'e\u0301', '人' * 1365 + 'a'):
@@ -255,7 +273,10 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         for text in ('', 'a\n', '\u0085', '\u2028', '\u2029', '\udc00', '人' * 1366):
             with self.assertRaises(ValueError):
                 gnome_input.encode_text(1, text)
-        for malformed in (b'T', b'T' + bytes(6), b'T' + struct.pack('!IH', 1, 1) + b'\x80'):
+        with self.assertRaises(ValueError):
+            gnome_input.encode_select_all(0)
+        self.assertEqual(gnome_input.decode_input(gnome_input.encode_select_all(9)), (b'A', (9,)))
+        for malformed in (b'A' + bytes(4), b'T', b'T' + bytes(6), b'T' + struct.pack('!IH', 1, 1) + b'\x80'):
             with self.assertRaises(ValueError):
                 gnome_input.decode_input(malformed)
 

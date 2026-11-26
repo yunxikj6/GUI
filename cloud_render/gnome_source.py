@@ -507,10 +507,11 @@ class _Source:
                 _focused(self.env, xid, self.size)
                 self.read_frames()
                 before = self.frames
-                if kind == b'T':
+                if kind in (b'T', b'A'):
                     if not self.search:
                         raise SourceError('此会话未协商搜索输入。')
-                    applied = self.search.commit(*args, self.poll)
+                    value = args[1] if kind == b'T' else None
+                    applied = self.search.commit(args[0], value, self.poll)
                 else:
                     _apply(self.env, xid, command, self.size)
                     applied = True

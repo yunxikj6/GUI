@@ -43,7 +43,7 @@ KEYS = ('Tab', 'Enter', 'Escape', 'Left', 'Right', 'Up', 'Down', 'Backspace',
 _KEYSYMS = dict(zip(KEYS, ('Tab', 'Return', 'Escape', 'Left', 'Right', 'Up', 'Down',
                            'BackSpace', 'Delete', 'Home', 'End', 'Prior', 'Next',
                            'shift+Tab', 'space')))
-_SIZES = {b'S': 1, b'K': 2, b'M': 5, b'L': 5, b'R': 5}
+_SIZES = {b'S': 1, b'A': 5, b'K': 2, b'M': 5, b'L': 5, b'R': 5}
 
 
 def checked_size(size):
@@ -68,6 +68,12 @@ def encode_pointer(op, x, y, *, size=DEFAULT_SIZE):
     return op + _COORDS.pack(x, y)
 
 
+def encode_select_all(revision):
+    if type(revision) is not int or not 0 < revision <= 0xffffffff:
+        raise ValueError('GNOME 选择操作的焦点编号无效。')
+    return b'A' + struct.pack('!I', revision)
+
+
 def encode_key(key):
     if key not in KEYS:
         raise ValueError('不支持的 GNOME 导航键。')
@@ -79,6 +85,10 @@ def decode_input(command, *, size=DEFAULT_SIZE):
     if type(command) is not bytes or len(command) != command_size(command):
         raise ValueError('GNOME 输入长度无效。')
     op = command[:1]
+    if op == b'A':
+        revision, = struct.unpack_from('!I', command, 1)
+        encode_select_all(revision)
+        return op, (revision,)
     if op == b'T':
         _, revision, _ = TEXT_HEAD.unpack_from(command)
         try:

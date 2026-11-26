@@ -89,6 +89,15 @@ export default class SearchInput extends Extension {
         });
     }
 
+    _selectAll() {
+        const nativeText = Main.overview.searchEntry.get_clutter_text();
+        nativeText.set_selection(0, -1);
+        const length = nativeText.get_buffer().get_length();
+        const position = nativeText.get_cursor_position();
+        const bound = nativeText.get_selection_bound();
+        return Math.abs((position < 0 ? length : position) - (bound < 0 ? length : bound)) === length;
+    }
+
     _read(cancel) {
         this._input.read_line_async(GLib.PRIORITY_DEFAULT, cancel, async (stream, result) => {
             if (cancel.is_cancelled())
@@ -98,12 +107,14 @@ export default class SearchInput extends Extension {
                 if (line === null)
                     return;
                 const [revision, text] = JSON.parse(line);
-                const applied = this._focus() && this._revision === revision &&
-                    typeof text === 'string' && text.length > 0 &&
+                const focused = this._focus() && this._revision === revision;
+                let applied = focused && typeof text === 'string' && text.length > 0 &&
                     !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(text) &&
                     new TextEncoder().encode(text).length <= 4096;
                 if (applied)
                     await this._commit(text);
+                else if (focused && text === null)
+                    applied = this._selectAll();
                 this._write(`A ${Number(applied)}\n`);
                 this._read(cancel);
             } catch {

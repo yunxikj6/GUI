@@ -38,5 +38,15 @@
     "originalFrames": 84,
     "matchingReplayFrames": 84,
     "chineseSourceAckMs": 49.5
+  },
+  "selectAll": {
+    "capability": 4,
+    "focusedControl": "Clutter.Text",
+    "before": "abc你",
+    "selectionVerified": "Native cursor and selection endpoints span the original buffer length.",
+    "replacement": "你好",
+    "matchedOriginalAndIndependentReplayFrames": 136,
+    "selectedFrame": 66,
+    "selectedFrameSha256": "c6a727253705c34faeded6fc55abbfdc9bd8013bf6e57262e5d07fea82e80bba"
   }
 }

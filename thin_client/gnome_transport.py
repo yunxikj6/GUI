@@ -11,7 +11,7 @@ import threading
 
 from cloud_render import gnome_wire as wire
 from cloud_render.instabox_relay import BATCH_BYTES, BATCH_COUNT, BATCH_INLINE
-from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer, encode_text
+from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer, encode_select_all, encode_text
 from .instabox_transport import InstaBoxControl, RequestOutcomeUnknown, TransportError
 
 
@@ -29,10 +29,12 @@ class _Provider(InstaBoxControl):
             dimensions = {} if size == DEFAULT_SIZE else dict(width=size[0], height=size[1])
             if search_input:
                 dimensions['searchInput'] = True
+                dimensions['selectAll'] = True
             if wallpaper:
                 dimensions['wallpaper'] = True
             started = self._call('start', port=port, pair=pairing, protocol='gnome', **dimensions)
             self.search_input = started.get('searchInput') is True and search_input
+            self.can_select_all = self.search_input and started.get('selectAll') is True
             self.batch = started.get('batch') is True
         except BaseException:
             self.close()
@@ -105,7 +107,7 @@ class _Provider(InstaBoxControl):
 class _Forward:
     def __init__(self, port, pairing, size, wallpaper=False, search_input=False):
         flags = 0
-        requested = (wire.WALLPAPER if wallpaper else 0) | (wire.SEARCH_INPUT if search_input else 0)
+        requested = (wire.WALLPAPER if wallpaper else 0) | ((wire.SEARCH_INPUT | wire.SELECT_ALL) if search_input else 0)
         if requested:
             with socket.create_connection(('127.0.0.1', port), timeout=5) as query, query.makefile('rb') as reply:
                 query.sendall(wire.QUERY + pairing.encode('ascii') + b'\n')
@@ -114,7 +116,10 @@ class _Forward:
                     magic, offered = wire.FEATURES.unpack(capabilities)
                     if magic == wire.FEATURE_MAGIC:
                         flags = offered & requested
+        if not flags & wire.SEARCH_INPUT:
+            flags &= ~wire.SELECT_ALL
         self.search_input = bool(flags & wire.SEARCH_INPUT)
+        self.can_select_all = bool(flags & wire.SELECT_ALL)
         self.peer = socket.create_connection(('127.0.0.1', port), timeout=8)
         try:
             extended = bool(flags) or size != DEFAULT_SIZE
@@ -303,6 +308,12 @@ class DesktopStream:
         if type(revision) is not int or self.text_focus() != revision:
             return False
         return self._input(encode_text(revision & 0xffffffff, text))
+
+    def select_all(self, revision):
+        if (not getattr(self.peer, 'can_select_all', False) or
+                type(revision) is not int or self.text_focus() != revision):
+            return False
+        return self._input(encode_select_all(revision & 0xffffffff))
 
     def send_super(self):
         return self._input(b'S')

@@ -60,6 +60,7 @@ class SearchBridge:
                 raise ValueError('原厂输入法回执无效。')
 
     def commit(self, revision, text, poll):
+        """Send one edit. The private extension interprets null as selection of the focused buffer."""
         if not self.active or self.revision != revision:
             return False
         self.decision = None

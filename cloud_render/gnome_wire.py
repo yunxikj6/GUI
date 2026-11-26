@@ -13,6 +13,7 @@ FEATURES = struct.Struct('!4sI')
 FEATURE_MAGIC = b'GCFG'
 WALLPAPER = 1
 SEARCH_INPUT = 2
+SELECT_ALL = 4
 FOCUS_STATE = struct.Struct('!IB')
 HEADER = struct.Struct('!4sBBHI')
 BLOCK, INPUT, ACK, READY, END, UNAVAILABLE, FOCUS = range(1, 8)
