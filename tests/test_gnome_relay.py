@@ -79,7 +79,7 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         self.retired = asyncio.Event()
 
         @asynccontextmanager
-        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False):
+        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False):
             self.artwork.append(wallpaper)
             source = Source(size)
             if search_input:
@@ -87,7 +87,7 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
                 def apply(data):
                     source.applied.append(data)
                     seq = len(source.applied)
-                    source.events.feed_data(json.dumps(dict(event='input', sequence=seq, applied=seq in (1, 3))).encode() + b'\n')
+                    source.events.feed_data(json.dumps(dict(event='input', sequence=seq, applied=seq in (1, 3, 5))).encode() + b'\n')
                 source.write = apply
             self.sources.append(source)
             try:
@@ -206,9 +206,10 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         server = await asyncio.start_server(legacy, '127.0.0.1', 0)
         port = server.sockets[0].getsockname()[1]
         def local():
-            with transport.connect(LocalProvider(), port, self.token, wallpaper=True, search_input=True) as peer:
+            with transport.connect(LocalProvider(), port, self.token, wallpaper=True, search_input=True, focus_delete=True) as peer:
                 self.assertEqual(read_exact(peer, 17), b'original graphics')
                 self.assertIsNone(peer.text_focus())
+                self.assertFalse(peer.has_focused_delete())
         try:
             await asyncio.wait_for(asyncio.to_thread(local), 12)
         finally:
@@ -224,8 +225,8 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         def exercise(private, previous):
             with patch.object(InstaBoxControl, '_open_file', local_file):
                 provider = LocalProvider()
-                stream = (transport.connect(provider, self.port, self.token, search_input=True) if private else
-                          transport.connect_forwarded(self.port, self.token, search_input=True))
+                stream = (transport.connect(provider, self.port, self.token, search_input=True, focus_delete=True) if private else
+                          transport.connect_forwarded(self.port, self.token, search_input=True, focus_delete=True))
                 with stream:
                     self.assertEqual(read_exact(stream, len(Source.content)), Source.content)
                     revision = stream.text_focus()
@@ -236,8 +237,13 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
                     self.assertFalse(stream.commit_text(revision, '已失焦'))
                     self.assertTrue(stream.select_all(revision))
                     self.assertFalse(stream.select_all(revision))
+                    self.assertTrue(stream.has_focused_delete())
+                    self.assertFalse(stream.key('Backspace'))
+                    self.assertFalse(stream.key('Delete'))
+                    self.assertTrue(stream.delete_text(revision, backward=True))
+                    self.assertFalse(stream.delete_text(revision, backward=False))
                     if private:
-                        self.assertEqual(provider.calls, [1, 1, 2, 2, 3, 3, 4, 4])
+                        self.assertEqual(provider.calls, [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6])
                     return revision
 
         last = None
@@ -246,23 +252,32 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
             last = await asyncio.wait_for(asyncio.to_thread(exercise, private, last), 15)
             await asyncio.wait_for(self.retired.wait(), 3)
             self.assertEqual([gnome_input.decode_input(data)[1] for data in self.sources[-1].applied],
-                             [(1, '搜索😀'), (1, '已失焦'), (1,), (1,)])
+                             [(1, '搜索😀'), (1, '已失焦'), (1,), (1,), (1,), (1,)])
 
-    async def test_text_only_peer_cannot_send_selection_without_negotiation(self):
-        reader, writer = await asyncio.open_connection('127.0.0.1', self.port)
-        writer.write(wire.AUTH_SIZE + self.token.encode() + b'\n' + wire.SESSION.pack(800, 520, wire.SEARCH_INPUT))
-        await writer.drain()
-        while True:
-            kind, _ = await wire.read_async(reader, transport.DOWNSTREAM)
-            if kind == wire.READY:
-                break
-        writer.write(wire.packet(wire.INPUT, wire.SEQUENCE.pack(1) + gnome_input.encode_select_all(1)))
-        await writer.drain()
-        while await asyncio.wait_for(wire.read_async(reader, transport.DOWNSTREAM), 3):
-            pass
-        self.assertEqual(self.sources[-1].applied, [])
-        writer.close()
-        await writer.wait_closed()
+    async def test_destructive_edit_requires_its_negotiated_focused_command(self):
+        search = wire.SEARCH_INPUT
+        deletion = wire.SEARCH_INPUT | wire.FOCUS_DELETE
+        for features, command in [(search, gnome_input.encode_select_all(1)),
+                                  (search, gnome_input.encode_delete(1, backward=True)),
+                                  (search, gnome_input.encode_delete(1, backward=False)),
+                                  (deletion, gnome_input.encode_key('Backspace')),
+                                  (deletion, gnome_input.encode_key('Delete'))]:
+            self.retired.clear()
+            reader, writer = await asyncio.open_connection('127.0.0.1', self.port)
+            writer.write(wire.AUTH_SIZE + self.token.encode() + b'\n' + wire.SESSION.pack(800, 520, features))
+            await writer.drain()
+            while True:
+                kind, _ = await wire.read_async(reader, transport.DOWNSTREAM)
+                if kind == wire.READY:
+                    break
+            writer.write(wire.packet(wire.INPUT, wire.SEQUENCE.pack(1) + command))
+            await writer.drain()
+            while await asyncio.wait_for(wire.read_async(reader, transport.DOWNSTREAM), 3):
+                pass
+            self.assertEqual(self.sources[-1].applied, [])
+            writer.close()
+            await writer.wait_closed()
+            await asyncio.wait_for(self.retired.wait(), 3)
 
     def test_unicode_input_length_and_framing(self):
         for text in ('中文', '👩‍💻', 'e\u0301', '人' * 1365 + 'a'):

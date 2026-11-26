@@ -91,14 +91,15 @@ def check_request(req):
     extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'},
               'input': {'id', 'data'}, 'close': set()}
     extras['desktop'] = {'id', 'data'}
-    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper', 'searchInput', 'selectAll'}, 'poll': {'reset', 'batch'}}
+    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper', 'searchInput', 'selectAll', 'focusDelete'}, 'poll': {'reset', 'batch'}}
     require(op in extras and set(req) - optional.get(op, set()) == {'op', 'session'} | extras[op],
             'invalid-request')
     require(isinstance(req['session'], str) and re.fullmatch('[0-9a-f]{32}', req['session']), 'invalid-session')
     if op == 'start':
         require('protocol' not in req or (req['protocol'] == 'gnome' and 'codec' not in req), 'invalid-protocol')
-        if 'selectAll' in req:
-            require(req['selectAll'] is True and req.get('searchInput') is True, 'invalid-capabilities')
+        for field in ('selectAll', 'focusDelete'):
+            if field in req:
+                require(req[field] is True and req.get('searchInput') is True, 'invalid-capabilities')
         if 'searchInput' in req:
             require(req.get('protocol') == 'gnome' and req['searchInput'] is True, 'invalid-capabilities')
         if 'wallpaper' in req:
@@ -120,7 +121,7 @@ def check_request(req):
         require(17 <= len(raw) <= 23 + MAX_TEXT and HEADER.unpack_from(raw) == (b'GVGL', 1, 2, 0, len(raw) - HEADER.size)
                 and struct.unpack_from('!I', raw, HEADER.size)[0] == req['id'], 'invalid-desktop-input')
         command = raw[16:]
-        if command[:1] == b'A':
+        if command[:1] in (b'A', b'B', b'D'):
             require(len(command) == 5 and struct.unpack_from('!I', command, 1)[0] != 0, 'invalid-desktop-input')
         elif command[:1] == b'T':
             require(len(command) >= 8, 'invalid-desktop-input')
@@ -214,9 +215,11 @@ class Relay:
             requested = int(self.start.get('wallpaper') is True) | (2 if self.start.get('searchInput') is True else 0)
             if self.start.get('selectAll'):
                 requested |= 4
+            if self.start.get('focusDelete'):
+                requested |= 8
             self.features = requested & await self.desktop_features() if requested else 0
             if not self.features & 2:
-                self.features &= ~4
+                self.features &= ~(4 | 8)
             reader, self.writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.start['port']), 5)
             desktop = self.desktop
             # GNOME emits many small draw blocks between inputs. Buffer them
@@ -394,7 +397,7 @@ class Relay:
             require(self.published and not self.closed, 'upstream-closed')
             # Mark consumed before writing to the transport. An interrupted write
             # has an unknown application outcome and must never be attempted twice.
-            self.pending_edit = self.desktop and raw[16:17] in (b'T', b'A')
+            self.pending_edit = self.desktop and raw[16:17] in (b'T', b'A', b'B', b'D')
             self.input_id, self.input_digest, self.input_flushed = index, digest, False
             try:
                 self.writer.write(raw)
@@ -428,7 +431,8 @@ class Relay:
                         desktop_size(req) == desktop_size(self.start) and
                         req.get('wallpaper') == self.start.get('wallpaper') and
                         req.get('searchInput') == self.start.get('searchInput') and
-                        req.get('selectAll') == self.start.get('selectAll'), 'session-conflict')
+                        req.get('selectAll') == self.start.get('selectAll') and
+                        req.get('focusDelete') == self.start.get('focusDelete'), 'session-conflict')
                 await asyncio.wait_for(self.ready.wait(), 35)
                 require(self.published, 'upstream-unavailable')
                 if self.desktop:
@@ -437,10 +441,16 @@ class Relay:
                         result['searchInput'] = True
                     if self.features & 4:
                         result['selectAll'] = True
+                    if self.features & 8:
+                        result['focusDelete'] = True
             elif op == 'poll':
                 result = await self.poll(req['after'], req.get('reset', False), req.get('batch', False))
             elif op in ('click', 'input', 'desktop'):
                 require((op == 'desktop') == (self.start.get('protocol') == 'gnome'), 'wrong-input-protocol')
+                if op == 'desktop' and raw[16:17] in (b'B', b'D'):
+                    require(self.features & 8, 'wrong-input-protocol')
+                if op == 'desktop' and self.features & 8:
+                    require(raw[16:] not in (b'K\x08', b'K\x09'), 'wrong-input-protocol')
                 if op == 'desktop' and raw[16:17] == b'A':
                     require(self.features & 4, 'wrong-input-protocol')
                 if op == 'desktop' and raw[16:17] == b'T':

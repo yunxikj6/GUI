@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -98,6 +99,31 @@ export default class SearchInput extends Extension {
         return Math.abs((position < 0 ? length : position) - (bound < 0 ? length : bound)) === length;
     }
 
+    _delete(backward) {
+        const nativeText = Main.overview.searchEntry.get_clutter_text();
+        const buffer = nativeText.get_buffer();
+        const binding = Clutter.BindingPool.find('ClutterText');
+        const key = backward ? Clutter.KEY_BackSpace : Clutter.KEY_Delete;
+        if (!binding || binding.find_action(key, 0) !== (backward ? 'delete-prev' : 'delete-next'))
+            return false;
+        const before = buffer.get_length();
+        const cursor = nativeText.get_cursor_position();
+        const bound = nativeText.get_selection_bound();
+        const pos = cursor < 0 ? before : cursor;
+        const selection = bound < 0 ? before : bound;
+        const canDelete = pos !== selection || (backward ? pos > 0 : pos < before);
+        let removed = 0;
+        const signal = buffer.connect('deleted-text', (_buffer, _position, count) => { removed += count; });
+        try {
+            // Run the same class binding that the original ClutterText uses
+            // for a physical key, scoped to this actor on the Shell thread.
+            binding.activate(key, 0, nativeText);
+            return (canDelete ? removed > 0 : removed === 0) && before - buffer.get_length() === removed;
+        } finally {
+            buffer.disconnect(signal);
+        }
+    }
+
     _read(cancel) {
         this._input.read_line_async(GLib.PRIORITY_DEFAULT, cancel, async (stream, result) => {
             if (cancel.is_cancelled())
@@ -106,15 +132,17 @@ export default class SearchInput extends Extension {
                 const [line] = stream.read_line_finish_utf8(result);
                 if (line === null)
                     return;
-                const [revision, text] = JSON.parse(line);
+                const [revision, text, action] = JSON.parse(line);
                 const focused = this._focus() && this._revision === revision;
                 let applied = focused && typeof text === 'string' && text.length > 0 &&
                     !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(text) &&
                     new TextEncoder().encode(text).length <= 4096;
                 if (applied)
                     await this._commit(text);
-                else if (focused && text === null)
+                else if (focused && text === null && action === undefined)
                     applied = this._selectAll();
+                else if (focused && text === null && (action === 'backspace' || action === 'delete'))
+                    applied = this._delete(action === 'backspace');
                 this._write(`A ${Number(applied)}\n`);
                 this._read(cancel);
             } catch {

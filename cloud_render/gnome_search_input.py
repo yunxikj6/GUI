@@ -61,11 +61,17 @@ class SearchBridge:
 
     def commit(self, revision, text, poll):
         """Send one edit. The private extension interprets null as selection of the focused buffer."""
+        return self._request(revision, [text], poll)
+
+    def delete(self, revision, backward, poll):
+        return self._request(revision, [None, 'backspace' if backward else 'delete'], poll)
+
+    def _request(self, revision, edit, poll):
         if not self.active or self.revision != revision:
             return False
         self.decision = None
         self.waiting = True
-        self.peer.sendall(json.dumps([revision, text], ensure_ascii=False).encode('utf-8') + b'\n')
+        self.peer.sendall(json.dumps([revision, *edit], ensure_ascii=False).encode('utf-8') + b'\n')
         deadline = time.monotonic() + 2
         while self.decision is None:
             left = deadline - time.monotonic()

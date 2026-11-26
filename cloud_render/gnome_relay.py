@@ -21,13 +21,15 @@ TOKEN = re.compile(r'[A-Za-z0-9_-]{43}\Z')
 
 
 @asynccontextmanager
-async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=False, search_input=False):
+async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False):
     width, height = checked_size(size)
     options = [] if size == DEFAULT_SIZE else ['--size', f'{width}x{height}']
     if wallpaper:
         options.append('--wallpaper')
     if search_input:
         options.append('--search-input')
+    if focus_delete:
+        options.append('--focus-delete')
     read_fd, write_fd = os.pipe()
     events = asyncio.StreamReader(limit=2048)
     transport = proc = None
@@ -70,9 +72,9 @@ async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=Fal
 
 
 class _SourceLink:
-    def __init__(self, source, events, reader, writer, size, search_input=False, select_all=False):
-        self.select_all = select_all
-        self.search_input = search_input
+    def __init__(self, source, events, reader, writer, size, features=0):
+        self.features = features
+        self.search_input = bool(features & wire.SEARCH_INPUT)
         self.focus_revision = 0
         self.salt = secrets.token_bytes(32)
         self.last_applied = True
@@ -172,9 +174,12 @@ class _SourceLink:
             seq, = wire.SEQUENCE.unpack_from(body)
             command = body[wire.SEQUENCE.size:]
             kind, _ = decode_input(command, size=self.size)
-            if ((kind == b'A' and not self.select_all) or
-                    (kind in (b'A', b'T') and not self.search_input)):
+            needed = {b'A': wire.SELECT_ALL, b'T': wire.SEARCH_INPUT,
+                      b'B': wire.FOCUS_DELETE, b'D': wire.FOCUS_DELETE}.get(kind)
+            if needed and not self.features & needed:
                 raise wire.DesktopError('当前会话未协商原厂文字输入。')
+            if self.features & wire.FOCUS_DELETE and command in (b'K\x08', b'K\x09'):
+                raise wire.DesktopError('删除操作需要原厂焦点编号。')
             fingerprint = hmac.digest(self.salt, command, 'sha256')
             if seq == self.sequence and seq and hmac.compare_digest(fingerprint, self.last_command):
                 await self.send(wire.packet(wire.ACK, wire.INPUT_ACK.pack(seq, self.last_applied)))
@@ -192,7 +197,7 @@ class _SourceLink:
             self.source.stdin.write(command)
             await asyncio.wait_for(self.source.stdin.drain(), 5)
             self.last_applied = await asyncio.wait_for(self.pending, 10)
-            if not self.last_applied and kind not in (b'T', b'A'):
+            if not self.last_applied and kind not in (b'T', b'A', b'B', b'D'):
                 raise wire.DesktopError('原桌面导航操作未经确认。')
             self.pending = None
             self.last_command = fingerprint
@@ -238,11 +243,11 @@ class DesktopService:
                 return
             login = await asyncio.wait_for(reader.readexactly(len(self.expected)), 5)
             if hmac.compare_digest(login, self.expected_query):
-                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL))
+                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE))
                 await writer.drain()
                 return
             options = {}
-            select_all = False
+            features = 0
             if hmac.compare_digest(login, self.expected):
                 size = DEFAULT_SIZE
             elif hmac.compare_digest(login, self.expected_size):
@@ -250,7 +255,9 @@ class DesktopService:
                 width, height, offered = wire.SESSION.unpack(raw)
                 if offered & wire.SEARCH_INPUT:
                     options['search_input'] = True
-                    select_all = bool(offered & wire.SELECT_ALL)
+                    features = offered & (wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE)
+                    if features & wire.FOCUS_DELETE:
+                        options['focus_delete'] = True
                 if offered & wire.WALLPAPER:
                     options['wallpaper'] = True
                 size = checked_size((width, height))
@@ -263,8 +270,7 @@ class DesktopService:
                 options['size'] = size
             factory = self.source_factory(**options)
             async with factory as (source, observations):
-                link = _SourceLink(source, observations, reader, writer, size,
-                                   options.get('search_input', False), select_all)
+                link = _SourceLink(source, observations, reader, writer, size, features)
                 await link.run()
         except (OSError, EOFError, ValueError, TimeoutError):
             pass

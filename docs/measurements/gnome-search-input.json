@@ -48,5 +48,14 @@
     "matchedOriginalAndIndependentReplayFrames": 136,
     "selectedFrame": 66,
     "selectedFrameSha256": "c6a727253705c34faeded6fc55abbfdc9bd8013bf6e57262e5d07fea82e80bba"
+  },
+  "focusedDeletion": {
+    "capability": 8,
+    "tested": "Native ClutterText delete-prev and delete-next key bindings; backward delete at end, forward delete at cursor, selected text, empty buffer and blur.",
+    "producedSourceFrames": 121,
+    "receivedReplayFrames": 120,
+    "receivedFramesMatchingSourcePrefix": 120,
+    "sourceAndReplayClose": "The viewer closed after receiving 120 frames.",
+    "sourceBackspaceAndForwardDeleteConfirmed": true
   }
 }

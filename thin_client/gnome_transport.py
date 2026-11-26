@@ -11,7 +11,7 @@ import threading
 
 from cloud_render import gnome_wire as wire
 from cloud_render.instabox_relay import BATCH_BYTES, BATCH_COUNT, BATCH_INLINE
-from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer, encode_select_all, encode_text
+from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_delete, encode_key, encode_pointer, encode_select_all, encode_text
 from .instabox_transport import InstaBoxControl, InvalidPayload, RequestOutcomeUnknown, TransportError
 
 
@@ -21,7 +21,7 @@ DOWNSTREAM = {wire.BLOCK, wire.ACK, wire.READY, wire.END, wire.UNAVAILABLE, wire
 
 
 class _Provider(InstaBoxControl):
-    def __init__(self, box, port, pairing, size, wallpaper=False, search_input=False):
+    def __init__(self, box, port, pairing, size, wallpaper=False, search_input=False, focus_delete=False):
         super().__init__(box)
         self.cursor = 0
         self.pending = deque()
@@ -30,11 +30,14 @@ class _Provider(InstaBoxControl):
             if search_input:
                 dimensions['searchInput'] = True
                 dimensions['selectAll'] = True
+                if focus_delete:
+                    dimensions['focusDelete'] = True
             if wallpaper:
                 dimensions['wallpaper'] = True
             started = self._call('start', port=port, pair=pairing, protocol='gnome', **dimensions)
             self.search_input = started.get('searchInput') is True and search_input
             self.can_select_all = self.search_input and started.get('selectAll') is True
+            self.focus_delete = self.search_input and focus_delete and started.get('focusDelete') is True
             self.batch = started.get('batch') is True
         except BaseException:
             self.close()
@@ -105,9 +108,11 @@ class _Provider(InstaBoxControl):
 
 
 class _Forward:
-    def __init__(self, port, pairing, size, wallpaper=False, search_input=False):
+    def __init__(self, port, pairing, size, wallpaper=False, search_input=False, focus_delete=False):
         flags = 0
         requested = (wire.WALLPAPER if wallpaper else 0) | ((wire.SEARCH_INPUT | wire.SELECT_ALL) if search_input else 0)
+        if focus_delete and search_input:
+            requested |= wire.FOCUS_DELETE
         if requested:
             with socket.create_connection(('127.0.0.1', port), timeout=5) as query, query.makefile('rb') as reply:
                 query.sendall(wire.QUERY + pairing.encode('ascii') + b'\n')
@@ -117,9 +122,10 @@ class _Forward:
                     if magic == wire.FEATURE_MAGIC:
                         flags = offered & requested
         if not flags & wire.SEARCH_INPUT:
-            flags &= ~wire.SELECT_ALL
+            flags &= ~(wire.SELECT_ALL | wire.FOCUS_DELETE)
         self.search_input = bool(flags & wire.SEARCH_INPUT)
         self.can_select_all = bool(flags & wire.SELECT_ALL)
+        self.focus_delete = bool(flags & wire.FOCUS_DELETE)
         self.peer = socket.create_connection(('127.0.0.1', port), timeout=8)
         try:
             extended = bool(flags) or size != DEFAULT_SIZE
@@ -318,6 +324,17 @@ class DesktopStream:
             return False
         return self._input(encode_select_all(revision & 0xffffffff))
 
+    def has_text_focus_protocol(self):
+        return bool(getattr(self.peer, 'search_input', False))
+
+    def has_focused_delete(self):
+        return bool(getattr(self.peer, 'focus_delete', False))
+
+    def delete_text(self, revision, *, backward=True):
+        if not self.has_focused_delete() or type(revision) is not int or self.text_focus() != revision:
+            return False
+        return self._input(encode_delete(revision & 0xffffffff, backward=backward))
+
     def send_super(self):
         return self._input(b'S')
 
@@ -330,6 +347,8 @@ class DesktopStream:
         return self._input(encode_pointer(b'L' if button == 'left' else b'R', x, y, size=self.size))
 
     def key(self, name):
+        if self.has_focused_delete() and name in ('Backspace', 'Delete'):
+            return False
         return self._input(encode_key(name))
 
     def pop_unavailable(self):
@@ -364,11 +383,11 @@ def _credentials(port, pairing):
         raise ValueError('云桌面端口或配对码无效。')
 
 
-def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False):
+def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False):
     _credentials(port, pairing)
-    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper, search_input), size=size)
+    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper, search_input or focus_delete, focus_delete), size=size)
 
 
-def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False):
+def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False):
     _credentials(port, pairing)
-    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper, search_input), size=size)
+    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper, search_input or focus_delete, focus_delete), size=size)

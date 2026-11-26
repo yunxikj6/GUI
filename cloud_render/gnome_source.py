@@ -303,10 +303,11 @@ def _apply(env, xid, command, size=DEFAULT_SIZE):
 
 
 class _Source:
-    def __init__(self, stack, directory, event_fd, control_fd, mode, size=DEFAULT_SIZE, wallpaper=False, search=False):
+    def __init__(self, stack, directory, event_fd, control_fd, mode, size=DEFAULT_SIZE, wallpaper=False, search=False, focus_delete=False):
         self.wallpaper = wallpaper
         self.size = size
         self.width, self.height = size
+        self.focus_delete = focus_delete
         self.search = SearchBridge(directory, stack) if search else None
         self.mode = mode
         self.stack = stack
@@ -507,7 +508,13 @@ class _Source:
                 _focused(self.env, xid, self.size)
                 self.read_frames()
                 before = self.frames
-                if kind in (b'T', b'A'):
+                if self.focus_delete and command in (b'K\x08', b'K\x09'):
+                    raise SourceError('删除操作需要原厂焦点编号。')
+                if kind in (b'B', b'D'):
+                    if not self.focus_delete or not self.search:
+                        raise SourceError('此会话未协商聚焦删除。')
+                    applied = self.search.delete(args[0], kind == b'B', self.poll)
+                elif kind in (b'T', b'A'):
                     if not self.search:
                         raise SourceError('此会话未协商搜索输入。')
                     value = args[1] if kind == b'T' else None
@@ -522,6 +529,7 @@ class _Source:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--focus-delete', action='store_true')
     parser.add_argument('--search-input', action='store_true')
     parser.add_argument('--size', choices=SIZE_NAMES, default='800x520')
     parser.add_argument('--event-fd', type=int, required=True, help='接收就绪、绘制与输入回执的专用写入文件描述符')
@@ -543,7 +551,7 @@ def main():
             signal.signal(signal.SIGTERM, stop)
             with tempfile.TemporaryDirectory(prefix='gnome-', dir='/tmp') as root, ExitStack() as stack:
                 _Source(stack, Path(root), args.event_fd, sys.stdin.fileno(), args.session_mode,
-                        SIZE_NAMES[args.size], args.wallpaper, args.search_input).serve()
+                        SIZE_NAMES[args.size], args.wallpaper, args.search_input, args.focus_delete).serve()
     except (Disconnected, KeyboardInterrupt, BrokenPipeError):
         return 0
     except (OSError, SourceError, StreamError, ValueError, subprocess.SubprocessError) as exc:
