@@ -284,7 +284,7 @@ async def collect(out, *, live=False, interactive=False, pair=None):
         xid.isdigit() or (xid.startswith('0x') and all(c in '0123456789abcdef' for c in xid[2:])),
         'invalid private display window',
     )
-    async with open_chatgpt(out / 'profile', executable=out / 'bin' / 'wayland-original') as page:
+    async with open_chatgpt(Path(os.environ.get('CW_APP_PROFILE', out / 'profile')), executable=out / 'bin' / 'wayland-original') as page:
         require(page.url == APP_PAGE and _exclusive_page(page), 'expected unique original page')
         browser = await page.context.browser.new_browser_cdp_session()
         details = await browser.send('SystemInfo.getProcessInfo')

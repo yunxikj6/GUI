@@ -10,6 +10,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import tempfile
 import warnings
 
 from cloud_render.gnome_relay import TOKEN
@@ -36,7 +37,7 @@ def _token():
     return value
 
 
-async def _session(workspace, port, token):
+async def _session(workspace, port, token, profile_fd=None):
     from experiments.original_desktop_bridge import serve
 
     channel = workspace / "pair"
@@ -45,7 +46,8 @@ async def _session(workspace, port, token):
     # guardian-owned group. Flooded logs or a missing client cannot extend it.
     proc = await asyncio.create_subprocess_exec(
         "bash", ROOT / "experiments/mutter_app/run.sh", "--interactive", channel, source,
-        stdin=subprocess.DEVNULL,
+        *(("--profile-fd", str(profile_fd)) if profile_fd is not None else ()),
+        stdin=subprocess.DEVNULL, pass_fds=(profile_fd,) if profile_fd is not None else (),
     )
     bridge = asyncio.create_task(serve(channel, port, token))
     exited = asyncio.create_task(proc.wait())
@@ -72,24 +74,25 @@ async def _session(workspace, port, token):
         await asyncio.gather(exited, return_exceptions=True)
 
 
-def _worker(workspace, port):
+def _worker(workspace, port, profile_fd=None):
     token = sys.stdin.buffer.readline(46)
     if len(token) != 44 or token[-1:] != b"\n":
         raise ValueError("配对输入无效。")
     value = token[:-1].decode("ascii")
     if not TOKEN.fullmatch(value):
         raise ValueError("配对输入无效。")
-    return asyncio.run(_session(workspace, port, value))
+    return asyncio.run(_session(workspace, port, value, profile_fd))
 
 
-def _launch(port, lifetime, token):
+def _launch(port, lifetime, token, profile=None):
     # Include a source Python venv, when present. Vendor and account credentials
     # are never inherited by bash, the renderer or an app launched from the Dock.
     env = {"PATH": os.environ.get("PATH", os.defpath), "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"}
     if "CW_MUTTER_PREBUILD" in os.environ:
         env["CW_MUTTER_PREBUILD"] = os.environ["CW_MUTTER_PREBUILD"]
     proc = subprocess.Popen(
-        [sys.executable, "-m", MODULE, "watch", str(port), str(lifetime)],
+        [sys.executable, "-m", MODULE, "watch", str(port), str(lifetime),
+         *(("--profile", str(profile.absolute())) if profile is not None else ())],
         cwd=ROOT, env=env, stdin=subprocess.PIPE, start_new_session=True,
     )
     try:
@@ -110,20 +113,52 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=17326, help="云机回环端口，0 表示自动选择")
     parser.add_argument("--lifetime", type=int, default=3600, help="从启动开始计算的最长运行秒数，默认 3600")
+    parser.add_argument("--profile", type=Path, help="保存原厂应用数据的云端专用目录，默认随会话回收")
     args = parser.parse_args(argv)
     if not 0 <= args.port <= 65535 or args.lifetime <= 0:
         parser.error("端口须在 0 至 65535 之间，最长运行秒数须为正整数。")
-    return _launch(args.port, args.lifetime, _token())
+    return _launch(args.port, args.lifetime, _token(), args.profile)
+
+
+def _provisioned(port, persistent):
+    # The outer Debian guardian owns this fixed mount, its exclusive lock and
+    # the entire PID namespace, including namespace teardown on disconnect.
+    with contextlib.ExitStack() as scope:
+        fd = None
+        if persistent:
+            fd = os.open("/run/cw-application-data", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            scope.callback(os.close, fd)
+        temporary = scope.enter_context(tempfile.TemporaryDirectory(prefix="original-ubuntu-"))
+        return asyncio.run(_session(Path(temporary), port, _token(), fd))
+
+
+def _supervised(argv):
+    role, *arguments = argv
+    parser = argparse.ArgumentParser()
+    if role == "provisioned":
+        parser.add_argument("port", type=int)
+        parser.add_argument("--persistent", action="store_true")
+        args = parser.parse_args(arguments)
+        return _provisioned(args.port, args.persistent)
+    if role == "worker":
+        parser.add_argument("workspace", type=Path)
+        parser.add_argument("port", type=int)
+        parser.add_argument("--profile-fd", type=int)
+        args = parser.parse_args(arguments)
+        return _worker(args.workspace, args.port, args.profile_fd)
+    parser.add_argument("port", type=int)
+    parser.add_argument("lifetime", type=int)
+    parser.add_argument("--profile", type=Path)
+    args = parser.parse_args(arguments)
+    return watch_private_worker(
+        MODULE, args.port, args.lifetime, prefix="original-ubuntu-", timeout_status=124, profile=args.profile,
+    )
 
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) == 4 and sys.argv[1] == "worker":
-            status = _worker(Path(sys.argv[2]), int(sys.argv[3]))
-        elif len(sys.argv) == 4 and sys.argv[1] == "watch":
-            status = watch_private_worker(
-                MODULE, int(sys.argv[2]), int(sys.argv[3]), prefix="original-ubuntu-", timeout_status=124,
-            )
+        if sys.argv[1:2] and sys.argv[1] in {"provisioned", "worker", "watch"}:
+            status = _supervised(sys.argv[1:])
         else:
             for sig in (signal.SIGTERM, signal.SIGHUP):
                 signal.signal(sig, _stop)

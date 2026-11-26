@@ -52,18 +52,25 @@ def main(argv=None):
     parser.add_argument(
         "--lifetime-minutes", type=int, default=240, help="从准备开始计算的最长存活分钟数，默认 240"
     )
-    parser.add_argument("--chatgpt-deb", type=Path, metavar="FILE",
+    application = parser.add_mutually_exclusive_group()
+    application.add_argument("--chatgpt", action="store_true", help="在云机获取并运行已固定版本的原厂 ChatGPT 软件包")
+    application.add_argument("--chatgpt-deb", type=Path, metavar="FILE",
                         help="在云机的临时 Ubuntu 桌面运行已核对的原版 Linux amd64 安装包")
+    parser.add_argument("--profile", type=Path, help="保存原厂应用数据的云端专用目录，默认随会话回收")
     args = parser.parse_args(argv)
+    if args.profile is not None and not (args.chatgpt_deb or args.chatgpt):
+        parser.error("--profile 需要同时指定 --chatgpt 或 --chatgpt-deb。")
     if args.port is None:
-        args.port = 17326 if args.chatgpt_deb else 17325
-    extra = []
+        args.port = 17326 if args.chatgpt_deb or args.chatgpt else 17325
+    extra = ["--chatgpt"] if args.chatgpt else []
     if args.chatgpt_deb:
         from .chatgpt import PACKAGE
         source = args.chatgpt_deb.absolute()
         if not source.is_file() or source.stat().st_size != PACKAGE["size"]:
             parser.error("请提供已核对版本的云端 ChatGPT Linux amd64 .deb。")
         extra = [str(source)]
+    if args.profile is not None:
+        extra += ["--profile", str(args.profile.absolute())]
     if not 0 <= args.port <= 65535 or not 1 <= args.lifetime_minutes <= 1440:
         parser.error("端口须在 0 至 65535 之间，生命周期须在 1 至 1440 分钟之间。")
     handles = contextlib.ExitStack()

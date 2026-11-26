@@ -11,12 +11,16 @@ from .caches import generate
 from .packages import build
 
 
-def run(directory, port, token, app_deb=None):
+def run(directory, port, token, app_deb=None, profile_fd=None):
     modules = Path(__file__).resolve().parents[1]
     root = directory / "ubuntu"
     ring = Path(__file__).with_name("keys") / "ubuntu-archive-keyring.gpg"
     # Quarantine and hash the supplied file before any APT network activity.
-    archive = chatgpt.stage(app_deb, directory) if app_deb else None
+    archive = None
+    if app_deb == "--chatgpt":
+        archive = chatgpt.fetch_vendor(directory)
+    elif app_deb:
+        archive = chatgpt.stage(app_deb, directory)
     with tempfile.TemporaryDirectory(dir=directory, prefix="apt-") as scratch:
         packages = resolve(Path(scratch), ring, chatgpt.PACKAGES if app_deb else ())
     print(f"Ubuntu 已验证 {len(packages)} 个软件包的索引，正在准备专用桌面。", flush=True)
@@ -61,7 +65,12 @@ def run(directory, port, token, app_deb=None):
     ]
     if app_deb:
         args += ["--ro-bind", str(modules.parent / "experiments"), "/run/app/experiments"]
-        service = ["experiments.original_desktop_source", "--port", str(port)]
+        # The host guardian already owns the build, the process group, its
+        # deadline and the exclusive profile lease. It includes preparation time.
+        service = ["experiments.original_desktop_source", "provisioned", str(port)]
+        if profile_fd is not None:
+            args += ["--bind-fd", str(profile_fd), "/run/cw-application-data"]
+            service.append("--persistent")
     else:
         service = ["cloud_render.gnome_relay", "--port", str(port), "--session-mode", "ubuntu"]
     args += ["--chdir", "/run/app", "--", "/usr/bin/python3", "-B", "-m", *service]

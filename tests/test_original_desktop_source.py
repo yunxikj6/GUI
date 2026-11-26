@@ -13,6 +13,7 @@ import time
 import unittest
 
 from cloud_render import gnome_wire as wire
+from cloud_render.provision.guardian import DESKTOP_PROFILE_MARKER
 from experiments.mutter_app.controls import ORIGINAL_SHA256
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,10 @@ test "$1" = --interactive
 test -z "${CLOUDWORKSPACE_GNOME_TOKEN+x}${INSTABOX_API_KEY+x}"
 mkdir "$2" "$3"
 base=$(dirname "$0")
+if test "$#" = 5; then
+    test "$4" = --profile-fd
+    stat -Lc '%d:%i' "/proc/self/fd/$5" > "$base/profile-inode"
+fi
 printf '%s\n' "$3" > "$base/scope"
 (sleep 120) &
 echo $! > "$base/pid"
@@ -126,6 +131,71 @@ class OriginalDesktopSourceTests(unittest.TestCase):
                 self.assertNotIn(self.token.encode(), stdout + stderr)
                 self.verify_cleanup()
                 (self.app / "pid").unlink()
+
+    def test_profile_pins_the_directory_until_the_private_session_is_reclaimed(self):
+        from cloud_render.chatgpt_process import _own_profile
+        profile = self.repo / 'data'
+        proc = self.start('--port', '0', '--profile', str(profile))
+        self.port(proc)
+        for _ in range(100):
+            if (self.app / 'profile-inode').exists():
+                break
+            time.sleep(.02)
+        inode = profile.stat()
+        self.assertEqual((self.app / 'profile-inode').read_text().strip(), f'{inode.st_dev}:{inode.st_ino}')
+        second = self.start('--port', '0', '--profile', str(profile))
+        _, stderr = second.communicate(timeout=6)
+        self.assertEqual(second.returncode, 1)
+        self.assertIn('已有运行中的工作区', stderr.decode())
+        # Rename the original and reuse its name for an unrelated directory.
+        # Neither the running process nor the cleanup may follow that name.
+        moved = profile.rename(self.repo / 'moved')
+        profile.mkdir(mode=0o700)
+        (profile / 'unrelated').touch()
+        self.assertTrue((moved / DESKTOP_PROFILE_MARKER).is_file())
+        proc.terminate()
+        proc.communicate(timeout=12)
+        self.verify_cleanup()
+        self.assertTrue((profile / 'unrelated').is_file())
+        with _own_profile(moved, marker_name=DESKTOP_PROFILE_MARKER) as fd:
+            self.assertEqual(os.fstat(fd).st_ino, inode.st_ino)
+
+    @unittest.skipUnless(shutil.which('bwrap'), 'bubblewrap directory-fd mounts')
+    def test_mount_uses_the_validated_inode_when_the_path_is_replaced(self):
+        from cloud_render.chatgpt_process import _own_profile
+        command = ['bwrap', '--unshare-user', '--ro-bind', '/', '/']
+        if subprocess.run(command + ['--', '/bin/true'], capture_output=True).returncode:
+            self.skipTest('user namespaces are unavailable')
+        profile = self.repo / 'profile'
+        with _own_profile(profile) as fd:
+            (profile / 'fixture').write_text('pinned')
+            profile.rename(self.repo / 'original')
+            profile.mkdir(mode=0o700)
+            (profile / 'fixture').write_text('replacement')
+            content = subprocess.check_output(command + [
+                '--tmpfs', '/tmp', '--bind-fd', str(fd), '/tmp/profile', '--', '/bin/cat', '/tmp/profile/fixture'
+            ], pass_fds=(fd,))
+            self.assertEqual(content, b'pinned')
+
+    def test_profile_rejects_foreign_contents_home_and_symlink_components(self):
+        from cloud_render.chatgpt_process import _own_profile
+        path = self.repo / 'private'
+        path.mkdir(mode=0o700)
+        alias = self.repo / 'alias'
+        alias.symlink_to(path)
+        for location in (alias, alias / 'child'):
+            with self.assertRaises(OSError), _own_profile(location):
+                pass
+        self.assertFalse((path / 'child').exists())
+        (path / 'personal').touch()
+        with self.assertRaisesRegex(RuntimeError, '空目录'), _own_profile(path):
+            pass
+        with self.assertRaisesRegex(ValueError, '主目录'), _own_profile(Path.home()):
+            pass
+        (path / 'personal').unlink()
+        path.chmod(0o755)
+        with self.assertRaises(PermissionError), _own_profile(path):
+            pass
 
     def test_explicit_failure_for_source_crash_port_conflict_or_missing_pairing(self):
         (self.app / "fail").touch()

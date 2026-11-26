@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 MODULE = "cloud_render.provision.guardian"
+DESKTOP_PROFILE_MARKER = ".cloudworkspace-original-desktop-v1"
 
 
 def _exited(pid):
@@ -20,21 +21,28 @@ def _exited(pid):
     return os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
 
 
-def supervise(port, lifetime, app=()):
-    return watch_private_worker(MODULE, port, lifetime, prefix="ubuntu-workspace-", args=app)
+def supervise(port, lifetime, app=(), profile=None):
+    return watch_private_worker(MODULE, port, lifetime, prefix="ubuntu-workspace-", args=app, profile=profile)
 
 
-def watch_private_worker(module, port, lifetime, *, prefix, timeout_status=0, args=()):
+def watch_private_worker(module, port, lifetime, *, prefix, timeout_status=0, args=(), profile=None):
     """Own a private /tmp tree and process group until the controller pipe closes."""
     token = sys.stdin.buffer.readline(46)
     if not re.fullmatch(rb"[A-Za-z0-9_-]{43}\n", token):
         raise ValueError("配对输入无效。")
     # The guardian owns both the directory and the unreaped direct worker.
     # Losing the terminal controller closes its pipe even after SIGKILL.
-    with tempfile.TemporaryDirectory(prefix=prefix, dir="/tmp") as workspace:
+    with contextlib.ExitStack() as scope:
+        fds = ()
+        if profile is not None:
+            from cloud_render.chatgpt_process import _own_profile
+            directory = scope.enter_context(_own_profile(profile, marker_name=DESKTOP_PROFILE_MARKER))
+            fds = (directory,)
+            args = (*args, "--profile-fd", str(directory))
+        workspace = scope.enter_context(tempfile.TemporaryDirectory(prefix=prefix, dir="/tmp"))
         proc = subprocess.Popen(
             [sys.executable, "-m", module, "worker", workspace, str(port), *args],
-            stdin=subprocess.PIPE,
+            stdin=subprocess.PIPE, pass_fds=fds,
             start_new_session=True,
         )
         try:
@@ -75,16 +83,28 @@ def watch_private_worker(module, port, lifetime, *, prefix, timeout_status=0, ar
 
 
 def main():
-    if len(sys.argv) in (4, 5) and sys.argv[1] == "watch":
-        return supervise(int(sys.argv[2]), int(sys.argv[3]), sys.argv[4:])
-    if len(sys.argv) in (4, 5) and sys.argv[1] == "worker":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("role", choices=("watch", "worker"))
+    parser.add_argument("scope")
+    parser.add_argument("number", type=int)
+    parser.add_argument("archive", nargs="?", type=Path)
+    parser.add_argument("--chatgpt", action="store_true")
+    parser.add_argument("--profile", type=Path)
+    parser.add_argument("--profile-fd", type=int)
+    args = parser.parse_args()
+    if args.chatgpt and args.archive:
+        parser.error("只能选择一个原厂软件包来源。")
+    app = "--chatgpt" if args.chatgpt else args.archive
+    if args.role == "watch" and args.profile_fd is None:
+        return supervise(int(args.scope), args.number, (str(app),) if app else (), args.profile)
+    if args.role == "worker" and args.profile is None:
         from .worker import run
 
         token = sys.stdin.buffer.readline(46)
         if not re.fullmatch(rb"[A-Za-z0-9_-]{43}\n", token):
             raise ValueError("配对输入无效。")
-        archive = Path(sys.argv[4]) if len(sys.argv) == 5 else None
-        run(Path(sys.argv[2]), int(sys.argv[3]), token.rstrip().decode("ascii"), archive)
+        run(Path(args.scope), args.number, token.rstrip().decode("ascii"), app, args.profile_fd)
         return 0
     raise ValueError("请使用 python3 -m cloud_render.provision 启动。")
 

@@ -12,11 +12,28 @@ PROFILE_MARKER = '.cloudworkspace-chatgpt-v1'
 
 
 @contextmanager
-def _own_profile(path):
-    path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    directory = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+def _own_profile(path, *, marker_name=PROFILE_MARKER):
+    path = Path(path).absolute()
+    if '..' in path.parts:
+        raise ValueError('云端配置目录不能包含上级目录引用。')
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    directory = os.open('/', flags)
     try:
+        for component in path.parts[1:]:
+            try:
+                child = os.open(component, flags, dir_fd=directory)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, mode=0o700, dir_fd=directory)
+                except FileExistsError:
+                    pass
+                child = os.open(component, flags, dir_fd=directory)
+            os.close(directory)
+            directory = child
         state = os.fstat(directory)
+        home = Path.home()
+        if home.exists() and os.path.samestat(state, home.stat()):
+            raise ValueError('请在主目录内另建专用云端配置目录。')
         if state.st_uid != os.geteuid() or state.st_mode & 0o077:
             raise PermissionError('云端工作区配置目录须属于当前用户且仅该用户可访问。')
         try:
@@ -25,13 +42,15 @@ def _own_profile(path):
             raise RuntimeError('该云端配置已有运行中的工作区。') from exc
         entries = os.listdir(directory)
         if not entries:
-            marker = os.open(PROFILE_MARKER, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600, dir_fd=directory)
+            marker = os.open(marker_name, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600, dir_fd=directory)
             os.close(marker)
-        elif PROFILE_MARKER not in entries or not stat.S_ISREG(os.stat(
-            PROFILE_MARKER, dir_fd=directory, follow_symlinks=False
-        ).st_mode):
-            raise RuntimeError('请选择空目录或此前由本服务建立的专用配置目录。')
-        yield
+        else:
+            marker = (os.stat(marker_name, dir_fd=directory, follow_symlinks=False)
+                      if marker_name in entries else None)
+            if (not marker or not stat.S_ISREG(marker.st_mode) or marker.st_uid != state.st_uid or
+                    marker.st_mode & 0o077 or marker.st_nlink != 1):
+                raise RuntimeError('请选择空目录或此前由本服务建立的专用配置目录。')
+        yield directory
     finally:
         os.close(directory)
 
@@ -69,7 +88,10 @@ async def open_chatgpt(profile: Path, *, executable: Path = Path('/usr/bin/chatg
 
     if not executable.is_absolute() or not executable.is_file() or not os.access(executable, os.X_OK):
         raise FileNotFoundError('云端缺少可执行的 ChatGPT 客户端。')
+    # Existing standalone deployments may have a symlinked home or parent.
+    # Resolve its parent once and keep the profile directory itself no-follow.
     root = profile.absolute()
+    root = root.parent.resolve() / root.name
     with _own_profile(root):
         home = root / 'home'
         home.mkdir(mode=0o700, exist_ok=True)

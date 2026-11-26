@@ -7,6 +7,11 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     src=$(cd "$(dirname "$0")/../.." && pwd -P)
     live=0
     ipc=()
+    profile=()
+    if [[ $# = 5 && ${1:-} = --interactive && $4 = --profile-fd && $5 =~ ^[0-9]+$ ]]; then
+        profile=(--bind-fd "$5" /run/cw-work/persistent --setenv CW_APP_PROFILE /run/cw-work/persistent/app)
+        set -- "$1" "$2" "$3"
+    fi
     if [[ ( ${1:-} = --live || ${1:-} = --interactive ) && $# = 3 ]]; then
         if [[ $1 = --interactive ]]; then mode=interactive; else mode=proof; fi
         channel=$(realpath -m -- "$2")
@@ -38,7 +43,7 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     done
     exec bwrap --die-with-parent --unshare-user --unshare-net --unshare-pid --unshare-ipc \
         --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run --tmpfs /home --tmpfs /root "${binds[@]}" \
-        --dir /run/cw-work --ro-bind "$src" /run/cw-work/source --bind "$out" /run/cw-work/result "${ipc[@]}" --clearenv \
+        --dir /run/cw-work --ro-bind "$src" /run/cw-work/source --bind "$out" /run/cw-work/result "${ipc[@]}" --clearenv "${profile[@]}" \
         --setenv PATH /usr/local/bin:/usr/bin:/bin --setenv LANG C.UTF-8 --setenv LC_ALL C.UTF-8 \
         --setenv HOME /run/cw-work/result/home --setenv CW_PYTHON "$python" --setenv CW_LIVE "$live" --chdir /run/cw-work/source \
         -- /bin/bash /run/cw-work/source/experiments/mutter_app/run.sh --inside

@@ -14,6 +14,14 @@ python3 -m experiments.original_desktop_source --port 17326 --lifetime 3600
 
 使用 `--port 0` 会在终端报告本次分配的回环端口。默认一小时包括启动和等待配对的时间。关闭已配对的窗口、终止这条命令或达到时限后，云机会回收该会话的进程与临时目录。再次运行会创建新的桌面。
 
+要在下次配对时继续使用相同的原厂云端应用数据，可在每次启动时指定同一目录。
+
+```sh
+python3 -m experiments.original_desktop_source --profile "$HOME/.local/share/cloud-workspace/chatgpt-desktop"
+```
+
+首次启动会创建权限为 `0700` 的专用目录，也可指定已有的私有空目录。一个目录同时只供一个桌面会话使用。关闭后应用自行写入的配置和数据保存在这个云端目录，下一次仍需重新配对。省略 `--profile` 时应用配置随临时会话回收。此入口的图形进程仍在隔离网络中运行。
+
 配对桥只在云机回环监听。使用 InstaBox 的 Windows 客户端通过现有官方私有传输取原版指令、绘图与真实输入确认。已将同一云端回环端口私密转发到本机的环境也可运行下列命令。配对码只通过交互提示或 `CLOUDWORKSPACE_GNOME_TOKEN` 输入。
 
 ```bat
