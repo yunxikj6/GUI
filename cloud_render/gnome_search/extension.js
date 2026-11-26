@@ -5,6 +5,13 @@ import Shell from 'gi://Shell';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+const cursorBindings = new Map([
+    ['Left', [Clutter.KEY_Left, 'move-left']],
+    ['Right', [Clutter.KEY_Right, 'move-right']],
+    ['Home', [Clutter.KEY_Home, 'line-start']],
+    ['End', [Clutter.KEY_End, 'line-end']],
+]);
+
 // Only the exclusive source's private Unix socket carries committed text.
 // The desktop continues to draw and edit its own St.Entry through Clutter.
 export default class SearchInput extends Extension {
@@ -124,6 +131,20 @@ export default class SearchInput extends Extension {
         }
     }
 
+    _navigate(action) {
+        const nativeText = Main.overview.searchEntry.get_clutter_text();
+        const binding = Clutter.BindingPool.find('ClutterText');
+        const [key, name] = cursorBindings.get(action);
+        if (!binding || binding.find_action(key, 0) !== name)
+            return false;
+        // Keep the same native binding as a physical key on this actor.
+        // Mutations and the next edit now run on the same Shell main loop.
+        const pos = nativeText.get_cursor_position();
+        const bound = nativeText.get_selection_bound();
+        const handled = binding.activate(key, 0, nativeText);
+        return handled || pos !== nativeText.get_cursor_position() || bound !== nativeText.get_selection_bound();
+    }
+
     _read(cancel) {
         this._input.read_line_async(GLib.PRIORITY_DEFAULT, cancel, async (stream, result) => {
             if (cancel.is_cancelled())
@@ -141,6 +162,8 @@ export default class SearchInput extends Extension {
                     await this._commit(text);
                 else if (focused && text === null && action === undefined)
                     applied = this._selectAll();
+                else if (focused && text === null && cursorBindings.has(action))
+                    applied = this._navigate(action);
                 else if (focused && text === null && (action === 'backspace' || action === 'delete'))
                     applied = this._delete(action === 'backspace');
                 this._write(`A ${Number(applied)}\n`);

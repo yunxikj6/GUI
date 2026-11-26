@@ -57,5 +57,56 @@
     "receivedFramesMatchingSourcePrefix": 120,
     "sourceAndReplayClose": "The viewer closed after receiving 120 frames.",
     "sourceBackspaceAndForwardDeleteConfirmed": true
+  },
+  "cursorThenDelete": {
+    "environment": "Dedicated real Ubuntu GNOME 46 Shell; two CPUs available during each input series. Private, Linux-host loopback.",
+    "test": "Commit 你好, immediately send native Left, then forward Delete; expect 你.",
+    "formerPhysicalNavigation": {
+      "completedAsRequested": 63,
+      "trials": 64,
+      "wrongTrialOneBased": 35,
+      "sourceAckBeforeDeleteMs": 67.1,
+      "actualLeftKeyPressAfterDeleteStartedMs": 4.4
+    },
+    "nativeClutterNavigation": {
+      "completedAsRequested": 64,
+      "trials": 64
+    },
+    "staleAfterRefocus": "The real search control lost and regained focus. Delayed text, selection and both deletions with the previous revision were rejected; the current revision committed normally.",
+    "cursorSelectionParity": {
+      "allNineMatched": true,
+      "bufferLength": 5,
+      "keys": [
+        "Left",
+        "Home",
+        "Home Right",
+        "Home End",
+        "Left Right",
+        "SelectAll Left",
+        "SelectAll Right",
+        "End End",
+        "Home Home"
+      ],
+      "cursorAndSelectionBound": [
+        4,
+        0,
+        1,
+        -1,
+        -1,
+        0,
+        1,
+        -1,
+        0
+      ]
+    },
+    "unchangedPackageConfirmation": {
+      "archiveSha256": "a68dc986f4952d546109e1662b01905bb729373187f14145964b0e27788c2ab0",
+      "entry": "cmd.exe /d /c Start.cmd --desktop-forwarded-port",
+      "environment": "Windows x64 CPython 3.13.17 through Wine 10; real Win32 HWND/IMM32",
+      "sourceFrame": 55,
+      "fullWindowSha256": "b1fcf80b968d1891d2d8a0b2e7ceca64cb43da90881603210f3799151bca88b9",
+      "rgbPixels": 416000,
+      "normalClose": true
+    }
   }
 }

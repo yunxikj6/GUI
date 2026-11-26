@@ -9,6 +9,7 @@ import tempfile
 import threading
 import unittest
 from contextlib import ExitStack, closing
+from unittest.mock import Mock, call, patch
 
 from cloud_render import gnome_app_request, gnome_input, gnome_search_input, gnome_source
 
@@ -41,9 +42,36 @@ class GnomeSourceTests(unittest.TestCase):
                 self.assertEqual(events, [('focus', dict(revision=1, active=True)),
                                           ('focus', dict(revision=2, active=False)),
                                           ('focus', dict(revision=3, active=True))])
+                def move(_timeout):
+                    self.assertEqual(json.loads(original.recv(256)), [3, None, 'Left'])
+                    original.sendall(b'A 1\n')
+                    channel.receive(notify)
+                self.assertTrue(channel.navigate(3, 'Left', move))
+                self.assertFalse(channel.navigate(1, 'Left', move))
+                with self.assertRaises(ValueError):
+                    channel.navigate(3, 'other', move)
                 original.sendall(b'A 1\n')
                 with self.assertRaises(ValueError):
                     channel.receive(notify)
+
+    def test_native_cursor_move_completes_before_next_buffer_deletion(self):
+        source = Mock()
+        source.size = gnome_input.DEFAULT_SIZE
+        source.env = {}
+        source.setup.return_value = 'focus'
+        source.focus_delete = True
+        source.frames = source.ack = 0
+        source.search.active = True
+        source.search.revision = 7
+        source.search.navigate.return_value = True
+        source.pending = bytearray(gnome_input.encode_key('Left') + gnome_input.encode_delete(7, backward=False))
+        source.poll.side_effect = [None, gnome_source.Disconnected()]
+        with patch.object(gnome_source, '_focused'), patch.object(gnome_source, '_apply') as physical:
+            with self.assertRaises(gnome_source.Disconnected):
+                gnome_source._Source.serve(source)
+        physical.assert_not_called()
+        self.assertEqual(source.search.method_calls, [call.navigate(7, 'Left', source.poll),
+                                                     call.delete(7, False, source.poll)])
 
     def test_input_is_one_exact_bounded_action(self):
         for action in (b'M', b'L', b'R'):

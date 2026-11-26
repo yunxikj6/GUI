@@ -20,7 +20,7 @@ import threading
 import time
 
 from .gnome_commands import StreamError, _connect, copy_commands
-from .gnome_search_input import SearchBridge, UUID
+from .gnome_search_input import CARET_KEYS, SearchBridge, UUID
 from .gnome_input import DEFAULT_SIZE, SIZE_NAMES, decode_input, command_size
 
 
@@ -520,7 +520,12 @@ class _Source:
                     value = args[1] if kind == b'T' else None
                     applied = self.search.commit(args[0], value, self.poll)
                 else:
-                    _apply(self.env, xid, command, self.size)
+                    # XTest can finish before Shell dispatches the event. A
+                    # focused cursor move must precede the next native edit.
+                    caret_key = (kind == b'K' and args[0] in CARET_KEYS
+                                 and self.search and self.search.active)
+                    if not caret_key or not self.search.navigate(self.search.revision, args[0], self.poll):
+                        _apply(self.env, xid, command, self.size)
                     applied = True
                 _focused(self.env, xid, self.size)
                 self.ack += 1

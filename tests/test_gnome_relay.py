@@ -249,7 +249,9 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         last = None
         for private in (True, False):
             self.retired.clear()
-            last = await asyncio.wait_for(asyncio.to_thread(exercise, private, last), 15)
+            # The local provider starts fresh helpers for each of six input
+            # operations and deliberately loses every first reply.
+            last = await asyncio.wait_for(asyncio.to_thread(exercise, private, last), 45 if private else 15)
             await asyncio.wait_for(self.retired.wait(), 3)
             self.assertEqual([gnome_input.decode_input(data)[1] for data in self.sources[-1].applied],
                              [(1, '搜索😀'), (1, '已失焦'), (1,), (1,), (1,), (1,)])

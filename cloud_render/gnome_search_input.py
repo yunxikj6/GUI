@@ -9,6 +9,7 @@ import time
 
 
 UUID = 'desktop-input@cloud-workspace.local'
+CARET_KEYS = ('Left', 'Right', 'Home', 'End')
 
 
 class SearchBridge:
@@ -62,6 +63,11 @@ class SearchBridge:
     def commit(self, revision, text, poll):
         """Send one edit. The private extension interprets null as selection of the focused buffer."""
         return self._request(revision, [text], poll)
+
+    def navigate(self, revision, key, poll):
+        if key not in CARET_KEYS:
+            raise ValueError('不支持的原厂光标移动。')
+        return self._request(revision, [None, key], poll)
 
     def delete(self, revision, backward, poll):
         return self._request(revision, [None, 'backspace' if backward else 'delete'], poll)
