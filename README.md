@@ -8,9 +8,9 @@
 
 在已具备 Ubuntu 桌面依赖的云机上运行 `python3 -m cloud_render.gnome_relay --port 17325`。在 Windows 解压完整客户端，打开 `Start.cmd`，输入 InstaBox 密钥和本次桌面配对码。服务仅监听云机回环，连接使用 InstaBox 的私有 HTTPS 通道。本机窗口支持指针移动、左右点击、导航键和 Ctrl+Esc 活动概览。可用 `--desktop-size 1920x1080` 请求全高清桌面，按默认参数启动时使用 800×520。Ubuntu 官方壁纸作为静态资源随包提供，匹配到相同源纹理时通过摘要引用。x64 使用内置运行时。ARM64 需要 Windows 11 x64 仿真，实机兼容性待验证。
 
-下面是实际 Windows 程序显示云机 Ubuntu 的窗口内容。鼠标点开顶栏的快速设置，按 Escape 后菜单关闭。Win64 程序运行于 Wine 10，通过私有 HTTPS 连接真实 InstaBox。在这次传输对照测试中，本机绘出的 105 帧逐帧匹配云端原始回读。[窗口和输入记录](docs/measurements/ubuntu-quick-settings-win64.json) · [其他会话的逐帧结果](docs/gnome-command-stream.md)
+下图来自发布包的实际窗口。双击启动的 Win64 程序通过 InstaBox 私有 HTTPS 连接原版 Ubuntu。鼠标点开快速设置后，本机窗口的 800×520 个像素与云端第 84 帧完全一致，并显示 “Dark Style”。按 Escape 后，菜单消失，窗口与第 125、126 帧相同。这次验证运行在 Wine 10，物理 Windows 11 仍待验证。[正式包的启动、操作和逐帧记录](docs/measurements/ubuntu-windows-launch.json) · [较早会话的结果](docs/gnome-command-stream.md)
 
-![Win64 窗口在真实云端 Ubuntu 桌面打开快速设置](docs/ubuntu-quick-settings-win64.png)
+![正式 Windows 包在云端 Ubuntu 桌面打开快速设置](docs/ubuntu-windows-launch-settings.png)
 
 ## 打开云端原版 ChatGPT
 

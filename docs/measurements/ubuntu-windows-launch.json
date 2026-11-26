@@ -1,0 +1,166 @@
+{
+  "zip": "c54fb9f2621ee232b3b018f6c0bda364e39161e4d0ae345a7a5bdc0faab4542c",
+  "source": "f237f931b8e1b654e1646ca855e6f873e2a18073",
+  "cloudSourceFrames": 126,
+  "distinctSourceFrames": 66,
+  "clientPixelMatchesToSourceFrameSequences": {
+    "win-before": [
+      27,
+      28,
+      29
+    ],
+    "win-settings": [
+      84
+    ],
+    "win-settings-closed": [
+      125,
+      126
+    ]
+  },
+  "independentOcrOfOriginalMenuTile": {
+    "win-before": "OME display manager.",
+    "win-settings": "@ Dark Style",
+    "win-settings-closed": ""
+  },
+  "cloudControls": {
+    "1": {
+      "control": 71527.873750744,
+      "kind": "M",
+      "input": 71527.886514754,
+      "framesBefore": 56,
+      "send-ack": 71527.886726794,
+      "sourceDispatchToAckMs": 12.976
+    },
+    "2": {
+      "control": 71528.486942138,
+      "kind": "L",
+      "input": 71528.600221001,
+      "framesBefore": 68,
+      "send-ack": 71528.600607851,
+      "sourceDispatchToAckMs": 113.666
+    },
+    "3": {
+      "control": 71532.167588629,
+      "kind": "K",
+      "input": 71532.192508097,
+      "framesBefore": 109,
+      "send-ack": 71532.192697627,
+      "sourceDispatchToAckMs": 25.109
+    }
+  },
+  "nativeClient": {
+    "scope": "real Windows CPython PE under Wine, source cloud GNOME through verified direct HTTPS, no stubs",
+    "actualWindowTitle": "Cloud Linux Workspace \u00b7 Ubuntu",
+    "observations": [
+      [
+        "before",
+        {
+          "hwnd": 131150,
+          "windowsProcessId": 120,
+          "processChain": [
+            {
+              "pid": 120,
+              "parentPid": 96,
+              "image": "python.exe"
+            },
+            {
+              "pid": 96,
+              "parentPid": 88,
+              "image": "CloudLinuxWorkspace-x64.exe"
+            },
+            {
+              "pid": 88,
+              "parentPid": 80,
+              "image": "cmd.exe"
+            },
+            {
+              "pid": 80,
+              "parentPid": 0,
+              "image": "python.exe"
+            }
+          ],
+          "width": 800,
+          "height": 520,
+          "rgbSha256": "9746698e7ccd2b020c666e25323872ddabcc9e2acffacfb83add592635d0fcaa",
+          "distinctSampleColors": 872,
+          "meanAbsoluteMenuTileDifference": 92.4898,
+          "meanChangeFromPrior": 255
+        }
+      ],
+      [
+        "pointer to Quick Settings",
+        {
+          "hwnd": 131150,
+          "windowsProcessId": 120,
+          "processChain": [
+            {
+              "pid": 120,
+              "parentPid": 96,
+              "image": "python.exe"
+            },
+            {
+              "pid": 96,
+              "parentPid": 88,
+              "image": "CloudLinuxWorkspace-x64.exe"
+            },
+            {
+              "pid": 88,
+              "parentPid": 80,
+              "image": "cmd.exe"
+            },
+            {
+              "pid": 80,
+              "parentPid": 0,
+              "image": "python.exe"
+            }
+          ],
+          "width": 800,
+          "height": 520,
+          "rgbSha256": "82b61d7d23ef9435339fa5f0d7d0289b51c7366928f89c097680592538649f94",
+          "distinctSampleColors": 831,
+          "meanAbsoluteMenuTileDifference": 0.0,
+          "meanChangeFromPrior": 14.1145
+        }
+      ],
+      [
+        "Escape",
+        {
+          "hwnd": 131150,
+          "windowsProcessId": 120,
+          "processChain": [
+            {
+              "pid": 120,
+              "parentPid": 96,
+              "image": "python.exe"
+            },
+            {
+              "pid": 96,
+              "parentPid": 88,
+              "image": "CloudLinuxWorkspace-x64.exe"
+            },
+            {
+              "pid": 88,
+              "parentPid": 80,
+              "image": "cmd.exe"
+            },
+            {
+              "pid": 80,
+              "parentPid": 0,
+              "image": "python.exe"
+            }
+          ],
+          "width": 800,
+          "height": 520,
+          "rgbSha256": "9c8b1a7cbfecacff20bfd3158d04ba011117db50c8a246406aeb598ef3695834",
+          "distinctSampleColors": 889,
+          "meanAbsoluteMenuTileDifference": 163.6807,
+          "meanChangeFromPrior": 34.9472
+        }
+      ]
+    ],
+    "windowsMainExit": 0,
+    "elapsedSeconds": 26.0
+  },
+  "system": "Windows PE x64 + bundled Windows CPython on Wine10/Linux and true InstaBox cloud. Default cmd.exe Start.cmd, normal Windows trust, no SSL_CERT_FILE/DIR, production renderer and transport.",
+  "proof": true
+}
