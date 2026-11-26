@@ -10,6 +10,7 @@ import stat
 
 from cloud_render import gnome_commands as mesa
 from cloud_render.gnome_input import decode_input
+from cloud_render.gnome_wire import FOCUS_STATE
 from cloud_render.gnome_relay import DesktopService, TOKEN
 from experiments.application_surface import SurfaceError
 from experiments.live_application_surface import BIND, DRAW, HOLD, REUSE, binding_record
@@ -92,8 +93,9 @@ class _Graphics:
 
 
 class _Pointer:
-    def __init__(self, channel, events):
+    def __init__(self, channel, events, *, editing):
         self.channel, self.events = channel, events
+        self.editing = editing
         self.fd = None
         self.sequence = 0
         self.pending = None
@@ -111,14 +113,28 @@ class _Pointer:
 
     def write(self, command):
         op, _ = decode_input(command, size=SIZE)
-        if op not in (b'M', b'L') or self.pending is not None or self.fd is None:
+        allowed = (b'M', b'L', b'T', b'A') if self.editing else (b'M', b'L')
+        if op not in allowed or self.pending is not None or self.fd is None:
             raise SurfaceError('unsupported or unacknowledged native pointer input')
         self.pending = command
 
     async def drain(self):
         command, self.pending = self.pending, None
-        if self.fd is None or command is None or os.write(self.fd, command) != len(command):
-            raise SurfaceError('incomplete native pointer input')
+        if self.fd is None or command is None:
+            raise SurfaceError('incomplete native input')
+        remaining = memoryview(command)
+        while remaining:
+            try:
+                written = os.write(self.fd, remaining)
+            except BlockingIOError:
+                # The largest UTF-8 commit can exceed PIPE_BUF by its header.
+                # Only this paired control task writes here; continue exactly
+                # where this write stopped, inside the relay's bounded deadline.
+                await asyncio.sleep(.005)
+                continue
+            if not written:
+                raise SurfaceError('private input pipe closed')
+            remaining = remaining[written:]
         self.sequence += 1
         while True:
             try:
@@ -130,12 +146,44 @@ class _Pointer:
                 if type(number) is not int or not 0 < number <= self.sequence:
                     raise SurfaceError('native input acknowledgement out of order')
                 if number == self.sequence:
-                    if ack.get('applied') is not True:
-                        raise SurfaceError('original pointer event was not accepted')
-                    event = dict(event='input', sequence=number)
+                    applied = ack.get('applied')
+                    if type(applied) is not bool or (not applied and command[:1] not in (b'T', b'A')):
+                        raise SurfaceError('invalid original input result')
+                    event = dict(event='input', sequence=number, applied=applied)
                     self.events.feed_data(json.dumps(event).encode() + b'\n')
                     return
             await asyncio.sleep(.01)
+
+    async def follow_focus(self):
+        # Only this source writes its journal. Keep one open file description so
+        # replacing its path cannot splice another window's epochs into the stream.
+        path = self.channel / 'focus.events'
+        while True:
+            try:
+                fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+                break
+            except FileNotFoundError:
+                await asyncio.sleep(.025)
+        with os.fdopen(fd, 'rb', buffering=0) as source:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                raise SurfaceError('focus observations must come from an owner-private regular file')
+            expected, partial = 1, b''
+            while True:
+                chunk = source.read(FOCUS_STATE.size * 64)
+                if not chunk:
+                    await asyncio.sleep(.025)
+                    continue
+                data = partial + chunk
+                complete = len(data) - len(data) % FOCUS_STATE.size
+                for revision, active in FOCUS_STATE.iter_unpack(data[:complete]):
+                    if revision != expected or active not in (0, 1):
+                        raise SurfaceError('invalid original editor focus sequence')
+                    expected += 1
+                    event = dict(event='focus', revision=revision, active=bool(active))
+                    self.events.feed_data(json.dumps(event).encode() + b'\n')
+                partial = data[complete:]
+                await asyncio.sleep(0)
 
     def close(self):
         if self.fd is not None:
@@ -153,7 +201,7 @@ class _Peer:
 
 
 @asynccontextmanager
-async def interactive_fifos(channel, *, size=SIZE, wallpaper=False):
+async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False):
     if size != SIZE or wallpaper:
         raise SurfaceError('unsupported application desktop configuration')
     _private(channel, stat.S_ISDIR)
@@ -172,19 +220,22 @@ async def interactive_fifos(channel, *, size=SIZE, wallpaper=False):
             finished.set()
             events.feed_eof()
         graphics = _Graphics(channel, reader, config, eof)
-        pointer = _Pointer(channel, events)
+        pointer = _Pointer(channel, events, editing=search_input)
         opening = asyncio.create_task(pointer.open())
         def opened(task):
             if not task.cancelled() and task.exception() is not None:
                 events.set_exception(task.exception())
         opening.add_done_callback(opened)
+        focus = asyncio.create_task(pointer.follow_focus()) if search_input else None
+        if focus:
+            focus.add_done_callback(opened)
         try:
             yield _Peer(graphics, pointer, finished), events
         finally:
-            opening.cancel()
-            if graphics.task:
-                graphics.task.cancel()
-            await asyncio.gather(*filter(None,(opening,graphics.task)), return_exceptions=True)
+            tasks = [task for task in (opening, focus, graphics.task) if task]
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             pointer.close()
             transport.close()
 

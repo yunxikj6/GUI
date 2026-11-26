@@ -16,12 +16,15 @@ class _WindowInput:
         self.lock = threading.Lock()
         self.reader = None
         self.visible = None
+        self.last_binding = None
+        self.notice = None
 
     def presented(self, stream):
         with self.lock:
             if not stream.can_present:
                 self.visible = None
                 return False
+            self.last_binding = stream.binding
             self.visible = (stream.binding, stream.digest)
             return True
 
@@ -31,14 +34,41 @@ class _WindowInput:
                     (self.reader.binding, self.reader.digest) == self.visible):
                 return self.visible
 
+    def rejected_click(self):
+        with self.lock:
+            self.notice = '画面正在更新，刚才的点击未发送。请确认画面后再点击。'
+
+    def rejected_edit(self):
+        with self.lock:
+            self.notice = '原厂输入焦点已更改，请在当前输入框继续。'
+
+    def pop_input_notice(self):
+        with self.lock:
+            notice, self.notice = self.notice, None
+            return notice
+
+    def has_displayed_application(self):
+        # During an animation the last verified window can stay on screen.
+        # The source's focus epoch independently binds editing to its control.
+        with self.lock:
+            return (self.reader is not None and self.last_binding is not None and
+                    self.reader.binding == self.last_binding)
+
     def events(self, submit):
         def handle(event):
             if event[0] == 'move':
                 submit(event)
+            elif event[0] in ('text', 'select-all'):
+                if self.has_displayed_application():
+                    submit(event)
+                else:
+                    self.rejected_edit()
             elif event[0] == 'click' and event[3] == 'left':
                 original = self.ticket()
                 if original is not None:
                     submit((*event, original))
+                else:
+                    self.rejected_click()
         return handle
 
 
@@ -49,12 +79,34 @@ class _PointerDesktop:
     def click(self, x, y, button, displayed):
         if self.state.ticket() == displayed:
             self.transport.click(x, y, button)
+        else:
+            self.state.rejected_click()
 
     def move(self, x, y):
         self.transport.move(x, y)
 
     def read(self, size):
         return self.transport.read(size)
+
+    def text_focus(self):
+        if self.state.has_displayed_application():
+            return self.transport.text_focus()
+        return None
+
+    def commit_text(self, revision, text):
+        if self.text_focus() == revision and self.transport.commit_text(revision, text):
+            return True
+        self.state.rejected_edit()
+        return False
+
+    def select_all(self, revision):
+        if self.text_focus() == revision and self.transport.select_all(revision):
+            return True
+        self.state.rejected_edit()
+        return False
+
+    def pop_input_notice(self):
+        return self.state.pop_input_notice()
 
     def pop_unavailable(self):
         return self.transport.pop_unavailable()
@@ -119,10 +171,10 @@ def main(argv=None):
         def start():
             box = InstaBox(key, args.machine)
             box.ensure_running()
-            return connect(box,args.port,token,size=SIZE)
+            return connect(box,args.port,token, size=SIZE, search_input=True)
     else:
         def start():
-            return connect_forwarded(args.port,token,size=SIZE)
+            return connect_forwarded(args.port,token, size=SIZE, search_input=True)
 
     bundled = Path(__file__).resolve().parents[1]/'thin_client/vendor/node/windows-x64/node.exe'
     node = args.node or (bundled if bundled.is_file() else 'node')

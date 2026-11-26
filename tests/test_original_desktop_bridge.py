@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import threading
+import time
+from types import SimpleNamespace
 import tempfile
 import unittest
 
@@ -13,7 +15,9 @@ from cloud_render import gnome_commands as mesa
 from cloud_render.gnome_relay import DesktopService
 from experiments.application_surface import Binding
 from experiments.live_application_surface import binding_record
-from experiments.original_desktop import _WindowInput
+from experiments.original_desktop import _PointerDesktop, _WindowInput
+from cloud_render.gnome_input import encode_text, encode_select_all
+from cloud_render.gnome_wire import FOCUS_STATE
 from experiments.original_desktop_bridge import interactive_fifos
 from experiments.original_desktop_protocol import SIZE, approved_binding, read_hello
 from experiments.mutter_app.controls import ORIGINAL_SHA256
@@ -40,6 +44,15 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
             ping = mesa._HEADER.pack(0, mesa.PING)
             bind = binding_record(len(ping), approved_binding(identity))
             received = []
+            focus = channel/'focus.events'
+            focus.touch(mode=0o600)
+            def focus_change(revision, active):
+                with focus.open('ab', buffering=0) as output:
+                    record = FOCUS_STATE.pack(revision, active)
+                    # An observer can see a partial write on a growing regular file.
+                    output.write(record[:2])
+                    time.sleep(.015)
+                    output.write(record[2:])
             def produce():
                 with (channel/'graphics.fifo').open('wb', buffering=0) as graphics:
                     with (channel/'input.fifo').open('rb') as inputs:
@@ -47,6 +60,12 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                         for index in range(1, 3):
                             received.append(inputs.read(5))
                             publish('last-input.json', dict(sequence=index, applied=True))
+                        focus_change(1,1)
+                        for index, command, applied in ((3,encode_text(1,'图文'),True),
+                                                        (4,encode_select_all(1),False)):
+                            received.append(inputs.read(len(command)))
+                            publish('last-input.json', dict(sequence=index, applied=applied))
+                        focus_change(2,0)
                         self.assertEqual(inputs.read(1), b'')
             task = asyncio.create_task(asyncio.to_thread(produce))
             token = 'd'*43
@@ -55,17 +74,30 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
             async with server:
                 port = server.sockets[0].getsockname()[1]
                 def client():
-                    with connect_forwarded(port,token,size=SIZE) as stream:
+                    with connect_forwarded(port,token,size=SIZE,search_input=True) as stream:
                         self.assertEqual(read_hello(stream), (bytes.fromhex(config['session']), bytes.fromhex(ORIGINAL_SHA256)))
                         self.assertEqual(stream.read(len(ping+bind)), ping+bind)
                         stream.move(31, 68)
                         stream.click(400,350)
+                        until = time.monotonic() + 3
+                        while stream.text_focus() is None and time.monotonic() < until:
+                            time.sleep(.01)
+                        revision = stream.text_focus()
+                        self.assertIsNotNone(revision)
+                        self.assertTrue(stream.commit_text(revision, '图文'))
+                        self.assertFalse(stream.select_all(revision))
+                        until = time.monotonic() + 3
+                        while stream.text_focus() == revision and time.monotonic() < until:
+                            time.sleep(.01)
+                        self.assertIsNone(stream.text_focus())
+                        self.assertFalse(stream.commit_text(revision,'图文'))
                 try:
                     await asyncio.wait_for(asyncio.to_thread(client), 18)
                     await asyncio.wait_for(task, 5)
                 finally:
                     await service.close()
-            self.assertEqual(received, [b'M\0\x1f\0D', b'L\x01\x90\x01^'])
+            self.assertEqual(received, [b'M\0\x1f\0D', b'L\x01\x90\x01^',
+                                        encode_text(1,'图文'), encode_select_all(1)])
 
     def test_desktop_pointer_captures_current_view_and_discards_a_stale_click(self):
         from types import SimpleNamespace
@@ -84,6 +116,33 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
         dispatch(('move', 20, 30))
         self.assertEqual(len(events), 2)
         self.assertEqual(events[-1], ('move',20,30))
+        self.assertIn('点击未发送',state.pop_input_notice())
+        self.assertIsNone(state.pop_input_notice())
+
+    def test_text_is_bound_to_visible_original_application_and_source_focus(self):
+        state = _WindowInput()
+        reader = SimpleNamespace(binding=None, digest=None, can_present=True)
+        state.reader = reader
+        actual = []
+        upstream = SimpleNamespace(text_focus=lambda: 99,
+            commit_text=lambda revision, value: actual.append((revision,value)) or True,
+            select_all=lambda revision: actual.append(revision) or True)
+        desktop = _PointerDesktop(upstream, state)
+        state.presented(reader)
+        self.assertIsNone(desktop.text_focus())
+        reader.binding, reader.digest = object(), b'original'
+        self.assertIsNone(desktop.text_focus())
+        state.presented(reader)
+        self.assertEqual(desktop.text_focus(),99)
+        reader.can_present = False
+        state.presented(reader)
+        self.assertTrue(desktop.commit_text(99,'文字'))
+        self.assertFalse(desktop.select_all(98))
+        self.assertIn('焦点',desktop.pop_input_notice())
+        reader.binding = object()
+        desktop.select_all(99)
+        self.assertEqual(actual,[(99,'文字')])
+
 
 class RetainedNativeWindow(unittest.TestCase):
     def test_disconnect_leaves_local_frame_and_refuses_old_inputs_until_user_closes(self):

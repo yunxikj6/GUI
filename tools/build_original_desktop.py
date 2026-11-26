@@ -12,6 +12,12 @@ NODE_EXE = '86fc4785327db5f5c7558dc6156c543b433c313e813a222e088086222ab4afa6'
 # The original desktop feature requires no local copy of Ubuntu or the cloud application.
 MODULES = (
     'cloud_render/gnome_commands.py',
+    'cloud_render/gnome_input.py',
+    'cloud_render/gnome_wire.py',
+    'cloud_render/instabox_relay.py',
+    'thin_client/gnome_window.py',
+    'thin_client/gnome_wintext.py',
+    'thin_client/gnome_transport.py',
     'thin_client/gnome_desktop.py',
     'experiments/application_surface.py',
     'experiments/live_application_surface.py',

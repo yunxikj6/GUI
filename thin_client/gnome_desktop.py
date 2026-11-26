@@ -212,7 +212,12 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
                 session = peer
             if has_title and session is not None:
                 app = session.pop_unavailable()
-                if app:
+                take_notice = getattr(session, 'pop_input_notice', None)
+                notice = take_notice() if take_notice else None
+                if notice:
+                    window.set_title(f'{TITLE} · {notice}')
+                    status_until = time.monotonic() + 8
+                elif app:
                     window.set_title(f'{TITLE} · {APPLICATION_STATUS[app]}')
                     status_until = time.monotonic() + 8
                 elif status_until and time.monotonic() >= status_until:
