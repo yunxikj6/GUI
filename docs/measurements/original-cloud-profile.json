@@ -1,0 +1,74 @@
+{
+  "sourceCommit": "9ed5676bd4a8a631286a61ee67fd93fb6e1c3915",
+  "originalElfSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "source": "Network-isolated, unprivileged Ubuntu Noble with the installed original signed-out ChatGPT desktop program. Separate loopback clients received drawing commands; this check performed no fresh APT download or remote account login.",
+  "sessions": [
+    {
+      "role": "Preinstalled Ubuntu, fresh dedicated profile",
+      "verifiedOriginalWindow": true,
+      "dockClick": true,
+      "cloudGraphicsBytes": 42342711,
+      "sourceExit": 0,
+      "temporaryScopeReclaimed": true
+    },
+    {
+      "role": "New preinstalled Ubuntu session, same profile",
+      "verifiedOriginalWindow": true,
+      "dockClick": true,
+      "cloudGraphicsBytes": 42336563,
+      "sourceExit": 0,
+      "temporaryScopeReclaimed": true
+    },
+    {
+      "role": "Prepared Debian guest role, same pinned cloud directory",
+      "verifiedOriginalWindow": true,
+      "dockClick": true,
+      "cloudGraphicsBytes": 41159108,
+      "sourceExit": 0,
+      "temporaryScopeReclaimed": true
+    },
+    {
+      "role": "Preinstalled Ubuntu, click on exposed desktop before closing",
+      "verifiedOriginalWindow": true,
+      "dockClick": true,
+      "desktopClick": true,
+      "cloudGraphicsBytes": 40763556,
+      "sourceExit": 0,
+      "temporaryScopeReclaimed": true,
+      "nativePreferencesStillMatch": true
+    }
+  ],
+  "nativeState": {
+    "path": "app/home/.codex/.codex-global-state.json",
+    "applicationWroteBothValues": true,
+    "sameOnReopenAndAcrossPreparedGuest": true,
+    "fields": {
+      "desktop-first-seen-at-ms": {
+        "matchesFirstSession": true,
+        "sha256": "f81bd545344979bf7ecc969b7b2d5569e8bf906bb6a12b1407c057c5720690d1"
+      },
+      "electron-main-window-bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1090,
+        "height": 760,
+        "isMaximized": false
+      }
+    }
+  },
+  "independentStockReference": {
+    "mode": "Direct, isolated X11 without a debugging pipe or source bridge. Original focused window received the stock Quit shortcut.",
+    "naturalExitCode": 0,
+    "windowPreferenceWritten": true,
+    "stockChromiumExitType": "Crashed",
+    "separateTerminationExitCode": -15,
+    "separateTerminationWroteWindowPreference": false
+  },
+  "guardChecks": [
+    "Owner-private directory and explicit marker",
+    "Existing ordinary home or nonempty unmarked directory refused",
+    "Concurrent second source refused before binding",
+    "Bubblewrap uses the original validated inode even across a path rename and replacement",
+    "The Debian build and app share the configured lifetime, including provisioning"
+  ]
+}

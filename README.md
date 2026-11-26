@@ -10,7 +10,7 @@ python3 -m experiments.original_desktop_source --port 17326
 
 真实 InstaBox 会话中，Windows 连入云端，点击 Dock 打开 ChatGPT，再打开原厂登录前表单。五次键盘输入均由云端确认，本机显示相同的 `orbit`。云端默认使用临时配置。要在不同配对之间保留原程序的设置，可在云端启动命令中加入 `--profile "$HOME/.local/share/cloud-workspace/chatgpt-desktop"`。应用网络仍隔离，登录后的聊天和 Claude Artifacts 待验证。此轮 Windows x64 客户端运行于 Wine 10，实体 Windows 11 尚待验收。[真实云桌面](docs/measurements/instabox-win64/desktop.png) · [Windows 输入后的原厂窗口](docs/measurements/instabox-win64/input.png) · [此会话的时间和确认记录](docs/measurements/instabox-win64/session.json)
 
-新版根据云端原始纹理的 SHA-256 引用本机附带的 Ubuntu 官方壁纸。在匹配纹理的同一段录制中，从起点到第一次桌面输出按 1 MiB 协议块计算，传输量从 9,838,740 字节降到 361,588 字节。两个独立 Win64 进程重绘的 98 次桌面输出全部一致。一次真实 InstaBox 首屏复测未命中这份资源，仍传输了约 9.9 MB。[传输量与像素对照](docs/measurements/original-app-wallpaper.json) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
+在同一台 InstaBox 上对比两个发布包，首次显示 Ubuntu 桌面所需的已压缩绘图数据从 9,887,960 字节降至 430,337 字节（减少 95.65%，未计外层 HTTPS 开销）。Windows 根据一条 84 字节引用，用随包的 Ubuntu 官方壁纸还原了 33,177,600 字节的原始纹理，并校验了全部四个通道。同一位置的 1200×750 个壁纸像素在两个版本中完全一致。此次从双击到看见桌面用时 20.44 秒，点击 Dock 后，在启动第 40.94 秒看见 ChatGPT 欢迎页。[首屏测量](docs/measurements/instabox-win64/first-desktop-5fe9.json) · [本次桌面实拍](docs/measurements/instabox-win64/5fe9-desktop.png) · [本次 ChatGPT 窗口](docs/measurements/instabox-win64/5fe9-welcome.png) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
 
 ## 连接基础 Ubuntu 桌面
 
@@ -31,6 +31,8 @@ python3 -m experiments.original_desktop_source --port 17326
 完整云桌面还支持在原版概览搜索框中使用 Windows 输入法。候选词在本机选择，提交后云端原搜索框更新文字和结果。已在原控件验证中文、退格、全选替换、取消和失焦，并与独立读取的 Win32 窗口核对像素。[原生输入法验收](docs/gnome-search-ime.md)
 
 应用内容变化时，两端可协商复用同一窗口中已经验证的绘图数据。每次重组都校验原图完整 SHA-256。在两态真实云录制的五轮回放中，协议数据量中位数从 2,396,121 字节降到 812,591 字节，重建的两幅原图和全部 38,001,652 字节 GPU 指令均相同。[绘图复用与操作耗时记录](docs/measurements/original-application-delta.json)
+
+在独立 Ubuntu 云端会话中，使用同一专用配置目录重新打开原厂应用，应用自行保存的窗口尺寸和首次启动时间一致。原版输入框的光标闪烁也会产生新的绘图。在云端重新核对画面期间，点击可能需要重试。已观测到用户重新点击 Cancel 后，原程序收到按下、松开并返回登录方式菜单。[跨会话设置](docs/measurements/original-cloud-profile.json) · [按钮动作与屏幕实拍](docs/measurements/original-app-pointer-surface.json)
 
 从原版程序选择账户登录时，它会在云机上打开独立的系统浏览器，并在同一台云机的回环地址接收 OAuth 回调。已观察到原版程序和浏览器的两个真实窗口。当前客户端还需要接入这第二个窗口，才能完成账户登录。[系统浏览器和回调的实测](docs/measurements/chatgpt-system-browser-signin.json)
 

@@ -1,0 +1,89 @@
+{
+  "verified": true,
+  "clientZipSha256": "5fe9e1a405c24a10a0c6afcada83fe15145e7ed3ed4fdc5bab5afa220b674858",
+  "sourceRevision": "2819c59d0ab8a663743a6e103942a0497c44c8eb",
+  "cloudSourceTarSha256": "5a1a9c3e847f5d8af7b05bc218789941729c9a3878d294243c2d3c6d6c9ec08e",
+  "method": "Same real InstaBox machine, two isolated Ubuntu source sessions, default Start.cmd and bundled x64 Windows CPython under Wine 10. Source loopback traffic counted after checksums and link compression. Win32 GetDC/GetDIBits images verified independently.",
+  "prior": {
+    "zip": "8abed38d866a27f6bc71df4197ec8ee79ab89d65ba3b07e36fbb142251fe862d",
+    "source": "60d3b5d694b679fdfae518f0baac889adf0a9e64",
+    "rawDrawingCommandBytes": 40543996,
+    "compressedAndFramedDrawingBytes": 9887960,
+    "drawingBlocks": 40,
+    "referenceRecords": 0
+  },
+  "current": {
+    "rawDrawingCommandBytes": 7368732,
+    "compressedAndFramedDrawingBytes": 430337,
+    "drawingBlocks": 9,
+    "referenceRecords": 1,
+    "referenceBytes": 84,
+    "reconstructedResourceBytes": 33177600,
+    "verifiedResourceSha256": "b4da4262ad652769b76d6d97c46514ea7e611362f436be6f965edf90c9330ca1",
+    "negotiated": [
+      {
+        "serverOffered": 190
+      },
+      {
+        "width": 1280,
+        "height": 900,
+        "requestedAndAgreedFlags": 190
+      }
+    ]
+  },
+  "reduction": {
+    "framedBytesSaved": 9457623,
+    "percent": 95.65
+  },
+  "display": {
+    "width": 1280,
+    "height": 900,
+    "verifiedIdenticalRegion": [
+      80,
+      150,
+      1280,
+      900
+    ],
+    "rgbSha256": "380ed850e2c3f0efb0c7db011eae5b7a7d8b28900f6d2f4faa80770dc3ad3a3f",
+    "windowApi": "Win32 GetDC/GetDIBits",
+    "snapshotPngSha256": {
+      "desktop": "bfa188211e04a633485409a9762a3637156adef82fa46c4b43b1c73bb5d88494",
+      "welcome": "bf53c1e9200840481981fe92b76dc921f638fb670dd767feb745b96fd1f3bc6d"
+    }
+  },
+  "input": {
+    "cloudAcceptedOsClickSeq": 2,
+    "stagesSecondsFromStart": {
+      "desktop": 20.44,
+      "welcome": 40.94
+    },
+    "renderedOriginalApp": "ne - 6 sign in to chatgpt sign in another way re,",
+    "originalApplicationElfSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+    "loggedIn": false
+  },
+  "sourceService": {
+    "entry": "python3 -m experiments.original_desktop_source --port 17327 --lifetime 600",
+    "loopbackMeterPort": 17326,
+    "release": "2819c59d0ab8a663743a6e103942a0497c44c8eb",
+    "accountLogin": false,
+    "testingStartedReady": true,
+    "startupSeconds": 1.204,
+    "exit": 0,
+    "originalServiceCleanedItsOwnWorkspace": true,
+    "sourceAndRendererPrivate": true,
+    "seconds": 87.82
+  },
+  "limits": "This counts compressed and framed drawing bytes through the cloud loopback server. Provider TLS and HTTP overhead is excluded. The desktop capture and click are event-driven and timing varies.",
+  "providerCleanup": {
+    "processesInScopeBeforeRemoval": 0,
+    "directoryRemoved": true,
+    "spool": {},
+    "noSystemInstall": true,
+    "postDeletionCheck": {
+      "directoryAbsent": true,
+      "processesBelongingToDeletedScope": 0
+    },
+    "localEphemeralControllerExited": true,
+    "localControllerExitStatus": 0
+  }
+}
