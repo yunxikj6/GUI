@@ -76,5 +76,3 @@ def install(root, archive):
                 verified.extractall(site)
             package.unlink()
         (site / "playwright/driver/node").chmod(0o755)
-    for folder in ("work/source", "work/result", "work/pair"):
-        (root / folder).mkdir(parents=True, exist_ok=True)

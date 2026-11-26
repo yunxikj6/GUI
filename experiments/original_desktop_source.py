@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import getpass
 import os
+import secrets
 from pathlib import Path
 import signal
 import subprocess
@@ -24,7 +25,10 @@ def _token():
         try:
             with open("/dev/tty", "w", encoding="utf-8") as terminal, warnings.catch_warnings():
                 warnings.simplefilter("error", getpass.GetPassWarning)
-                value = getpass.getpass("本次桌面的 43 位随机配对码（隐藏输入）：", stream=terminal)
+                value = getpass.getpass("输入已有配对码，或直接按回车生成本次配对码：", stream=terminal)
+                if not value:
+                    value = secrets.token_urlsafe(32)
+                    print("本次云桌面配对码 " + value, file=terminal, flush=True)
         except (OSError, EOFError, getpass.GetPassWarning):
             raise ValueError("请在私有终端输入配对码，或通过私有环境设置 CLOUDWORKSPACE_GNOME_TOKEN。") from None
     if not TOKEN.fullmatch(value):

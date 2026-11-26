@@ -27,3 +27,5 @@ python3 -m cloud_render.provision --chatgpt-deb /path/to/chatgpt_amd64.deb
 当前适配版本为 26.1120.50957。云机在下载 Ubuntu 前先把软件包复制到本次会话的私有目录，校验与厂商签名索引匹配的 SHA-256。它在临时 Ubuntu 中安装原版软件、输入与字体依赖和绘图观测器，由云端 GCC 编译 Mutter 图面来源的记录组件。四个云端 Python wheel 的文件、尺寸及摘要固定在随包清单中。启动前的空间检查包含原软件 1,560,353 KiB 的安装大小。[原版软件来源](https://learn.chatgpt.com/docs/linux/linux-app)
 
 看到本次私有端口后，在 Windows 解压**原厂应用桌面客户端**再执行其中的 `Start.cmd`，通过相同配对码连接。这个版本支持指定软件的登录前窗口；专用原程序使用一次性配置，图形进程的隔离网络未启用外网登录。用户输入与项目数据的持久会话，以及登录后的官方界面仍需单独接入。预装了原版软件和依赖的 Ubuntu 24.04 云机也可从仓库运行 `python3 -m experiments.original_desktop_source`。[云端条件与操作实测](../../docs/interactive-original-desktop.md)
+
+在预装 Ubuntu 入口的私有终端，配对提示可直接按回车，让云机生成本次随机配对码。
