@@ -272,5 +272,41 @@
       "samePictureLayerBytesAndPlacement": true,
       "result": "The two recorded source surfaces passed the PNG bracketing check. The paint commands and all layer placement were identical. Only the frame sequence changed. This session demonstrates the input and return to the original menu. It does not establish faithful display of both caret states."
     }
+  },
+  "sourceGuardReplay": {
+    "method": "Feed each separate earlier session\u2019s measured source RGB, witness offset and unmodified original recording to a fresh source cache in observation order; verify the eligibility index and assets after the second observation. The client was unchanged.",
+    "distinctCommands": {
+      "observations": [
+        {
+          "sourceRgbSha256": "76a279193b7c80387039677bcb32ba33add1ccec1cb115c5c0852d7cc04b3242",
+          "recordingCommandsSha256": "c185eb565d4b54a759e68296f671401236e536f5fbc6683996810b839690ffed",
+          "grantAtObservation": true
+        },
+        {
+          "sourceRgbSha256": "3597f7c1f3ea878cf61cb5df4c234b482e4bdcd53dbe32bb00d545f181a70b87",
+          "recordingCommandsSha256": "728fec55956946750e786367c6e08fb566473a563e45a5217de6dad2c6175be7",
+          "grantAtObservation": true
+        }
+      ],
+      "retainedGrantsAfterBoth": 2,
+      "retainedAssets": 2
+    },
+    "sameCommandsDifferentSources": {
+      "observations": [
+        {
+          "sourceRgbSha256": "3597f7c1f3ea878cf61cb5df4c234b482e4bdcd53dbe32bb00d545f181a70b87",
+          "recordingCommandsSha256": "c185eb565d4b54a759e68296f671401236e536f5fbc6683996810b839690ffed",
+          "grantAtObservation": true
+        },
+        {
+          "sourceRgbSha256": "76a279193b7c80387039677bcb32ba33add1ccec1cb115c5c0852d7cc04b3242",
+          "recordingCommandsSha256": "c185eb565d4b54a759e68296f671401236e536f5fbc6683996810b839690ffed",
+          "grantAtObservation": false
+        }
+      ],
+      "retainedGrantsAfterBoth": 0,
+      "retainedAssets": 0
+    },
+    "scope": "Conflicts between retained source observations withdraw both claims. Later distinct independently corroborated commands are required before a new sample of the disputed commands can regain eligibility. A pre-conflict draw already displayed cannot be recalled. A single temporally mispaired recording without conflicting evidence can still evade this check."
   }
 }

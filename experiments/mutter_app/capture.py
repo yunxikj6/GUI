@@ -175,6 +175,13 @@ def publish(path, value):
     temp.replace(path)
 
 
+def command_digest(frame):
+    # The frame sequence is a transport identifier. Hash the same geometry,
+    # layer order and original SkPictures with a constant, valid wire sequence.
+    canonical = Frame(1, frame.width, frame.height, frame.layers)
+    return hashlib.sha256(encode_message(canonical)).hexdigest()
+
+
 class DrawingCache:
     """Index a bounded source-only set of verified vendor recordings by their visual identity."""
 
@@ -183,6 +190,8 @@ class DrawingCache:
         self.path = out / 'drawings'
         self.path.mkdir(mode=0o700)
         self.records = OrderedDict()
+        self.disputed = {}
+        self.saturated = False
         self.capacity = capacity
         self.byte_limit = byte_limit
         self.size = 0
@@ -194,10 +203,50 @@ class DrawingCache:
         self.records.move_to_end(digest)
         return True
 
-    def add(self, digest, raw, start):
+    def _can_bind(self, digest, commands):
+        if self.saturated:
+            return False
+        other = next((k for k, v in self.records.items() if v['commandsSha256'] == commands), None)
+        if other is not None:
+            old = self.records.pop(other)
+            self.size -= old['bytes']
+            self._publish([old['pictureSha256']])
+            self.disputed.setdefault(commands, set()).add(other)
+        sources = self.disputed.get(commands)
+        if sources is None:
+            return True
+        sources.add(digest)
+        if sum(map(len, self.disputed.values())) > 2 * self.capacity:
+            # Do not forget still-unresolved claims to make room for new ones.
+            self.saturated = True
+            evicted = [v['pictureSha256'] for v in self.records.values()]
+            self.records.clear()
+            self.size = 0
+            self._publish(evicted)
+        if other is not None or self.saturated:
+            publish(
+                self.out / 'drawing-conflict.json',
+                {
+                    'commandsSha256': commands,
+                    'unresolvedCommandKeys': len(self.disputed),
+                    'unresolvedCapacityReached': self.saturated,
+                },
+            )
+        if self.saturated or other is not None or any(k not in self.records for k in sources if k != digest):
+            return False
+        # Every other claimant now has a different independently witnessed
+        # drawing. This claimant still requires the current fresh sample.
+        del self.disputed[commands]
+        return True
+
+    def add(self, digest, frame, start):
+        raw = encode_message(frame)
         require(0 < len(raw) <= self.byte_limit, 'original drawing exceeds the source cache budget')
         require(not self.find(digest), 'drawing already indexed')
         picture = hashlib.sha256(raw).hexdigest()
+        commands = picture if frame.sequence == 1 else command_digest(frame)
+        if not self._can_bind(digest, commands):
+            return False
         asset = self.path / (picture + '.clrp')
         temp = self.path / '.capture'
         temp.write_bytes(raw)
@@ -206,6 +255,7 @@ class DrawingCache:
         self.sequence += 1
         self.records[digest] = {
             'pictureSha256': picture,
+            'commandsSha256': commands,
             'witnessByteStart': start,
             'bytes': len(raw),
         }
@@ -214,6 +264,10 @@ class DrawingCache:
             _, old = self.records.popitem(last=False)
             self.size -= old['bytes']
             evicted.append(old['pictureSha256'])
+        self._publish(evicted)
+        return True
+
+    def _publish(self, evicted):
         publish(self.out / 'scenes.json', self.records)
         retained = {r['pictureSha256'] for r in self.records.values()}
         for key in evicted:
@@ -283,10 +337,10 @@ async def observe_interactive(page, out, native_layers):
                     and page.url == APP_PAGE
                     and await geometry(page) == SUPPORTED_GEOMETRY
                 ):
-                    raw = encode_message(
-                        Frame(frame.sequence, frame.width, frame.height, frame.layers + native_layers)
-                    )
-                    cache.add(digest, raw, start)
+                    complete = Frame(frame.sequence, frame.width, frame.height, frame.layers + native_layers)
+                    if not cache.add(digest, complete, start):
+                        changed_during_request = True
+                        publish(out / 'pending-scene.json', {})
                 else:
                     retry = time.monotonic() < retry_until
             if changed_during_request:

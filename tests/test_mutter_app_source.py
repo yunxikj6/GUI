@@ -243,17 +243,72 @@ class LiveMutterSourceTest(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            cache = DrawingCache(root, capacity=2, byte_limit=5)
-            cache.add('a', b'aa', 10)
-            cache.add('b', b'bb', 20)
+            from cloud_render.wire import Frame, Layer, encode_message
+
+            def drawing(content):
+                return Frame(1, 1090, 760, (Layer(0, 0, 1, 1, b'skiapict' + content),))
+
+            small = len(encode_message(drawing(b'aa')))
+            cache = DrawingCache(root, capacity=2, byte_limit=2 * small)
+            cache.add('a', drawing(b'aa'), 10)
+            cache.add('b', drawing(b'bb'), 20)
             self.assertTrue(cache.find('a'))
-            cache.add('c', b'cc', 30)
+            cache.add('c', drawing(b'cc'), 30)
             self.assertEqual(list(json.loads((root / 'scenes.json').read_text())), ['a', 'c'])
             self.assertFalse(cache.find('b'))
-            cache.add('d', b'dddd', 40)
+            cache.add('d', drawing(b'd' * small), 40)
             self.assertEqual(list(cache.records), ['d'])
             self.assertEqual(len(list((root / 'drawings').glob('*.clrp'))), 1)
             self.assertEqual(cache.sequence, 4)
+
+    def test_conflicting_recordings_revoke_both_claims_until_new_distinct_original_samples(self):
+        import json
+        from dataclasses import replace
+
+        from cloud_render.wire import Frame, Layer, encode_message
+        from experiments.mutter_app.capture import DrawingCache, command_digest
+
+        a = Frame(1, 100, 100, (Layer(0, 0, 100, 100, b'skiapict-A'),))
+        same = replace(a, sequence=2)
+        b = replace(a, sequence=3, layers=(replace(a.layers[0], skp=b'skiapict-B'),))
+        self.assertNotEqual(encode_message(a), encode_message(same))
+        self.assertEqual(command_digest(a), command_digest(same))
+        self.assertNotEqual(command_digest(a), command_digest(b))
+        self.assertNotEqual(
+            command_digest(a), command_digest(replace(a, layers=(replace(a.layers[0], x=1),)))
+        )
+        with TemporaryDirectory() as tmp:
+            cache = DrawingCache(Path(tmp))
+
+            def issue(rgb, frame, start):
+                return cache.add(rgb, frame, start)
+
+            self.assertTrue(issue('rgbA', a, 10))
+            self.assertFalse(issue('rgbB', same, 20))
+            self.assertEqual(json.loads((cache.out / 'scenes.json').read_text()), {})
+            self.assertEqual(list(cache.path.iterdir()), [])
+            self.assertFalse(issue('rgbA', replace(same, sequence=3), 30))
+            self.assertFalse(issue('rgbB', replace(same, sequence=4), 40))
+            self.assertTrue(issue('rgbB', b, 50))
+            self.assertTrue(issue('rgbA', replace(a, sequence=6), 60))
+            self.assertEqual(cache.records['rgbA']['witnessByteStart'], 60)
+            self.assertEqual(cache.records['rgbB']['witnessByteStart'], 50)
+
+    def test_unresolved_conflict_limit_cannot_grant_old_ambiguous_pictures(self):
+        from dataclasses import replace
+
+        from cloud_render.wire import Frame, Layer
+        from experiments.mutter_app.capture import DrawingCache
+
+        frame = Frame(1, 10, 10, (Layer(0, 0, 10, 10, b'skiapict-X'),))
+        with TemporaryDirectory() as tmp:
+            cache = DrawingCache(Path(tmp), capacity=1)
+            self.assertTrue(cache.add('a', frame, 1))
+            self.assertFalse(cache.add('b', replace(frame, sequence=2), 2))
+            self.assertFalse(cache.add('c', replace(frame, sequence=3), 3))
+            self.assertTrue(cache.saturated)
+            self.assertFalse(cache.add('d', replace(frame, width=12), 4))
+            self.assertEqual(cache.records, {})
 
 
 class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
@@ -320,10 +375,11 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
             seen = []
             original_add = DrawingCache.add
 
-            def added(cache, digest, raw, start):
+            def added(cache, digest, frame, start):
                 seen.append(digest)
-                original_add(cache, digest, raw, start)
+                original_add(cache, digest, frame, start)
                 (root / 'controller-closed').touch()
+                return True
 
             async def backoff(seconds):
                 self.assertEqual(seconds, 0.5)
