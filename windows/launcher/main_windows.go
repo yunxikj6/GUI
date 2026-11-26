@@ -129,7 +129,7 @@ func runProcess(program string, args, env []string, mode runMode) runResult {
 	if mode == setupRun {
 		return runSetup(program, args, env)
 	}
-	if mode == rendererRun || mode == instaboxRendererRun || mode == desktopRendererRun {
+	if mode == rendererRun || mode == instaboxRendererRun || mode == desktopRendererRun || mode == forwardedDesktopRun {
 		var code int
 		if mode == instaboxRendererRun || mode == desktopRendererRun {
 			env, code = withCredential(env, "INSTABOX_API_KEY", "连接 InstaBox", "请在密码栏输入有权连接此云机的 InstaBox API 密钥。", "CloudLinuxWorkspace.InstaBox")
@@ -137,7 +137,7 @@ func runProcess(program string, args, env []string, mode runMode) runResult {
 				return runResult{exit: code}
 			}
 		}
-		if mode == desktopRendererRun {
+		if mode == desktopRendererRun || mode == forwardedDesktopRun {
 			env, code = withCredential(env, "CLOUDWORKSPACE_GNOME_TOKEN", "连接云端 GNOME 桌面", "请输入云端 GNOME 桌面服务生成的会话配对码。", "CloudLinuxWorkspace.GNOME")
 		} else {
 			env, code = withCredential(env, "CLOUDWORKSPACE_RENDER_TOKEN", "连接云端应用", "请在密码栏输入云端应用绘图服务生成的本次会话配对码。", "CloudLinuxWorkspace.Render")

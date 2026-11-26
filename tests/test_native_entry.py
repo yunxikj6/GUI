@@ -21,7 +21,10 @@ class NativeEntry(unittest.TestCase):
                 patch.object(launcher, 'LocalServer', side_effect=AssertionError), \
                 patch.object(launcher, 'InstaBox', side_effect=AssertionError), \
                 contextlib.redirect_stderr(io.StringIO()) as err:
-            for options in (['--machine', 'example'], ['--no-browser'], ['--port', '8000'],
+            for options in (['--desktop-forwarded-port', '0'], ['--desktop-forwarded-port', '9', '--instabox'],
+                            ['--desktop-forwarded-port', '9', '--machine', 'm_a'], ['--desktop-forwarded-port', '9', '--desktop-port', '10'],
+                            ['--desktop-forwarded-port', '9', '--connect-port', '10'], ['--desktop-forwarded-port', '9', '--cloud-app'],
+                            ['--desktop-forwarded-port', '9', '--native'], ['--machine', 'example'], ['--no-browser'], ['--port', '8000'],
                             ['--connect-port', '65536'], ['--connect-port', '0', '--native'],
                             ['--desktop-size', '1920x1080', '--native'], ['--desktop-size', '800x520', '--cloud-app'],
                             ['--desktop-size', '1024x768'], ['--desktop-size', '1280x900', '--connect-port', '1'],
@@ -36,6 +39,8 @@ class NativeEntry(unittest.TestCase):
         cases = (
             ([], {}, False, ['--instabox', '--port', '17325']),
             ([], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, False, ['--instabox', '--port', '17325']),
+            (['--desktop-forwarded-port', '44123'], {}, False, ['--forwarded', '--port', '44123']),
+            (['--desktop-forwarded-port', '9', '--desktop-size', '1280x900'], {}, False, ['--forwarded', '--port', '9', '--size', '1280x900']),
             (['--desktop-size', '1920x1080'], {}, False, ['--instabox', '--port', '17325', '--size', '1920x1080']),
             (['--desktop-port', '4100', '--machine', 'm_abc'], {}, False, ['--instabox', '--port', '4100', '--machine', 'm_abc']),
             (['--machine', 'm_abc'], {}, False, ['--instabox', '--port', '17325', '--machine', 'm_abc']),

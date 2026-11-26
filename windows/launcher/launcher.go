@@ -23,6 +23,7 @@ const help = `Cloud Linux Workspace
   --instabox        使用 InstaBox 私有连接
   --desktop-size SIZE  新会话尺寸，可选 800x520、1280x900、1920x1080
   --desktop-port N  指定云端 GNOME 服务端口，默认 17325
+  --desktop-forwarded-port N  使用本机回环上已有的 GNOME 私有转发
   --cloud-app       打开单独的云端 ChatGPT 程序，默认云端端口 17324
   --machine ID      选用指定的 InstaBox 实例
   --connect-port N  指定本地转发端口，与 --instabox 同用时指定云端端口
@@ -36,10 +37,10 @@ const help = `Cloud Linux Workspace
   --help            显示本说明`
 
 type options struct {
-	distro, app                                   string
-	renderPort, desktopPort, desktopSize, machine string
-	direct, cloudApp                              bool
-	native, check, setup, showHelp, offerInstall  bool
+	distro, app                                                         string
+	renderPort, desktopPort, desktopSize, machine, desktopForwardedPort string
+	direct, cloudApp                                                    bool
+	native, check, setup, showHelp, offerInstall                        bool
 }
 type failure struct {
 	code, message string
@@ -67,6 +68,12 @@ func parse(args []string) (options, *failure) {
 				return opt, fail("arguments", "--desktop-port 需要 1 到 65535 之间的云端 GNOME 端口。")
 			}
 			opt.desktopPort = args[i]
+		case "--desktop-forwarded-port":
+			i++
+			if i >= len(args) || opt.desktopForwardedPort != "" || !validRenderPort(args[i]) {
+				return opt, fail("arguments", "--desktop-forwarded-port 需要 1 到 65535 之间的本地转发端口。")
+			}
+			opt.desktopForwardedPort = args[i]
 		case "--instabox":
 			opt.direct = true
 		case "--machine":
@@ -116,10 +123,13 @@ func parse(args []string) (options, *failure) {
 	if opt.app != "" && opt.distro != "" {
 		return opt, fail("arguments", "--open-app 使用 Windows 应用，不能与 --distro 同时使用。")
 	}
-	if (opt.desktopPort != "" || opt.desktopSize != "") && (opt.cloudApp || opt.renderPort != "") {
+	if opt.desktopForwardedPort != "" && (opt.desktopPort != "" || opt.machine != "" || opt.direct) {
+		return opt, fail("arguments", "桌面已转发端口不能和云端端口或 InstaBox 连接参数同时指定。")
+	}
+	if (opt.desktopForwardedPort != "" || opt.desktopPort != "" || opt.desktopSize != "") && (opt.cloudApp || opt.renderPort != "") {
 		return opt, fail("arguments", "请分别选择云端桌面或单应用连接。")
 	}
-	if (opt.cloudApp || opt.desktopSize != "" || opt.desktopPort != "" || opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
+	if (opt.cloudApp || opt.desktopForwardedPort != "" || opt.desktopSize != "" || opt.desktopPort != "" || opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
 		return opt, fail("arguments", "云端绘图与本地兼容模式不能同时使用。")
 	}
 	return opt, nil
@@ -289,13 +299,14 @@ const (
 	rendererRun
 	instaboxRendererRun
 	desktopRendererRun
+	forwardedDesktopRun
 )
 
 type runner func(program string, args, env []string, mode runMode) runResult
 
 func launchRenderer(opt options, exe string, env []string, run runner) *failure {
 	desktop := !opt.cloudApp && opt.renderPort == ""
-	direct := desktop || opt.direct || opt.machine != ""
+	direct := (desktop && opt.desktopForwardedPort == "") || opt.direct || opt.machine != ""
 	if opt.cloudApp && opt.renderPort == "" && !direct {
 		direct = true
 		for _, pair := range env {
@@ -331,6 +342,10 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 		tokenKey = "CLOUDWORKSPACE_GNOME_TOKEN"
 		if opt.desktopSize != "" {
 			args = append(args, "--desktop-size", opt.desktopSize)
+		}
+		if opt.desktopForwardedPort != "" {
+			mode = forwardedDesktopRun
+			args = append(args, "--desktop-forwarded-port", opt.desktopForwardedPort)
 		}
 		if opt.desktopPort != "" {
 			args = append(args, "--desktop-port", opt.desktopPort)

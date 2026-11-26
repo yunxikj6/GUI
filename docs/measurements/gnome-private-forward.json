@@ -1,0 +1,48 @@
+{
+  "environment": "Local isolated SSH test gateway, one x86-64 Linux host. The actual amd64 Windows Go GUI launcher and bundled Windows CPython ran under Wine; a separate OpenSSH server passed the single allowed loopback destination through to an original Ubuntu Noble GNOME Shell. No WAN latency was emulated.",
+  "route": "Win32 --desktop-forwarded-port PORT connects to 127.0.0.1:PORT, over SSH user and host certificates and a strict trusted host CA. GNOME pairing remains separate. No public port or provider HTTPS image polling.",
+  "checks": {
+    "nativeClientAreaSamples": 165,
+    "samplesMatchingAnOriginalCloudFrame": 165,
+    "differentMatchedGdiFrames": 19,
+    "originalCloudFrames": 40,
+    "digest": "SHA-256 of original BGRX and actual Win32 client area via BitBlt/GetDIBSection after ignoring the unused high byte."
+  },
+  "measurements": [
+    {
+      "action": "Super",
+      "cloudAckMs": 117.06,
+      "firstChangedOriginalSourceFrame": 10,
+      "observedNativeGdiMs": 433.81,
+      "firstMatchingGdiSha256": "71526a4de7c63d7054850252f65b0bd9b835e54ea450850b4b969b40d437a1b6"
+    },
+    {
+      "action": "Super",
+      "cloudAckMs": 183.45,
+      "firstChangedOriginalSourceFrame": 21,
+      "observedNativeGdiMs": 497.58,
+      "firstMatchingGdiSha256": "f9836f0baeba15a7b5847c60d45d4c5a7bc4bf98836f76b515a74cc1a5997663"
+    },
+    {
+      "action": "Quick Settings",
+      "cloudAckMs": 279.76,
+      "firstChangedOriginalSourceFrame": 29,
+      "observedNativeGdiMs": 285.33,
+      "firstMatchingGdiSha256": "16585b529143d74525b64041b21f67168da65b72c5daa552ef2f30111d248aff"
+    },
+    {
+      "action": "Escape",
+      "cloudAckMs": 101.89,
+      "firstChangedOriginalSourceFrame": 37,
+      "observedNativeGdiMs": 398.23,
+      "firstMatchingGdiSha256": "fb3c369302c54806c89d5e0360dfc86c476a1036ffd746fbac0584e30249a081"
+    }
+  ],
+  "timing": "From injecting a physical key or mouse action in the isolated Windows display to observing the first different source-matching Win32 client-area sample. Includes scheduling, keyboard injection, cloud rendering, transport, local rendering and sample interval.",
+  "realInstaBoxGateway": {
+    "shortLivedCertificateWasIssued": true,
+    "hostVerificationConfigured": "strict CA",
+    "tcpResultFromThisExecutor": "connection refused",
+    "actualEndToEndViaProviderGateway": false
+  }
+}

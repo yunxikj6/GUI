@@ -22,6 +22,18 @@ python3 -m cloud_render.gnome_relay --port 17325
 Start.cmd --machine m_YOUR_MACHINE --desktop-port 17325
 ```
 
+本机能够连接 InstaBox SSH 网关时，也可用官方 CLI 建立持续的私有转发。先在已登录 CLI 的终端运行下面的命令，将 `dev` 换成云机名称或 ID。`41325` 是本机回环端口，`17325` 是云端 GNOME 服务的回环端口。[InstaBox CLI](https://instabox.sh/docs/cli) · [InstaBox SSH](https://instabox.sh/docs/access/ssh)
+
+```sh
+instabox port-forward dev 41325:17325 --address 127.0.0.1
+```
+
+保持转发终端运行，在 Windows 客户端目录另开终端执行以下命令。桌面客户端只提示输入 GNOME 配对码。原始绘图和键鼠回执沿同一条已认证连接持续传输。关闭桌面后可在转发终端按 Ctrl+C 释放本机端口。独立 OpenSSH 测试网关中，实际 Win64 窗口读取的 165 个画面样本均与云端原桌面匹配。当前执行器连接 InstaBox 动态 SSH 网关时收到 TCP 拒绝，供应商网关上的端到端时延仍待实测。[转发验收记录](measurements/gnome-private-forward.json)
+
+```bat
+Start.cmd --desktop-forwarded-port 41325
+```
+
 窗口支持指针移动、左右点击以及 Tab、Shift+Tab、Enter、方向键等导航键。可按 Ctrl+Esc 切换 GNOME 活动概览。默认桌面尺寸是 800×520。启动新会话时可指定 1280×900 或 1920×1080，例如运行 `Start.cmd --desktop-size 1920x1080`。Ubuntu 将按所选尺寸排布原版桌面。会话期间调整 Windows 窗口大小会同步缩放显示和点击坐标。较大尺寸需要云机也运行支持尺寸协商的版本。
 
 ## 单独打开原版 ChatGPT

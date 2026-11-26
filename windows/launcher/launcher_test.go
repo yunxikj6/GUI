@@ -202,7 +202,7 @@ func TestDiagnostics(t *testing.T) {
 }
 
 func TestRenderEntry(t *testing.T) {
-	for _, flags := range [][]string{{"--desktop-size"}, {"--desktop-size", "1280x720"}, {"--desktop-size", "1920x1080", "--cloud-app"}, {"--desktop-size", "1280x900", "--native"}, {"--connect-port"}, {"--connect-port", ""}, {"--connect-port", "0"}, {"--desktop-port", "65536"}, {"--desktop-port", "1e1"}, {"--connect-port", "０１"}, {"--cloud-app", "--desktop-port", "7"}, {"--desktop-port", "8", "--connect-port", "9"}, {"--cloud-app", "--native"}, {"--connect-port", "9", "--distro", "Ubuntu"}, {"--connect-port", "20", "--open-app", "Claude"}, {"--machine", "example"}, {"--instabox", "--setup-native"}} {
+	for _, flags := range [][]string{{"--desktop-forwarded-port"}, {"--desktop-forwarded-port", "65536"}, {"--desktop-forwarded-port", "9", "--instabox"}, {"--desktop-forwarded-port", "9", "--machine", "m_a"}, {"--desktop-forwarded-port", "9", "--desktop-port", "10"}, {"--desktop-forwarded-port", "9", "--connect-port", "10"}, {"--desktop-forwarded-port", "9", "--native"}, {"--desktop-forwarded-port", "9", "--cloud-app"}, {"--desktop-size"}, {"--desktop-size", "1280x720"}, {"--desktop-size", "1920x1080", "--cloud-app"}, {"--desktop-size", "1280x900", "--native"}, {"--connect-port"}, {"--connect-port", ""}, {"--connect-port", "0"}, {"--desktop-port", "65536"}, {"--desktop-port", "1e1"}, {"--connect-port", "０１"}, {"--cloud-app", "--desktop-port", "7"}, {"--desktop-port", "8", "--connect-port", "9"}, {"--cloud-app", "--native"}, {"--connect-port", "9", "--distro", "Ubuntu"}, {"--connect-port", "20", "--open-app", "Claude"}, {"--machine", "example"}, {"--instabox", "--setup-native"}} {
 		if _, err := parse(flags); err == nil {
 			t.Errorf("accepted %q", flags)
 		}
@@ -218,6 +218,8 @@ func TestRenderEntry(t *testing.T) {
 		mode             runMode
 		envPort          string
 	}{
+		{[]string{"--desktop-forwarded-port", "9"}, []string{"--desktop-forwarded-port", "9"}, forwardedDesktopRun, ""},
+		{[]string{"--desktop-size", "1920x1080", "--desktop-forwarded-port", "9"}, []string{"--desktop-size", "1920x1080", "--desktop-forwarded-port", "9"}, forwardedDesktopRun, "5900"},
 		{nil, []string{"--instabox"}, desktopRendererRun, ""},
 		{nil, []string{"--instabox"}, desktopRendererRun, "5900"},
 		{[]string{"--instabox", "--machine", "m_abc"}, []string{"--instabox", "--machine", "m_abc"}, desktopRendererRun, ""},
@@ -251,7 +253,8 @@ func TestRenderEntry(t *testing.T) {
 				}
 				return false
 			}
-			if has("CLOUDWORKSPACE_GNOME_TOKEN") != (mode == desktopRendererRun) || has("CLOUDWORKSPACE_RENDER_TOKEN") != (mode != desktopRendererRun) || has("INSTABOX_API_KEY") != (mode != rendererRun) {
+			desktop := mode == desktopRendererRun || mode == forwardedDesktopRun
+			if has("CLOUDWORKSPACE_GNOME_TOKEN") != desktop || has("CLOUDWORKSPACE_RENDER_TOKEN") == desktop || has("INSTABOX_API_KEY") != (mode == desktopRendererRun || mode == instaboxRendererRun) {
 				t.Fatal("wrong credential scope")
 			}
 			return runResult{exit: 1}

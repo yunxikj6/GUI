@@ -169,13 +169,17 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='打开云端 GNOME 原生桌面。')
-    parser.add_argument('--instabox', action='store_true', help='使用 InstaBox 私有通道')
+    route = parser.add_mutually_exclusive_group()
+    route.add_argument('--instabox', action='store_true', help='使用 InstaBox 私有通道')
+    route.add_argument('--forwarded', action='store_true', help='使用已转发至本机回环的 GNOME 服务端口')
     parser.add_argument('--port', type=int, default=17325)
     parser.add_argument('--machine')
     parser.add_argument('--size', choices=SIZE_NAMES, default='800x520')
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error('端口必须在 1 至 65535 之间。')
+    if args.forwarded and args.machine is not None:
+        parser.error('已转发的 GNOME 服务不能与 --machine 同时指定。')
     if args.machine and not re.fullmatch(r'm_[A-Za-z0-9_]+', args.machine):
         parser.error('实例 ID 格式无效。')
     if sys.platform != 'win32':
@@ -186,13 +190,14 @@ def main(argv=None):
     if not pairing or not re.fullmatch(r'[A-Za-z0-9_-]{43}', pairing):
         print('请提供 GNOME 服务生成的配对码。', file=sys.stderr)
         return 2
-    key = hidden_value('INSTABOX_API_KEY', 'InstaBox API 密钥（输入隐藏）：')
-    if not key:
-        print('请提供 InstaBox API 密钥。', file=sys.stderr)
-        return 2
+    if not args.forwarded:
+        key = hidden_value('INSTABOX_API_KEY', 'InstaBox API 密钥（输入隐藏）：')
+        if not key:
+            print('请提供 InstaBox API 密钥。', file=sys.stderr)
+            return 2
     try:
         from instabox import InstaBox
-        from .gnome_transport import connect
+        from .gnome_transport import connect, connect_forwarded
         from .gnome_window import open_window
         from .virgl_windows import replay
 
@@ -205,6 +210,8 @@ def main(argv=None):
                 artwork = decoded_asset(Path(__file__).with_name('vendor') / 'ubuntu-noble' / 'wallpaper.rgb.xz')
             except (OSError, ValueError, ImportError):
                 artwork = None
+            if args.forwarded:
+                return connect_forwarded(args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None)
             box = InstaBox(key, args.machine)
             box.ensure_running()
             return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None)

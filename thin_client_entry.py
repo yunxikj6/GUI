@@ -15,6 +15,7 @@ def add_arguments(parser):
     parser.add_argument('--desktop-size', choices=SIZE_NAMES, help='新建 Ubuntu 桌面的尺寸')
     routes = parser.add_mutually_exclusive_group()
     routes.add_argument('--desktop-port', metavar='PORT', help='云端 GNOME 服务端口，默认 17325')
+    routes.add_argument('--desktop-forwarded-port', metavar='PORT', help='通过本机回环上已有的私有转发打开 GNOME 桌面')
     routes.add_argument('--cloud-app', action='store_true', help='打开单独的云端 ChatGPT 原程序')
     parser.add_argument('--connect-port', metavar='PORT', help='单应用兼容模式的本地转发端口，与 --instabox 同用时为云端端口')
 
@@ -22,7 +23,10 @@ def add_arguments(parser):
 def start(options, parser):
     if options.machine is not None and not re.fullmatch(r'm_[A-Za-z0-9_]+', options.machine):
         parser.error('--machine 需要有效的 InstaBox 实例 ID')
-    if options.desktop_port is not None and options.connect_port is not None:
+    forwarded = options.desktop_forwarded_port is not None
+    if forwarded and (options.instabox or options.machine is not None):
+        parser.error('桌面已转发端口不能和 --instabox 或 --machine 同时指定')
+    if (forwarded or options.desktop_port is not None) and options.connect_port is not None:
         parser.error('桌面端口和单应用连接端口不能同时指定')
     app = options.cloud_app or options.connect_port is not None
     if app and options.desktop_size is not None:
@@ -35,12 +39,17 @@ def start(options, parser):
             direct = port is None
         if port is None:
             port = DEFAULT_APP_PORT
+    elif forwarded:
+        direct = False
+        port = options.desktop_forwarded_port
     else:
         direct = True
         port = options.desktop_port if options.desktop_port is not None else DEFAULT_DESKTOP_PORT
     if not re.fullmatch(r'[0-9]{1,5}', port) or not 1 <= int(port) <= 65535:
         parser.error('云端连接端口必须在 1 到 65535 之间')
     arguments = ['--instabox'] if direct else []
+    if forwarded:
+        arguments.append('--forwarded')
     arguments.extend(['--port', str(int(port))])
     if options.desktop_size is not None:
         arguments.extend(['--size', options.desktop_size])
