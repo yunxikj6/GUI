@@ -123,11 +123,14 @@ class OriginalDesktopSourceTests(unittest.TestCase):
         for exit_case in ("timeout", "terminated", "killed"):
             with self.subTest(exit_case=exit_case):
                 proc = self.start("--port", "0", "--lifetime", "1" if exit_case == "timeout" else "60")
-                self.port(proc)
-                for _ in range(100):
-                    if (self.app / "pid").is_file():
-                        break
-                    time.sleep(.02)
+                # The lifetime includes startup. Only the explicit termination
+                # cases require an already running source and its descendant.
+                if exit_case != "timeout":
+                    self.port(proc)
+                    for _ in range(100):
+                        if (self.app / "pid").is_file():
+                            break
+                        time.sleep(.02)
                 if exit_case == "terminated":
                     proc.terminate()
                 if exit_case == "killed":
@@ -136,6 +139,17 @@ class OriginalDesktopSourceTests(unittest.TestCase):
                 stdout, stderr = proc.communicate(timeout=12)
                 self.assertEqual(proc.returncode, expected, stderr)
                 self.assertNotIn(self.token.encode(), stdout + stderr)
+                if exit_case == "timeout":
+                    self.assertIn("已达到设置的最长运行时间".encode(), stderr)
+                    self.assertIn("正在回收它的临时目录".encode(), stdout)
+                    pid = self.app / "pid"
+                    if not pid.is_file() or not pid.read_text().strip():
+                        # The worker can expire before the test source starts.
+                        scope = self.app / "scope"
+                        if scope.is_file() and (name := scope.read_text().strip()):
+                            self.assertFalse(Path(name).parent.exists())
+                        pid.unlink(missing_ok=True)
+                        continue
                 self.verify_cleanup()
                 (self.app / "pid").unlink()
 
