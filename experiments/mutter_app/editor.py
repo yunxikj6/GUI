@@ -18,10 +18,11 @@ FOCUS = struct.Struct('!IB')
 _ALLOWED = """s => !!s.node?.isConnected && s.node.ownerDocument.hasFocus()
     && (s.node.isContentEditable || s.node.matches('textarea:read-write, input:read-write'))"""
 _COMMIT_FOCUSED = '(s, text) => (' + _ALLOWED + ')(s) && (' + _COMMIT + ')(s, text)'
-_SELECT_ALL = (
-    's => (' + _ALLOWED + ')(s) && (' + _FOCUS_MATCH + ")(s, 'edit')"
-    " && s.node.ownerDocument.execCommand('selectAll')"
+_EDIT_ACTION = (
+    '(s, command) => (' + _ALLOWED + ')(s) && (' + _FOCUS_MATCH + ")(s, 'edit')"
+    ' && s.node.ownerDocument.execCommand(command)'
 )
+_EDIT_COMMANDS = {b'A': 'selectAll', b'B': 'delete', b'D': 'forwardDelete'}
 
 
 class Editor:
@@ -69,13 +70,13 @@ class Editor:
 
     async def apply(self, command):
         op, args = decode_input(command)
-        if op not in (b'T', b'A'):
+        if op != b'T' and op not in _EDIT_COMMANDS:
             return False
         async with self.lock:
             if not await self.check() or args[0] != self.revision:
                 return False
-            if op == b'A':
-                applied = await self.focus.handle.evaluate(_SELECT_ALL)
+            if op in _EDIT_COMMANDS:
+                applied = await self.focus.handle.evaluate(_EDIT_ACTION, _EDIT_COMMANDS[op])
             else:
                 applied = await self.focus.handle.evaluate(_COMMIT_FOCUSED, args[1])
             await self.check()

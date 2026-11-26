@@ -38,7 +38,9 @@ def initialize(channel):
     for name in ('graphics.fifo', 'input.fifo'):
         os.mkfifo(channel / name, 0o600)
     (channel / 'focus.events').touch(mode=0o600, exist_ok=False)
-    publish(channel / 'session.json', {'session': secrets.token_hex(32), 'exe': ORIGINAL_SHA256})
+    session = secrets.token_hex(32)
+    publish(channel / 'session.json', {'session': session, 'exe': ORIGINAL_SHA256})
+    publish(channel / 'editor-capabilities.json', {'session': session, 'flags': 2 | 4 | 8})
 
 
 class LiveInput:
@@ -390,10 +392,12 @@ def receive_click(out, channel, *, interactive=False):
                 require(size is not None, 'incomplete editor command')
                 event = header + src.read(size - len(header))
                 opcode, args = decode_input(event, size=(1280, 900))
-                if opcode in (b'T', b'A'):
+                if opcode in (b'T', b'A', b'B', b'D') or (
+                    opcode == b'K' and args in (('BackSpace',), ('Delete',))
+                ):
                     from .editor import deliver
 
-                    applied = deliver(out, event)
+                    applied = opcode != b'K' and deliver(out, event)
                     sequence += 1
                     publish(channel / 'last-input.json', {'sequence': sequence, 'applied': applied})
                     continue

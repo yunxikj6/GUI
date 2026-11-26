@@ -200,3 +200,24 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
             page.url = 'about:blank'
             self.assertFalse(await editor.check())
             self.assertEqual(events.getvalue(), FOCUS.pack(1, 1) + FOCUS.pack(2, 0))
+
+    async def test_delete_requires_same_editor_and_exact_focus_generation(self):
+        import io
+        from unittest.mock import AsyncMock, patch
+
+        from experiments.mutter_app.editor import Editor
+
+        with TemporaryDirectory() as tmp:
+            editor = Editor(object(), Path(tmp), io.BytesIO())
+            editor.focus = AsyncMock()
+            editor.revision = 7
+            editor.check = AsyncMock(return_value=True)
+            for op, command in ((b'B', 'delete'), (b'D', 'forwardDelete')):
+                with self.subTest(op=op):
+                    with patch('experiments.mutter_app.editor.decode_input', return_value=(op, (6,))):
+                        self.assertFalse(await editor.apply(op))
+                    editor.focus.handle.evaluate.assert_not_awaited()
+                    with patch('experiments.mutter_app.editor.decode_input', return_value=(op, (7,))):
+                        self.assertTrue(await editor.apply(op))
+                    self.assertEqual(editor.focus.handle.evaluate.await_args.args[1], command)
+                    editor.focus.handle.evaluate.reset_mock()
