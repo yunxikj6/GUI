@@ -74,6 +74,9 @@ func TestSourceCheckoutUsesItsExactReleaseAndCleansUp(t *testing.T) {
 
 func TestCheckoutSelectsOriginalOnlyForDefault(t *testing.T) {
 	root := t.TempDir()
+	// An older portable runtime unpacked into the checkout still requires archive verification.
+	touch(t, filepath.Join(root, "launcher.py"))
+	touch(t, filepath.Join(root, "windows", "runtime", "python.exe"))
 	touch(t, filepath.Join(root, "thin_client_entry.py"))
 	exe := filepath.Join(root, "windows", "CloudLinuxWorkspace-x64.exe")
 	originalPath, original := writeTestClient(t, root, "original-win64", "windows/runtime/python.exe", "experiments/original_desktop.py", originalNode)

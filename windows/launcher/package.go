@@ -15,10 +15,16 @@ import (
 
 const originalNode = "thin_client/vendor/node/windows-x64/node.exe"
 
+// launcher.py belongs to the source checkout and is absent from both portable
+// downloads. A previous extraction in the checkout must not select an older client.
+func unpackedPortableClient(root string) bool {
+	return !regular(filepath.Join(root, "launcher.py")) && regular(filepath.Join(root, "windows", "runtime", "python.exe"))
+}
+
 // A source checkout expands the release selected for this invocation. A portable
 // client already has its isolated Python runtime and can run in place.
 func packagedClient(root string, original bool) (string, func(), *failure) {
-	if regular(filepath.Join(root, "windows", "runtime", "python.exe")) {
+	if unpackedPortableClient(root) {
 		return root, func() {}, nil
 	}
 	packageDir, entry := "thin-windows", "thin_client_entry.py"

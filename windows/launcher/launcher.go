@@ -324,7 +324,7 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 	if root == "" {
 		return fail("package-layout", "找不到客户端入口。请完整解压发行 ZIP 后打开 Start.cmd。")
 	}
-	original := opt == (options{}) && !regular(filepath.Join(root, "windows", "runtime", "python.exe"))
+	original := opt == (options{}) && !unpackedPortableClient(root)
 	root, cleanup, problem := packagedClient(root, original)
 	if problem != nil {
 		return problem
