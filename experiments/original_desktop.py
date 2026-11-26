@@ -58,7 +58,7 @@ class _WindowInput:
         def handle(event):
             if event[0] == 'move':
                 submit(event)
-            elif event[0] in ('text', 'select-all'):
+            elif event[0] in ('text', 'select-all', 'delete-key'):
                 if self.has_displayed_application():
                     submit(event)
                 else:
@@ -101,6 +101,16 @@ class _PointerDesktop:
 
     def select_all(self, revision):
         if self.text_focus() == revision and self.transport.select_all(revision):
+            return True
+        self.state.rejected_edit()
+        return False
+
+    def has_text_focus_protocol(self):
+        # This window has no unscoped Delete/Backspace compatibility path.
+        return True
+
+    def delete_text(self, revision, *, backward):
+        if self.text_focus() == revision and self.transport.delete_text(revision, backward=backward):
             return True
         self.state.rejected_edit()
         return False
@@ -196,10 +206,10 @@ def main(argv=None):
         def start():
             box = InstaBox(key, args.machine)
             box.ensure_running()
-            return connect(box,args.port,token, size=SIZE, search_input=True)
+            return connect(box,args.port,token, size=SIZE, search_input=True, focus_delete=True)
     else:
         def start():
-            return connect_forwarded(args.port,token, size=SIZE, search_input=True)
+            return connect_forwarded(args.port,token, size=SIZE, search_input=True, focus_delete=True)
 
     bundled = Path(__file__).resolve().parents[1]/'thin_client/vendor/node/windows-x64/node.exe'
     node = args.node or (bundled if bundled.is_file() else 'node')

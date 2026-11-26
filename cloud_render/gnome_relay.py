@@ -223,8 +223,19 @@ class _SourceLink:
             await asyncio.gather(source, draw, metadata, inputs, return_exceptions=True)
 
 
+_FEATURES = wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE
+
+
+def _valid_features(flags):
+    return (type(flags) is int and flags >= 0 and not flags & ~_FEATURES and
+            (not flags & (wire.SELECT_ALL | wire.FOCUS_DELETE) or bool(flags & wire.SEARCH_INPUT)))
+
+
 class DesktopService:
-    def __init__(self, token, source_factory=open_source):
+    def __init__(self, token, source_factory=open_source, *, features=_FEATURES):
+        if not callable(features) and not _valid_features(features):
+            raise ValueError('invalid desktop source capabilities')
+        self.features = features
         if not TOKEN.fullmatch(token):
             raise ValueError('无效的云桌面配对码。')
         self.expected = wire.AUTH + token.encode('ascii') + b'\n'
@@ -233,6 +244,14 @@ class DesktopService:
         self.source_factory = source_factory
         self.busy = False
         self.active = set()
+
+    async def enabled_features(self):
+        # The source can finish booting after the private server starts. Resolve
+        # its bound capability record only after authenticating the caller.
+        flags = await self.features() if callable(self.features) else self.features
+        if not _valid_features(flags):
+            raise ValueError('invalid desktop source capabilities')
+        return flags
 
     async def accept(self, reader, writer):
         task = asyncio.current_task()
@@ -243,7 +262,7 @@ class DesktopService:
                 return
             login = await asyncio.wait_for(reader.readexactly(len(self.expected)), 5)
             if hmac.compare_digest(login, self.expected_query):
-                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE))
+                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, await self.enabled_features()))
                 await writer.drain()
                 return
             options = {}
@@ -253,6 +272,8 @@ class DesktopService:
             elif hmac.compare_digest(login, self.expected_size):
                 raw = await asyncio.wait_for(reader.readexactly(wire.SESSION.size), 5)
                 width, height, offered = wire.SESSION.unpack(raw)
+                if not _valid_features(offered) or offered & ~(await self.enabled_features()):
+                    return
                 if offered & wire.SEARCH_INPUT:
                     options['search_input'] = True
                     features = offered & (wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FOCUS_DELETE)

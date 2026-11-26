@@ -10,7 +10,7 @@ import stat
 
 from cloud_render import gnome_commands as mesa
 from cloud_render.gnome_input import decode_input
-from cloud_render.gnome_wire import FOCUS_STATE
+from cloud_render.gnome_wire import FOCUS_STATE, SEARCH_INPUT, SELECT_ALL, FOCUS_DELETE
 from cloud_render.gnome_relay import DesktopService, TOKEN
 from experiments.application_surface import SurfaceError
 from experiments.live_application_surface import BIND, DRAW, HOLD, REUSE, binding_record
@@ -30,6 +30,29 @@ def _metadata(path):
     if len(body) > 2048:
         raise SurfaceError('source identity exceeds the supported size')
     return json.loads(body)
+
+
+def supported_editor_features(channel):
+    _private(channel, stat.S_ISDIR)
+    config = _metadata(channel/'session.json')
+    source_hello(config)
+    try:
+        definition = _metadata(channel/'editor-capabilities.json')
+    except FileNotFoundError:
+        try:
+            _private(channel/'focus.events', stat.S_ISREG)
+        except FileNotFoundError:
+            return 0
+        # The previous interactive source defined focus observation plus text
+        # and selection. It had no way to bind a deletion to the original focus.
+        return SEARCH_INPUT | SELECT_ALL
+    if (definition.get('session') != config['session'] or type(definition.get('flags')) is not int or
+            definition['flags'] not in (0, SEARCH_INPUT, SEARCH_INPUT | SELECT_ALL,
+                                        SEARCH_INPUT | FOCUS_DELETE, SEARCH_INPUT | SELECT_ALL | FOCUS_DELETE)):
+        raise SurfaceError('unsupported original editor capability record')
+    if definition['flags']:
+        _private(channel/'focus.events', stat.S_ISREG)
+    return definition['flags']
 
 
 class _Graphics:
@@ -93,9 +116,10 @@ class _Graphics:
 
 
 class _Pointer:
-    def __init__(self, channel, events, *, editing):
+    def __init__(self, channel, events, *, editing, focus_delete):
         self.channel, self.events = channel, events
         self.editing = editing
+        self.focus_delete = focus_delete
         self.fd = None
         self.sequence = 0
         self.pending = None
@@ -114,6 +138,8 @@ class _Pointer:
     def write(self, command):
         op, _ = decode_input(command, size=SIZE)
         allowed = (b'M', b'L', b'T', b'A') if self.editing else (b'M', b'L')
+        if self.focus_delete:
+            allowed += (b'B', b'D')
         if op not in allowed or self.pending is not None or self.fd is None:
             raise SurfaceError('unsupported or unacknowledged native pointer input')
         self.pending = command
@@ -147,7 +173,7 @@ class _Pointer:
                     raise SurfaceError('native input acknowledgement out of order')
                 if number == self.sequence:
                     applied = ack.get('applied')
-                    if type(applied) is not bool or (not applied and command[:1] not in (b'T', b'A')):
+                    if type(applied) is not bool or (not applied and command[:1] not in (b'T', b'A', b'B', b'D')):
                         raise SurfaceError('invalid original input result')
                     event = dict(event='input', sequence=number, applied=applied)
                     self.events.feed_data(json.dumps(event).encode() + b'\n')
@@ -201,12 +227,15 @@ class _Peer:
 
 
 @asynccontextmanager
-async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False):
-    if size != SIZE or wallpaper:
+async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False, focus_delete=False):
+    if size != SIZE or wallpaper or (focus_delete and not search_input):
         raise SurfaceError('unsupported application desktop configuration')
     _private(channel, stat.S_ISDIR)
     for name in ('graphics.fifo','input.fifo'):
         _private(channel/name, stat.S_ISFIFO)
+    flags = supported_editor_features(channel)
+    if (search_input and not flags & SEARCH_INPUT) or (focus_delete and not flags & FOCUS_DELETE):
+        raise SurfaceError('source lacks the requested native input capability')
     config = _metadata(channel/'session.json')
     source_hello(config)
     finished = asyncio.Event()
@@ -220,7 +249,7 @@ async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input
             finished.set()
             events.feed_eof()
         graphics = _Graphics(channel, reader, config, eof)
-        pointer = _Pointer(channel, events, editing=search_input)
+        pointer = _Pointer(channel, events, editing=search_input, focus_delete=focus_delete)
         opening = asyncio.create_task(pointer.open())
         def opened(task):
             if not task.cancelled() and task.exception() is not None:
@@ -250,18 +279,21 @@ async def serve(channel, port, token):
         nonlocal claimed
         if claimed:
             raise SurfaceError('the private application session has ended')
-        deadline = asyncio.get_running_loop().time() + 45
-        while not (channel/'session.json').is_file():
-            if asyncio.get_running_loop().time() >= deadline:
-                raise SurfaceError('application source did not initialize')
-            await asyncio.sleep(.05)
         async with interactive_fifos(channel, **options) as endpoint:
             claimed = True
             try:
                 yield endpoint
             finally:
                 finished.set()
-    service = DesktopService(token, source)
+    async def capabilities():
+        deadline = asyncio.get_running_loop().time() + 45
+        while not (channel/'session.json').is_file():
+            if asyncio.get_running_loop().time() >= deadline:
+                raise SurfaceError('application source did not initialize')
+            await asyncio.sleep(.05)
+        return supported_editor_features(channel)
+
+    service = DesktopService(token, source, features=capabilities)
     closing = False
     async def accept(reader, writer):
         # A socket accepted just before close() can enter its callback later.

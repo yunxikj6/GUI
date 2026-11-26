@@ -16,9 +16,9 @@ from cloud_render.gnome_relay import DesktopService
 from experiments.application_surface import Binding
 from experiments.live_application_surface import binding_record
 from experiments.original_desktop import _PointerDesktop, _WindowInput
-from cloud_render.gnome_input import encode_text, encode_select_all
-from cloud_render.gnome_wire import FOCUS_STATE
-from experiments.original_desktop_bridge import interactive_fifos
+from cloud_render.gnome_input import encode_text, encode_select_all, encode_delete
+from cloud_render.gnome_wire import FOCUS_STATE, FOCUS_DELETE, SEARCH_INPUT, SELECT_ALL
+from experiments.original_desktop_bridge import interactive_fifos, supported_editor_features
 from experiments.original_desktop_protocol import SIZE, approved_binding, read_hello
 from experiments.mutter_app.controls import ORIGINAL_SHA256
 from thin_client.gnome_transport import connect_forwarded
@@ -63,6 +63,26 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                 await writer.wait_closed()
                 await asyncio.gather(task, return_exceptions=True)
 
+    def test_legacy_sources_negotiate_only_inputs_their_original_editor_supports(self):
+        with tempfile.TemporaryDirectory() as temp:
+            channel = Path(temp)
+            def write(name, data):
+                path = channel/name
+                path.write_text(json.dumps(data))
+                path.chmod(0o600)
+            identity = dict(session='41'*32, exe=ORIGINAL_SHA256)
+            write('session.json',identity)
+            self.assertEqual(supported_editor_features(channel),0)
+            (channel/'focus.events').touch(mode=0o600)
+            self.assertEqual(supported_editor_features(channel),SEARCH_INPUT|SELECT_ALL)
+            for session, flags in ((identity['session'], FOCUS_DELETE),('55'*32,14),
+                                   (identity['session'],14.0),(identity['session'],255)):
+                write('editor-capabilities.json',dict(session=session,flags=flags))
+                with self.assertRaises(ValueError):
+                    supported_editor_features(channel)
+            write('editor-capabilities.json',dict(session=identity['session'],flags=14))
+            self.assertEqual(supported_editor_features(channel),14)
+
     async def test_production_loopback_transport_observes_applied_pointer_and_closes_source(self):
         with tempfile.TemporaryDirectory() as temp:
             channel = Path(temp)
@@ -77,6 +97,7 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                 tmp.chmod(0o600)
                 tmp.replace(path)
             publish('session.json', config)
+            publish('editor-capabilities.json',dict(session=config['session'], flags=14))
             publish('binding.json', identity)
             ping = mesa._HEADER.pack(0, mesa.PING)
             bind = binding_record(len(ping), approved_binding(identity))
@@ -99,7 +120,9 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                             publish('last-input.json', dict(sequence=index, applied=True))
                         focus_change(1,1)
                         for index, command, applied in ((3,encode_text(1,'图文'),True),
-                                                        (4,encode_select_all(1),False)):
+                                                        (4,encode_select_all(1),False),
+                                                        (5,encode_delete(1,backward=True),True),
+                                                        (6,encode_delete(1,backward=False),False)):
                             received.append(inputs.read(len(command)))
                             publish('last-input.json', dict(sequence=index, applied=applied))
                         focus_change(2,0)
@@ -111,7 +134,7 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
             async with server:
                 port = server.sockets[0].getsockname()[1]
                 def client():
-                    with connect_forwarded(port,token,size=SIZE,search_input=True) as stream:
+                    with connect_forwarded(port,token,size=SIZE,search_input=True,focus_delete=True) as stream:
                         self.assertEqual(read_hello(stream), (bytes.fromhex(config['session']), bytes.fromhex(ORIGINAL_SHA256)))
                         self.assertEqual(stream.read(len(ping+bind)), ping+bind)
                         stream.move(31, 68)
@@ -123,6 +146,8 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                         self.assertIsNotNone(revision)
                         self.assertTrue(stream.commit_text(revision, '图文'))
                         self.assertFalse(stream.select_all(revision))
+                        self.assertTrue(stream.delete_text(revision,backward=True))
+                        self.assertFalse(stream.delete_text(revision,backward=False))
                         until = time.monotonic() + 3
                         while stream.text_focus() == revision and time.monotonic() < until:
                             time.sleep(.01)
@@ -134,7 +159,8 @@ class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
                 finally:
                     await service.close()
             self.assertEqual(received, [b'M\0\x1f\0D', b'L\x01\x90\x01^',
-                                        encode_text(1,'图文'), encode_select_all(1)])
+                                        encode_text(1,'图文'), encode_select_all(1),
+                                        encode_delete(1,backward=True), encode_delete(1,backward=False)])
 
     def test_desktop_pointer_captures_current_view_and_discards_a_stale_click(self):
         from types import SimpleNamespace
