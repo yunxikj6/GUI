@@ -25,10 +25,10 @@ SUPPORTED_GEOMETRY = (1090, 760, 1, 1026, 36, 'light')
 
 def business_digest(image):
     """Identity check for two source-owned observations. No image leaves the source."""
-    rgb = image.convert('RGB')
-    require(rgb.size == (1090, 760), 'unsupported application size')
-    h = hashlib.sha256(rgb.crop((0, 0, 1026, 36)).tobytes())
-    h.update(rgb.crop((0, 36, 1090, 760)).tobytes())
+    require(image.size == (1090, 760), 'unsupported application size')
+    rgb = image if image.mode in ('RGB', 'RGBA') else image.convert('RGB')
+    h = hashlib.sha256(rgb.crop((0, 0, 1026, 36)).tobytes('raw', 'RGB'))
+    h.update(rgb.crop((0, 36, 1090, 760)).tobytes('raw', 'RGB'))
     return h.hexdigest()
 
 
@@ -244,7 +244,7 @@ async def observe_interactive(page, out, native_layers):
             digest = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
             references += 1
             if not cache.find(digest):
-                publish(out / 'pending-scene.json', {'businessRgbSha256': digest})
+                publish(out / 'pending-scene.json', {'businessRgbSha256': digest, 'witnessByteStart': start})
                 attempts += 1
                 try:
                     frame = await capture_frame(page, cache.sequence + 1)

@@ -23,6 +23,16 @@ class OriginalWindowSourceTest(unittest.TestCase):
         app.putpixel((1025, 35), (1, 2, 3))
         self.assertNotEqual(digest, business_digest(app))
 
+    def test_source_reference_preserves_rgb_bytes_for_translucent_pixels(self):
+        raw = bytes((15, 82, 164, 0, 12, 126, 180, 189)) * (1090 * 760 // 2)
+        image = Image.frombytes('RGBA', (1090, 760), raw)
+        rgb = image.convert('RGB')
+        expected = rgb.crop((0, 0, 1026, 36)).tobytes() + rgb.crop((0, 36, 1090, 760)).tobytes()
+        self.assertEqual(business_digest(image), hashlib.sha256(expected).hexdigest())
+        self.assertEqual(business_digest(rgb), business_digest(image))
+        r, g, b, a = image.split()
+        self.assertEqual(image.tobytes('raw', 'BGRA'), Image.merge('RGBA', (b, g, r, a)).tobytes())
+
     def test_private_display_pointer_finds_real_origin(self):
         app = Image.new('RGB', (1090, 760), 'white')
         draw = ImageDraw.Draw(app)
@@ -101,6 +111,42 @@ class LiveMutterSourceTest(unittest.TestCase):
                 self.assertIsNone(witness.at(64))
             finally:
                 witness.file.close()
+
+    def test_only_commits_within_the_pending_drawing_can_wait_for_approval(self):
+        import json
+        from unittest.mock import patch
+
+        from experiments.mutter_app.live import Inspector, initialize
+
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            channel = out / 'pair'
+            initialize(channel)
+            inspector = Inspector(out, channel, interactive=True)
+            (out / 'scenes.json').write_text('{}')
+            (out / 'pending-scene.json').write_text(
+                json.dumps({'businessRgbSha256': 'rgb', 'witnessByteStart': 51})
+            )
+            with patch('experiments.mutter_app.live.time.sleep') as sleep:
+                self.assertEqual(inspector.manual_scene('rgb', 50), (None, None))
+                sleep.assert_not_called()
+                self.assertEqual(inspector.manual_scene('other', 52), (None, None))
+                sleep.assert_not_called()
+
+            raw = b'original recording'
+            picture = hashlib.sha256(raw).hexdigest()
+            (out / 'drawings').mkdir()
+            (out / 'drawings' / (picture + '.clrp')).write_bytes(raw)
+
+            def approve(_):
+                (out / 'scenes.json').write_text(
+                    json.dumps({'rgb': {'pictureSha256': picture, 'witnessByteStart': 51, 'bytes': len(raw)}})
+                )
+
+            with patch('experiments.mutter_app.live.time.sleep', side_effect=approve) as sleep:
+                self.assertEqual(inspector.manual_scene('rgb', 51), ('approved', bytes.fromhex(picture)))
+                sleep.assert_called_once()
+                self.assertEqual(inspector.manual_scene('rgb', 50), (None, None))
 
     def test_private_channels_use_new_session_and_reject_reuse(self):
         import json

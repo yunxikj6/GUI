@@ -210,9 +210,14 @@ class Inspector:
             if not scenes.exists():
                 wait_for(scenes.is_file, 'original application did not supply its first drawing', 75)
             pending = self.out / 'pending-scene.json'
+            in_progress = json.loads(pending.read_text()) if pending.is_file() else {}
+            # A matching drawing can only authorize a commit at or beyond its start.
+            # Waiting on an earlier PUT would also delay every later compositor command.
+            start = in_progress.get('witnessByteStart')
             if (
-                pending.is_file()
-                and json.loads(pending.read_text()).get('businessRgbSha256') == source_digest
+                in_progress.get('businessRgbSha256') == source_digest
+                and type(start) is int
+                and 0 <= start <= journal_byte
             ):
                 until = time.monotonic() + 1.5
                 while time.monotonic() < until and source_digest not in approvals:
@@ -318,10 +323,8 @@ class Inspector:
             'original graphics resource changed',
         )
         self.image.paste(Image.frombytes('RGBA', (w, h), bytes(pixels), 'raw', 'RGBA', stride), (x, y))
-        r, g, b, a = self.image.split()
         require(
-            access['shm']
-            == (4360, 760, hashlib.sha256(Image.merge('RGBA', (b, g, r, a)).tobytes()).hexdigest()),
+            access['shm'] == (4360, 760, hashlib.sha256(self.image.tobytes('raw', 'BGRA')).hexdigest()),
             'source SHM and observed Mesa data differ',
         )
         native_hash = hashlib.sha256(
