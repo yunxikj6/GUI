@@ -1,12 +1,14 @@
 import base64
+import hashlib
 from io import BytesIO
 import os
 from pathlib import Path
 import sys
+import struct
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from cloud_render.browser_surface import OFFLINE_TARGET, SystemBrowserWindow, _identify_idle_layers, _window_identity
+from cloud_render.browser_surface import OFFLINE_TARGET, SystemBrowserWindow, _comparison_with_original_icon, _identify_idle_layers, _window_identity
 from cloud_render.chromium_capture import CaptureError
 
 
@@ -73,6 +75,33 @@ class PrivateLayerComparison(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(KeyError):
             await _identify_idle_layers(target, {'active_tree': {'layers': [layer(1, 'r')]}}, {}, [record('left')])
         self.assertEqual(target.released, ['current-1'])
+
+
+class BrowserImageResource(unittest.TestCase):
+    def test_original_png_can_verify_an_inspector_placeholder_without_changing_the_source_layer(self):
+        from PIL import Image
+
+        icon = Image.new('RGBA', (3, 2), (60, 50, 40, 255))
+        data = BytesIO()
+        icon.save(data, 'PNG')
+        png = data.getvalue()
+        skp = b'gami' + struct.pack('<III', 1, 0, len(png)) + png + bytes(-len(png) % 4) + b' foe'
+        record = {'skp64': base64.b64encode(skp).decode()}
+        rect = {'left': 0, 'top': 0, 'right': 6, 'bottom': 6}
+        area = dict(rect, right=3, bottom=2)
+        translate = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 1, 0, 1]
+        commands = [{'method': 'save'}, {'method': 'clipRect', 'params': {'rect': rect}},
+                    {'method': 'drawRect', 'params': {'rect': rect, 'paint': {'color': '#FFFFFFFF', 'blendMode': 'Src'}}},
+                    {'method': 'save'}, {'method': 'concat44', 'params': {'matrix44': translate}},
+                    {'method': 'drawImageRect', 'params': {'image': {'width': 1, 'height': 1}, 'src': area, 'dst': area}}]
+        empty = Image.new('RGBA', (6, 6), 'white')
+        expected = empty.copy()
+        expected.paste(icon, (2, 1))
+        self.assertEqual(_comparison_with_original_icon(empty, commands, record), hashlib.sha256(expected.tobytes()).digest())
+        self.assertEqual(empty.getpixel((2, 1)), (255, 255, 255, 255))
+        self.assertEqual(base64.b64decode(record['skp64']), skp)
+        translate[0] = 2
+        self.assertIsNone(_comparison_with_original_icon(empty, commands, record))
 
 
 @unittest.skipUnless(sys.platform.startswith('linux'), 'dedicated Linux browser process')
