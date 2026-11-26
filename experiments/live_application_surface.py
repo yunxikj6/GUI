@@ -20,6 +20,7 @@ _POINT = struct.Struct('<QQ')
 DRAW_PREFIX_BYTES = _POINT.size + mesa._TRANSFER.size + 32
 _MAX_ASSET = MAX_PAYLOAD + 12
 _MAX_HANDLES = 4096
+_TEXTURE_CACHE_BYTES = 16 << 20
 
 
 def binding_record(offset, binding):
@@ -98,7 +99,8 @@ class LiveSurfaceStream:
         self.handles = {}
         self.binding = self.commit = self.digest = self.picture = None
         self.last_serial = 0
-        self.serial_digest = self.cached_digest = self.cached_pixels = None
+        self.serial_digest = None
+        self._textures = {}
         self._buffer = memoryview(b'')
         self.picture_delta = picture_delta
         self.wallpaper = wallpaper
@@ -115,10 +117,17 @@ class LiveSurfaceStream:
             return self.commit
 
     def _render_current(self, frame):
-        if self.cached_digest != self.digest:
-            self.cached_pixels = self.rasterize(frame)
-            self.cached_digest = self.digest
-        return self.cached_pixels
+        pixels = self._textures.pop(self.digest, None)
+        if pixels is None:
+            pixels = self.rasterize(frame)
+        if type(pixels) is bytes and len(pixels) == frame.width * frame.height * 4:
+            self._textures[self.digest] = pixels
+            # One large application keeps its current texture. Two normal-sized
+            # drawings (for example, the two original caret phases) may share this budget.
+            while len(self._textures) > 1 and (len(self._textures) > 2 or
+                    sum(map(len, self._textures.values())) > _TEXTURE_CACHE_BYTES):
+                del self._textures[next(iter(self._textures))]
+        return pixels
 
     def _read_asset(self, digest, limit):
         if self.digest != digest or self.picture is None or len(self.picture) > limit:
@@ -252,7 +261,7 @@ class LiveSurfaceStream:
             self.guard.observe_unreferenced(handle)
             if self.binding and self.binding.handle == handle:
                 self.binding = self.digest = self.picture = self.commit = self.serial_digest = None
-                self.cached_digest = self.cached_pixels = None
+                self._textures.clear()
                 self.last_serial = 0
         self.offset += len(header) + len(body)
         return header + body
@@ -276,7 +285,8 @@ class LiveSurfaceStream:
             return data
         except Exception:
             self._failed = True
-            self.picture = self.commit = self.cached_digest = self.cached_pixels = None
+            self.picture = self.commit = None
+            self._textures.clear()
             raise
 
 

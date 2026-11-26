@@ -1,6 +1,7 @@
 import hashlib
 import io
 import unittest
+from unittest.mock import patch
 
 from cloud_render import gnome_commands as mesa
 from cloud_render.wire import Frame, Layer, encode_message
@@ -89,6 +90,53 @@ class IncrementalOriginalSurface(unittest.TestCase):
             client=self.reader(Fragmented(self.create+stream));client.read(4096)
             with self.assertRaises(SurfaceError):client.read(4096)
             self.assertFalse(client.can_present)
+
+    def test_cached_native_textures_follow_only_verified_draws_in_this_binding(self):
+        frames = {
+            i: encode_message(Frame(i, 2, 2, (Layer(0, 0, 2, 2, b'skiapictunit'),)))
+            for i in (1, 2, 3)
+        }
+        for budget, rendered in ((32, [1, 2, 3, 2]), (16, [1, 2, 1, 3, 2])):
+            with self.subTest(budget=budget), patch('experiments.live_application_surface._TEXTURE_CACHE_BYTES', budget):
+                offset = len(self.create)
+                records = [self.create, binding_record(offset, self.binding)]
+                for serial, phase in enumerate((1, 2, None, 1, 3, 2), 1):
+                    picture = frames.get(phase)
+                    digest = hashlib.sha256(picture).digest() if picture else None
+                    records.append(replacement_record(offset, serial, self.desc, digest=digest, picture=picture))
+                    offset += len(self.raw)
+                records += [mesa._HEADER.pack(1, mesa.UNREF), mesa._WORD.pack(self.binding.handle)]
+                client = self.reader(io.BytesIO(b''.join(records)))
+                calls = []
+                def rasterize(frame):
+                    calls.append(frame.sequence)
+                    return bytes((frame.sequence, 0, 0, 255)) * 4
+                client.rasterize = rasterize
+                client.read(4096)
+                for phase in (1, 2, 1, 3, 2):
+                    output = client.read(4096)
+                    self.assertEqual(output[-16:], bytes((phase, 0, 0, 255))*4)
+                client.read(4096)
+                self.assertEqual(calls, rendered)
+                self.assertEqual(client.holds, 1)
+                self.assertFalse(client._textures)
+
+    def test_prior_rgba_never_authorizes_a_missing_original_drawing(self):
+        other = encode_message(Frame(2, 2, 2, (Layer(0, 0, 2, 2, b'skiapictunit'),)))
+        second = hashlib.sha256(other).digest()
+        offset = len(self.create)
+        stream = [self.create, binding_record(offset, self.binding)]
+        for serial, digest, picture in ((1, self.digest, self.frame), (2, second, other), (3, self.digest, None)):
+            stream.append(replacement_record(offset, serial, self.desc, digest=digest, picture=picture))
+            offset += len(self.raw)
+        client = self.reader(io.BytesIO(b''.join(stream)))
+        self.assertEqual(client.read(4096), self.create)
+        self.assertEqual(client.read(4096), self.local)
+        self.assertEqual(client.read(4096), self.local)
+        with self.assertRaises(SurfaceError):
+            client.read(4096)
+        self.assertFalse(client._textures)
+        self.assertFalse(client.can_present)
 
     def test_long_stream_holds_gaps_and_reuses_only_the_current_drawing(self):
         data = io.BytesIO(self.create + binding_record(len(self.create), self.binding))

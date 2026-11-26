@@ -1,0 +1,59 @@
+{
+  "scope": "51 actual authenticated original ChatGPT Wayland commits from one private Ubuntu session, serials 197 through 247 in source order. Native Win64 Python and Windows Node/CanvasKit under Wine. Measures guard.local_texture only, excluding networking, composition and WM_PAINT.",
+  "bindingCache": "within this single process + application-surface lifetime and drawing SHA-256; unknown or unpaired inputs remain rejected",
+  "sets": [
+    {
+      "implementation": "old",
+      "callsToCanvasKit": 51,
+      "totalTextureMilliseconds": 11207.701,
+      "medianAfterTwoFirstCommitsMs": 141.77
+    },
+    {
+      "implementation": "new",
+      "callsToCanvasKit": 2,
+      "totalTextureMilliseconds": 1880.136,
+      "medianAfterTwoFirstCommitsMs": 7.062
+    },
+    {
+      "implementation": "new",
+      "callsToCanvasKit": 2,
+      "totalTextureMilliseconds": 1903.791,
+      "medianAfterTwoFirstCommitsMs": 5.711
+    },
+    {
+      "implementation": "old",
+      "callsToCanvasKit": 51,
+      "totalTextureMilliseconds": 8649.872,
+      "medianAfterTwoFirstCommitsMs": 91.344
+    }
+  ],
+  "all51LocalTexturesIdenticalAcrossRuns": true,
+  "uniqueOutputRGBA": [
+    "2ceae2f4b35376321c909ae7acf20d95bb99fe2b985062c5fb06535ff9a9e272",
+    "c1e6db6a830865bec45eef2dfc45b8185e0f10ba69f12658a12aa99df18c9343"
+  ],
+  "inputs": {
+    "surfaceSize": [
+      1090,
+      760
+    ],
+    "knownOriginalCommitRange": [
+      197,
+      247
+    ],
+    "pictures": [
+      "5a7e0ff17c1e5dc1cea144bf625454726312ec49c3edc2a7329b5717f8c1b81d",
+      "f761a9efb48ac57e403e4fa57d2a90497c5b81791eaa8681e8eee2731b35be23"
+    ],
+    "damage": [
+      "[416, 411, 1, 15]"
+    ],
+    "method": "The source journal matched each offset and original surface commit. For the replay we restored its binding in a fresh guard and measured original CLRP verification, local CanvasKit replay or reuse, and production texture validation. SHA comparison is on the complete RGBA texture after each accepted commit."
+  },
+  "limits": {
+    "cachedRevisions": 2,
+    "combinedBytesForTwo": 16777216,
+    "maximumOneLiveTextureBytes": 33554432,
+    "retention": "one confirmed surface lifetime; drop on UNREF or protocol failure"
+  }
+}
