@@ -273,7 +273,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='从云端原版 Chromium 的离线错误页读取实时绘图。')
     parser.add_argument('--port', type=int, default=17328)
     parser.add_argument('--executable', type=Path, default=Path('/usr/lib/chromium/chromium'))
-    parser.add_argument('--window-size', nargs=2, type=int, default=(900, 500), metavar=('WIDTH', 'HEIGHT'))
+    parser.add_argument('--window-size', nargs=2, type=int, default=(1000, 900), metavar=('WIDTH', 'HEIGHT'))
     args = parser.parse_args(argv)
     if not all(240 <= side <= 4096 for side in args.window_size):
         parser.error('窗口宽高必须介于 240 与 4096 像素。')
