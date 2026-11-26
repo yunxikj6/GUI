@@ -166,7 +166,7 @@ def _source_snapshots(owned, tree_id):
     return snapshots, sources
 
 
-def _checkpoint(owned, tree_id):
+def _checkpoint(owned, tree_id, *, optional=False):
     streams, sources = _source_snapshots(owned, tree_id)
     selected = None
     for stream in streams.values():
@@ -188,10 +188,17 @@ def _checkpoint(owned, tree_id):
                 if (0 < len(matched) == len(layers) == len(pending) <= MAX_LAYERS
                         and set(matched) == {_ref(layer)[0] for layer in layers}
                         and (selected is None or selected[0] < e['ts'])):
-                    selected = e['ts'], tree, layers, matched
+                    selected = e['ts'], e['tid'], tree, layers, matched
             pending = []
+    if optional:
+        return selected
     _require(selected is not None, '缺少能与原窗口每个活动图层逐一匹配的完整绘图。')
-    return selected[1:]
+    return selected[2:]
+
+
+def _animations(owned, tree_id):
+    from .claude_activation import activations
+    return activations(owned, tree_id, checkpoint=_checkpoint(owned, tree_id, optional=True))
 
 
 def _draw_layer(recording, layer, snapshot):
@@ -225,9 +232,8 @@ def import_scene(events, *, activation=None):
         if activation is None:
             tree, layers, pictures = _checkpoint(owned, tree_id)
         else:
-            from .claude_activation import activations
             _require(type(activation) is int and activation >= 0, '原厂活动帧编号无效。')
-            scene = next((scene for seq, scene in activations(owned, tree_id) if seq == activation), None)
+            scene = next((scene for seq, scene in _animations(owned, tree_id) if seq == activation), None)
             _require(scene is not None, '该状态缺少原窗口完整提交与呈现的关联记录。')
             tree, layers, pictures = scene
         viewport = tree['device_viewport_size']
@@ -291,9 +297,8 @@ def main():
         if args.list_activations:
             if args.output is not None:
                 parser.error('--list-activations takes no output file')
-            from .claude_activation import activations
             owned, tree_id = _main_tree(_read_events(args.trace))
-            for sequence, _ in activations(owned, tree_id):
+            for sequence, _ in _animations(owned, tree_id):
                 print(sequence)
         else:
             if args.output is None:

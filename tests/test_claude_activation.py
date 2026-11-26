@@ -56,6 +56,29 @@ class ClaudeActivationTests(unittest.TestCase):
         self.assertNotIn(originals[1], b)
         self.assertEqual(a, c)
 
+    def test_repeat_invalidates_both_occurrences_and_later_partial_updates(self):
+        events, _, _ = captured_states()
+        other = deepcopy(next(e for e in events if e['name'] == 'ActivateLayerTree' and e['ts'] == 131))
+        other['ts'] += 1
+        events.append(other)
+        self.assertEqual([90], [n for n, _ in activations(*claude_trace._main_tree(events))])
+
+    def test_verified_checkpoint_starts_a_partial_commit_only_in_its_source_tree(self):
+        events, _, _ = captured_states()
+        # Model recording starting between two native activations.
+        prefix, _ = sample()
+        for e in prefix:
+            e['ph'] = 'X' if e['name'] == 'UpdateLayer' else 'I'
+        base_tree = prefix[-1]['args']['snapshot']
+        base_tree['active_tree']['source_frame_number'] = 90
+        events = prefix + [e for e in events if e.get('ts', 0) >= 100]
+        self.assertEqual([91, 92], [n for n, _ in claude_trace._animations(*claude_trace._main_tree(events))])
+        orphan = deepcopy(prefix[-1])
+        orphan['ts'] = 89
+        orphan['args']['snapshot']['active_tree']['source_frame_number'] = 1234
+        events.append(orphan)
+        self.assertEqual([], list(claude_trace._animations(*claude_trace._main_tree(events))))
+
     def test_empty_save_layer_keeps_vector_contents_and_rejects_effect_flags(self):
         from cloud_render.viz_picture import _Draw, _Recording
         rec = _Recording()

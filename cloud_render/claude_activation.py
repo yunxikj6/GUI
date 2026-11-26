@@ -1,6 +1,6 @@
 """Correlate an original main-thread paint with the compositor that presented it."""
 from bisect import bisect_left, bisect_right
-from collections import defaultdict
+from collections import Counter, defaultdict
 import math
 
 from .wire import MAX_LAYERS
@@ -99,7 +99,7 @@ def _scoped_pictures(events, tree_id):
     return by_sequence
 
 
-def activations(owned, tree_id):
+def activations(owned, tree_id, *, checkpoint=None):
     """Yield one actual active scene per proven presentation, in source order."""
     names = {'Activation', 'PipelineReporter', 'Commit', 'UpdateLayer', 'ActivateLayerTree', PICTURE, TREE}
     events = sorted((e for e in owned if e['name'] in names), key=lambda e: _time(e['ts']))
@@ -116,15 +116,26 @@ def activations(owned, tree_id):
     trees = [e for e in events if e['name'] == TREE and 'snapshot' in e.get('args', {})
              and e['args'].get('layerTreeId') == tree_id and actions and e['tid'] == actions[0]['tid']]
     ticks = [e['ts'] for e in trees]
+    ids = [a['args']['frameId'] for a in actions]
+    if any(type(n) is not int or n < 0 for n in ids) or ids != sorted(ids):
+        raise ValueError('invalid original frame ordering')
+    appearances = Counter(ids)
     previous = {}
-    last = -1
     for i, action in enumerate(actions):
-        sequence = action['args']['frameId']
-        if type(sequence) is not int or sequence <= last:
-            raise ValueError('repeated or unordered original frame ID')
-        last = sequence
-        saved, previous = previous, {}
+        sequence = ids[i]
         t, tid = action['ts'], action['tid']
+        if checkpoint and checkpoint[0] < t:
+            when, thread, source_tree, layers, records = checkpoint
+            if thread == tid:
+                checkpoint_id = source_tree['active_tree']['source_frame_number']
+                lo, hi = bisect_left(ticks, when), bisect_left(ticks, t)
+                if all(e['args']['snapshot']['active_tree']['source_frame_number'] == checkpoint_id
+                       for e in trees[lo:hi]):
+                    previous = {_ref(layer): (layer['bounds'], records[layer['layer_id']]) for layer in layers}
+            checkpoint = None
+        saved, previous = previous, {}
+        if appearances[sequence] != 1:
+            continue
         if tid not in pipeline:
             continue
         owner = _cover(pipeline[tid], t, t)
@@ -160,5 +171,8 @@ def activations(owned, tree_id):
             else:
                 break
         else:
-            previous = current
+            end = bisect_left(ticks, actions[i+1]['ts']) if i + 1 < len(actions) else len(trees)
+            if all(e['args']['snapshot']['active_tree']['source_frame_number'] == sequence
+                   for e in trees[j:end]):
+                previous = current
             yield sequence, (tree, layers, {k[0]: v[1] for k, v in current.items()})
