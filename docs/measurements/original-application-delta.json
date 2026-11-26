@@ -1,0 +1,316 @@
+{
+  "implementationCommit": "6296b618c9acf593ce302c3b298b495d76341f3c",
+  "scope": "Offline audit and lossless replay of a previously recorded InstaBox session and eight unique original application pictures. This measurement exercised production Python, GVGL and local CanvasKit on Linux. It did not log in, modify the published ZIP, start a new Windows host, or measure network latency.",
+  "origin": {
+    "cloud": "InstaBox",
+    "sourceRevision": "ee367f7",
+    "applicationElfSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+    "capture": {
+      "binding.json": {
+        "bytes": 544,
+        "sha256": "0255f3c9fcbe2d484cd2620d04541f63542f9a6c26531a9bc906d88d6c8ab578"
+      },
+      "stats.json": {
+        "bytes": 97,
+        "sha256": "54c94ba9cbd1a47317cd53059bca41eb082c276f5741c0bf5303860694895178"
+      },
+      "desktop.virglx": {
+        "bytes": 12001495,
+        "sha256": "9274424814c2da0f65d32b92cc0d1a3def83cf8797d23c4955c1ebca2f527f85"
+      }
+    },
+    "storedCloudCapture": {
+      "originalBytes": 160766284,
+      "removedApplicationBytes": 152582560,
+      "drawings": 2,
+      "pending": 86
+    },
+    "isolatedEightPictureSceneManifestSha256": "daa027b2c923ce714a0940c6d529a33a40b741faa6bc714e2b4ee8e93a4d7732"
+  },
+  "changedProtocol": {
+    "featureBit": 32,
+    "distinctFromBoundWallpaperBit": 16,
+    "dictionary": "Previous hash-verified drawing within one bound surface lifetime, or repeated spans within the current picture. HOLD/REUSE preserve it, while BIND/UNREF reset it. A plain DRAW advances the same dictionary. Both participants must advertise support.",
+    "integrity": "Existing wire sequence/chain, previous picture SHA, patch output SHA and independent full picture SHA are checked. An unknown or corrupt record terminates replay."
+  },
+  "realCloudTwoState": {
+    "inputHasPublishedUbuntuArtworkReference": false,
+    "fullTraceFivePairedCoalescerRuns": [
+      {
+        "off": {
+          "blocks": 12,
+          "bytes": 2396121,
+          "includedHeader": true
+        },
+        "on": {
+          "blocks": 10,
+          "bytes": 812591,
+          "includedHeader": true
+        }
+      },
+      {
+        "on": {
+          "blocks": 9,
+          "bytes": 812511,
+          "includedHeader": true
+        },
+        "off": {
+          "blocks": 12,
+          "bytes": 2396121,
+          "includedHeader": true
+        }
+      },
+      {
+        "off": {
+          "blocks": 12,
+          "bytes": 2396121,
+          "includedHeader": true
+        },
+        "on": {
+          "blocks": 11,
+          "bytes": 813334,
+          "includedHeader": true
+        }
+      },
+      {
+        "on": {
+          "blocks": 9,
+          "bytes": 812511,
+          "includedHeader": true
+        },
+        "off": {
+          "blocks": 12,
+          "bytes": 2396281,
+          "includedHeader": true
+        }
+      },
+      {
+        "off": {
+          "blocks": 12,
+          "bytes": 2394288,
+          "includedHeader": true
+        },
+        "on": {
+          "blocks": 10,
+          "bytes": 813349,
+          "includedHeader": true
+        }
+      }
+    ],
+    "regularGvglMedianBytes": 2396121,
+    "negotiatedGvglMedianBytes": 812591,
+    "reducedPercent": 66.09,
+    "scheduler": "Original closed trace fed back to production source block packer (90ms coalescing, up to 1 MiB, zlib3). Source held all retained bytes ready. Counting full GVGL drawing data packets including the CWORIG hello, excluding setup, END and provider HTTP. Actual network segmentation and timing were not recovered.",
+    "deterministicFixedBlockByteCounts": {
+      "1048576": {
+        "previous": 2395960,
+        "new": 812545
+      },
+      "262144": {
+        "previous": 2420160,
+        "new": 831449
+      },
+      "65536": {
+        "previous": 2529448,
+        "new": 924221
+      }
+    },
+    "recordReplay": {
+      "clrpSha256": [
+        "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+        "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a"
+      ],
+      "pixelSha256": [
+        "5b3b52807c2bdb986f897a61b3b12695c095edfaa3fe89f42b3ea81797e19772",
+        "d8d9ddd9560cc5677f7948f87471488d843bc611b3502dfcdb7ae1d42f330fe4"
+      ],
+      "logicalMesaSha256": "73f772759b8c1fd0e46a2f837436701487de8efd676e060ed152ed9be57989e2",
+      "logicalMesaBytes": 38001652,
+      "drawings": 2,
+      "reuses": 7,
+      "holds": 86
+    },
+    "allFourNegotiationsProducedIdenticalGpuInput": true,
+    "allOriginalPicturesAndRenderedPixelsMatched": true,
+    "totalGvglPerChangedPicture": [
+      {
+        "clrpBytes": 1526443,
+        "sha256": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+        "oldGvgl": 801149,
+        "newGvgl": 407984,
+        "compactPayloadBytes": 414766,
+        "delta": true,
+        "oldTx": 40.08,
+        "newTx": 60.34,
+        "oldRx": 12.51,
+        "newRx": 9.85,
+        "candidateBridge": 49.24,
+        "candidateReconstruct": 8.81
+      },
+      {
+        "clrpBytes": 2289392,
+        "sha256": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a",
+        "oldGvgl": 1202902,
+        "newGvgl": 13696,
+        "compactPayloadBytes": 13559,
+        "delta": true,
+        "oldTx": 63.21,
+        "newTx": 22.31,
+        "oldRx": 40.42,
+        "newRx": 48.73,
+        "candidateBridge": 21.99,
+        "candidateReconstruct": 48.63
+      }
+    ]
+  },
+  "eightOriginalPictureRun": {
+    "uniquePictures": 8,
+    "allEightRestoredByteForByte": true,
+    "oldGvglTotalBytes": 8800672,
+    "newGvglTotalBytes": 480932,
+    "initialSourceCpuMs": [
+      37.97,
+      57.35
+    ],
+    "followingSevenMedianSourceCpuMs": [
+      56.39,
+      21.78
+    ],
+    "followingSevenMedianReceiverCpuMs": [
+      14.96,
+      4.7
+    ],
+    "followingSevenSentBytesRange": [
+      5689,
+      16438
+    ],
+    "timingNotes": "Median of 5 same-process CPU timings per operation. Full GVGL zlib level 3/hash, complete 1 MiB framed blocks, grouping restarted at each DRAW to isolate its contribution. Client timing includes GVGL decode and CLRP reconstruction, excludes common rasterizer/guard. Eight-state comparison uses the original hash-verified CLRP and stand-in DRAW offsets/descriptors for framing; full-trace metrics are reported independently.",
+    "units": "oldTx/newTx and oldRx/newRx are process CPU milliseconds for framing or unframing and reconstruction. Full per-scene records retain individual slower samples. Network RTT, presentation delays and common raster/compositor work are outside these CPU timings.",
+    "rows": [
+      {
+        "clrpBytes": 1526443,
+        "sha256": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+        "oldGvgl": 801143,
+        "newGvgl": 407980,
+        "compactPayloadBytes": 414766,
+        "delta": true,
+        "oldTx": 37.97,
+        "newTx": 57.35,
+        "oldRx": 10.0,
+        "newRx": 6.87,
+        "candidateBridge": 46.98,
+        "candidateReconstruct": 5.82,
+        "witnessOffset": 32915
+      },
+      {
+        "clrpBytes": 2289392,
+        "sha256": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a",
+        "oldGvgl": 1202896,
+        "newGvgl": 13690,
+        "compactPayloadBytes": 13559,
+        "delta": true,
+        "oldTx": 57.82,
+        "newTx": 20.29,
+        "oldRx": 15.52,
+        "newRx": 4.75,
+        "candidateBridge": 20.07,
+        "candidateReconstruct": 4.68,
+        "witnessOffset": 36806
+      },
+      {
+        "clrpBytes": 2285475,
+        "sha256": "78eeb5a9349a42dd9db4b755793c308e67ce47934980b5499b664ad733faae91",
+        "oldGvgl": 1199156,
+        "newGvgl": 16438,
+        "compactPayloadBytes": 16273,
+        "delta": true,
+        "oldTx": 56.39,
+        "newTx": 22.55,
+        "oldRx": 14.76,
+        "newRx": 4.73,
+        "candidateBridge": 22.27,
+        "candidateReconstruct": 4.65,
+        "witnessOffset": 42845
+      },
+      {
+        "clrpBytes": 2285483,
+        "sha256": "293df752da5e0c48c1ce1e31d634bf1efbb6b2abc532fb03f8ecb43f53a050d6",
+        "oldGvgl": 1199190,
+        "newGvgl": 7159,
+        "compactPayloadBytes": 7025,
+        "delta": true,
+        "oldTx": 56.46,
+        "newTx": 22.17,
+        "oldRx": 48.41,
+        "newRx": 74.02,
+        "candidateBridge": 21.96,
+        "candidateReconstruct": 73.92,
+        "witnessOffset": 51541
+      },
+      {
+        "clrpBytes": 2285431,
+        "sha256": "7e4b28f2f8cb2e179c42e0d9db2aaa240ee41428b16b212286c5ee7e6408fd5e",
+        "oldGvgl": 1199162,
+        "newGvgl": 5689,
+        "compactPayloadBytes": 5556,
+        "delta": true,
+        "oldTx": 56.53,
+        "newTx": 21.71,
+        "oldRx": 14.96,
+        "newRx": 4.54,
+        "candidateBridge": 21.61,
+        "candidateReconstruct": 4.5,
+        "witnessOffset": 58225
+      },
+      {
+        "clrpBytes": 2284111,
+        "sha256": "3bf9bfd064a367464c250afc1baead5c04f35f6817de0817d66a9b4d41b7ff9f",
+        "oldGvgl": 1198817,
+        "newGvgl": 9331,
+        "compactPayloadBytes": 9197,
+        "delta": true,
+        "oldTx": 54.66,
+        "newTx": 23.16,
+        "oldRx": 14.91,
+        "newRx": 4.61,
+        "candidateBridge": 23.0,
+        "candidateReconstruct": 4.56,
+        "witnessOffset": 65010
+      },
+      {
+        "clrpBytes": 2285459,
+        "sha256": "58dc7be8bb22e14a291a5d7d40a9ad5a276da6a6dd82080dc88dd8c62197f79a",
+        "oldGvgl": 1199170,
+        "newGvgl": 9548,
+        "compactPayloadBytes": 9417,
+        "delta": true,
+        "oldTx": 54.93,
+        "newTx": 21.78,
+        "oldRx": 15.23,
+        "newRx": 4.7,
+        "candidateBridge": 21.63,
+        "candidateReconstruct": 4.65,
+        "witnessOffset": 71423
+      },
+      {
+        "clrpBytes": 1526443,
+        "sha256": "635993da5a89b7a2286b21984dcc6da5dfcca6c2c542d58812cb31f41f7c8968",
+        "oldGvgl": 801138,
+        "newGvgl": 11097,
+        "compactPayloadBytes": 10939,
+        "delta": true,
+        "oldTx": 36.0,
+        "newTx": 17.94,
+        "oldRx": 9.52,
+        "newRx": 3.75,
+        "candidateBridge": 17.76,
+        "candidateReconstruct": 3.69,
+        "witnessOffset": 90425
+      }
+    ]
+  },
+  "reproduction": {
+    "checks": "PYTHONPATH=.:tests python -m unittest test_application_surface test_live_application_surface test_original_desktop_artwork test_original_desktop_bridge test_frame_delta test_gnome_wallpaper test_scene_cache test_gnome_batch_poll test_original_picture_delta test_gnome_relay",
+    "offlineTraceSteps": "Open the captured Mesa stream with experiments.original_desktop_bridge._Graphics using the authenticated binding.json from the original session. Compare old and negotiated modes through cloud_render.gnome_relay._SourceLink.drawing and round-trip every GVGL block. Continue to LiveSurfaceStream with OriginalPicturePainter. Compare both original picture SHA, all locally produced RGBA, and SHA of every logical Mesa byte. A second CPU run calls _compact_drawing with the immediately previous original drawing identified by the witness position, with five samples per case."
+  }
+}
