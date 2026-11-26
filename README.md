@@ -8,7 +8,9 @@
 python3 -m experiments.original_desktop_source --port 17326
 ```
 
-真实 InstaBox 会话中，Windows 连入云端，点击 Dock 打开 ChatGPT，再打开原厂登录前表单。五次键盘输入均由云端确认，本机显示相同的 `orbit`。云端默认使用临时配置。要在不同配对之间保留原程序的设置，可在云端启动命令中加入 `--profile "$HOME/.local/share/cloud-workspace/chatgpt-desktop"`。应用网络仍隔离，登录后的聊天和 Claude Artifacts 待验证。此轮 Windows x64 客户端运行于 Wine 10，实体 Windows 11 尚待验收。[真实云桌面](docs/measurements/instabox-win64/desktop.png) · [Windows 输入后的原厂窗口](docs/measurements/instabox-win64/input.png) · [此会话的时间和确认记录](docs/measurements/instabox-win64/session.json)
+真实 InstaBox 会话中，Windows 连入云端，点击 Dock 打开 ChatGPT，再打开原厂登录前表单。五次键盘输入均由云端确认，本机显示相同的 `orbit`。云端默认使用临时配置。要在不同配对之间保留原程序的设置，可在云端启动命令中加入 `--profile "$HOME/.local/share/cloud-workspace/chatgpt-desktop"`。应用网络仍隔离，登录后的聊天和 Claude Artifacts 待验证。本轮使用 InstaBox 的系统信任库访问两个公开登录入口，`auth.openai.com/` 返回 HTTP 530，`chatgpt.com/auth/login` 返回 HTTP 403。[云机公开入口响应](docs/measurements/system-browser/instabox-public-login.json)
+
+此轮 Windows x64 客户端运行于 Wine 10，实体 Windows 11 尚待验收。[真实云桌面](docs/measurements/instabox-win64/desktop.png) · [Windows 输入后的原厂窗口](docs/measurements/instabox-win64/input.png) · [此会话的时间和确认记录](docs/measurements/instabox-win64/session.json)
 
 在同一台 InstaBox 上对比两个发布包，首次显示 Ubuntu 桌面所需的已压缩绘图数据从 9,887,960 字节降至 430,337 字节（减少 95.65%，未计外层 HTTPS 开销）。Windows 根据一条 84 字节引用，用随包的 Ubuntu 官方壁纸还原了 33,177,600 字节的原始纹理，并校验了全部四个通道。同一位置的 1200×750 个壁纸像素在两个版本中完全一致。此次从双击到看见桌面用时 20.44 秒，点击 Dock 后，在启动第 40.94 秒看见 ChatGPT 欢迎页。[首屏测量](docs/measurements/instabox-win64/first-desktop-5fe9.json) · [本次桌面实拍](docs/measurements/instabox-win64/5fe9-desktop.png) · [本次 ChatGPT 窗口](docs/measurements/instabox-win64/5fe9-welcome.png) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
 
@@ -38,7 +40,7 @@ python3 -m experiments.original_desktop_source --port 17326
 
 在安装了 Chromium 的隔离 Ubuntu 云桌面，点击原版 ChatGPT 的登录按钮会由系统打开一扇独立的浏览器窗口。Mutter 记录到键盘焦点从 ChatGPT 切到 Chromium，在浏览器中按 Ctrl+W 后又回到原来的 ChatGPT 窗口。云端负责打开链接和接收应用回调。实测覆盖窗口交接，在线账户登录仍待完成。[原窗口与焦点的实测](docs/measurements/system-browser/actual-wayland-physical-focus.json) · [回调监听的实测](docs/measurements/chatgpt-system-browser-signin.json)
 
-要单独验证系统浏览器内容区，可以在云端运行 `python3 -m cloud_render.browser_viewport_service --port 17328`，在 Windows 客户端运行 `Start.cmd --browser-viewport --instabox --port 17328`。在这一入口，原版 Chromium 打开固定的离线页面。Windows 执行它提供的 Skia 指令，点击「Details」由云端原控件处理。已经在 1000×813 内容区测到原控件展开、同一个 Windows 窗口更新。独立实验也重绘了浏览器自己的标签栏和地址栏。在线登录页以及浏览器在默认桌面中的完整合成仍待接入。[配对说明](docs/interactive-original-desktop.md) · [原版标签栏在 Win64 的绘图](docs/measurements/original-chromium-top/win32-chrome.png)
+要单独验证系统浏览器内容区，可以在云端运行 `python3 -m cloud_render.browser_viewport_service --port 17328`，在 Windows 客户端运行 `Start.cmd --browser-viewport --instabox --port 17328`。在这一入口，原版 Chromium 打开固定的离线页面。Windows 执行它提供的 Skia 指令，点击「Details」由云端原控件处理。已经在 1000×813 内容区测到原控件展开、同一个 Windows 窗口更新。独立实验也重绘了浏览器自己的标签栏和地址栏。在线登录页以及浏览器在默认桌面中的完整合成仍待接入。[配对说明](docs/interactive-original-desktop.md) · [按钮展开后的 Win64 实拍](docs/measurements/system-browser/paired-release/win32-after.png) · [配套发布包双端实测](docs/measurements/system-browser/paired-release/receipt.json) · [原版标签栏在 Win64 的绘图](docs/measurements/original-chromium-top/win32-chrome.png)
 
 ## 单独打开云端 ChatGPT
 

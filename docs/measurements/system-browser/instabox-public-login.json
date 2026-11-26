@@ -1,0 +1,19 @@
+{
+  "source": "Ordinary process running on the authorized InstaBox. Verified server certificates using the cloud system trust store. No account login, cookie jar or form submission.",
+  "date": "2026-11-26",
+  "method": "GET with redirects disabled. No OAuth request or query string was sent.",
+  "responses": [
+    {
+      "url": "https://auth.openai.com/",
+      "httpStatus": 530,
+      "responseType": "application/json",
+      "redirectToOpenAILoginHost": null
+    },
+    {
+      "url": "https://chatgpt.com/auth/login",
+      "httpStatus": 403,
+      "responseType": "text/plain",
+      "redirectToOpenAILoginHost": null
+    }
+  ]
+}
