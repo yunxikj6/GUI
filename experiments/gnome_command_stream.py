@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import socket
 import struct
+import stat
 import sys
 
 # Also support running the experiment by file path from outside the repository.
@@ -25,6 +26,11 @@ def record(args):
         raise StreamError('the listening socket needs an owner-private parent directory')
     if sys.stdout.isatty():
         raise StreamError('redirect the command stream to a private file or a pipe')
+    options = {}
+    if getattr(args, 'live', False):
+        if not stat.S_ISFIFO(os.fstat(sys.stdout.fileno()).st_mode):
+            raise StreamError('live recording requires a pipe to the bounded command transport')
+        options['max_bytes'] = None
     with closing(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)) as listener:
         listener.bind(os.fspath(args.listen))
         try:
@@ -35,7 +41,7 @@ def record(args):
                     if uid != os.getuid() or not os.path.samefile(f'/proc/{pid}/exe', '/usr/bin/nautilus'):
                         raise StreamError('expected the original Files process on its private rendering socket')
                 copy_commands(incoming, gpu, recording=sys.stdout.buffer, respond=app.sendall,
-                              renderer=args.application.encode('ascii'))
+                              renderer=args.application.encode('ascii'), **options)
         finally:
             args.listen.unlink(missing_ok=True)
 
@@ -67,6 +73,7 @@ def main():
     capture.add_argument('--listen', type=Path, required=True)
     capture.add_argument('--gpu', type=Path, required=True)
     capture.add_argument('--application', choices=('gnome-shell', 'nautilus'), default='gnome-shell')
+    capture.add_argument('--live', action='store_true', help='continue streaming to a pipe until disconnect')
     capture.set_defaults(action=record)
     client = roles.add_parser('replay', help='read commands on stdin and output locally rendered BGRX surfaces')
     client.add_argument('--gpu', type=Path, required=True)

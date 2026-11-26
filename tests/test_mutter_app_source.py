@@ -90,7 +90,10 @@ class LiveMutterSourceTest(unittest.TestCase):
             try:
                 self.assertIsNone(witness.at(64))
                 with path.open('a') as out:
-                    out.write('GL 1 12 3553\nEND 1\nORIGIN 476 UNCLASSIFIED_SHM 8 0 0 10 9 360\n')
+                    out.write('GL 1 12 3553\nEN')
+                self.assertIsNone(witness.at(64))
+                with path.open('a') as out:
+                    out.write('D 1\nORIGIN 476 UNCLASSIFIED_SHM 8 0 0 10 9 360\n')
                 kind, desc, metadata = witness.at(64)
                 self.assertEqual((kind, desc), ('SHM', [5, 0, 0, 10, 9, 360]))
                 self.assertEqual(metadata['gl'], (12, 3553))
@@ -153,3 +156,47 @@ class LiveMutterSourceTest(unittest.TestCase):
                 json.loads((pair / 'last-input.json').read_text()), {'sequence': 2, 'applied': True}
             )
             self.assertTrue((root / 'controller-closed').is_file())
+
+    def test_drawing_cache_evicts_by_bytes_and_lru_without_retiring_a_revisited_scene(self):
+        import json
+
+        from experiments.mutter_app.capture import DrawingCache
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = DrawingCache(root, capacity=2, byte_limit=5)
+            cache.add('a', b'aa', 10)
+            cache.add('b', b'bb', 20)
+            self.assertTrue(cache.find('a'))
+            cache.add('c', b'cc', 30)
+            self.assertEqual(list(json.loads((root / 'scenes.json').read_text())), ['a', 'c'])
+            self.assertFalse(cache.find('b'))
+            cache.add('d', b'dddd', 40)
+            self.assertEqual(list(cache.records), ['d'])
+            self.assertEqual(len(list((root / 'drawings').glob('*.clrp'))), 1)
+            self.assertEqual(cache.sequence, 4)
+
+
+class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
+    async def test_source_editor_ignores_unpresented_and_invalidated_focus(self):
+        import io
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        from cloud_render.chatgpt_process import APP_PAGE
+        from experiments.mutter_app.editor import FOCUS, Editor
+
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            events = io.BytesIO()
+            page = SimpleNamespace(url=APP_PAGE, context=SimpleNamespace(pages=[object()], browser=None))
+            editor = Editor(page, out, events)
+            editor.focus = AsyncMock()
+            editor.focus.matches.return_value = True
+            self.assertFalse(await editor.check())
+            (out / 'presented-scene.json').touch()
+            self.assertTrue(await editor.check())
+            self.assertEqual(events.getvalue(), FOCUS.pack(1, 1))
+            page.url = 'about:blank'
+            self.assertFalse(await editor.check())
+            self.assertEqual(events.getvalue(), FOCUS.pack(1, 1) + FOCUS.pack(2, 0))
