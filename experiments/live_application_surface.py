@@ -1,11 +1,11 @@
 """Consume original GNOME commands and verified native drawings from one paired source.
 
 A trusted source must remove every PUT for each participating application before
-sending bytes, including revisions whose pictures are unavailable. This narrow
-experiment supports one opaque application resource at a time. The normal GNOME
-desktop entry does not negotiate this extension.
+sending bytes, including revisions whose pictures are unavailable. The default stream permits one
+opaque application resource. An explicitly enabled producer and consumer can also
+carry two overlapping, independently verified resource lifetimes.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import struct
 
@@ -83,6 +83,34 @@ class _Lifetime:
     received_put: bool = False
 
 
+@dataclass
+class _SurfaceHistory:
+    binding: Binding
+    serial: int = 0
+    serial_digest: bytes | None = None
+    digest: bytes | None = None
+
+    def observe(self, serial, digest):
+        if type(serial) is not int or serial <= 0 or serial < self.serial:
+            raise SurfaceError('stale application commit')
+        if serial != self.serial:
+            self.serial = serial
+            self.serial_digest = None
+        if digest is not None:
+            if type(digest) is not bytes or len(digest) != 32:
+                raise SurfaceError('invalid original drawing digest')
+            if self.serial_digest is not None and self.serial_digest != digest:
+                raise SurfaceError('conflicting drawing for one application commit')
+            self.serial_digest = digest
+
+
+@dataclass
+class _LocalSurface(_SurfaceHistory):
+    commit: Commit | None = None
+    picture: bytes | None = None
+    textures: dict = field(default_factory=dict)
+
+
 class LiveSurfaceStream:
     """File-like adapter for Win64 replay. Call read on the renderer thread.
 
@@ -90,17 +118,18 @@ class LiveSurfaceStream:
     checks each source-attested process/surface lifetime against the application
     this session requested. The adapter accepts no network URLs, paths or commands.
     """
-    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None, picture_delta=False, wallpaper_x99=False):
+    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None, picture_delta=False,
+                 wallpaper_x99=False, multiple_surfaces=False):
         self.source = source
         self.session = session
         self.authorize = authorize
         self.rasterize = rasterize
         self.offset = self.creation = 0
         self.handles = {}
-        self.binding = self.commit = self.digest = self.picture = None
-        self.last_serial = 0
-        self.serial_digest = None
-        self._textures = {}
+        self._surfaces = {}
+        self._surface_limit = 2 if multiple_surfaces else 1
+        self._view_epoch = 0
+        self._rendering = None
         self._buffer = memoryview(b'')
         self.picture_delta = picture_delta
         self.wallpaper = wallpaper
@@ -112,34 +141,68 @@ class LiveSurfaceStream:
                                          self._read_asset, self._render_current)
         self.drawings = self.reuses = self.holds = 0
 
+    def _only_surface(self):
+        surfaces = tuple(self._surfaces.values())
+        return surfaces[0] if len(surfaces) == 1 else None
+
+    @property
+    def binding(self):
+        # A legacy input caller must never infer keyboard focus from the last PUT.
+        surface = self._only_surface()
+        return surface.binding if surface is not None else None
+
+    @property
+    def digest(self):
+        surface = self._only_surface()
+        return surface.digest if surface is not None else None
+
+    @property
+    def picture(self):
+        surface = self._only_surface()
+        return surface.picture if surface is not None else None
+
+    @property
+    def commit(self):
+        if self._surface_limit == 1:
+            surface = self._only_surface()
+            return surface.commit if surface is not None else None
+        # A click belongs to the whole displayed desktop. Opening and closing a
+        # second surface invalidates a press even if the first picture is unchanged.
+        return self._view_epoch, tuple(s.commit for s in tuple(self._surfaces.values()))
+
     def _commit_for(self, session, ticket):
-        if session == self.session and ticket == self.digest:
-            return self.commit
+        surface = self._rendering
+        if surface is not None and session == self.session and ticket == surface.digest:
+            return surface.commit
 
     def _render_current(self, frame):
-        pixels = self._textures.pop(self.digest, None)
+        surface = self._rendering
+        textures = surface.textures
+        pixels = textures.pop(surface.digest, None)
         if pixels is None:
             pixels = self.rasterize(frame)
         if type(pixels) is bytes and len(pixels) == frame.width * frame.height * 4:
-            self._textures[self.digest] = pixels
-            # One large application keeps its current texture. Two normal-sized
-            # drawings (for example, the two original caret phases) may share this budget.
-            while len(self._textures) > 1 and (len(self._textures) > 2 or
-                    sum(map(len, self._textures.values())) > _TEXTURE_CACHE_BYTES):
-                del self._textures[next(iter(self._textures))]
+            textures[surface.digest] = pixels
+            # Each lifetime keeps its own current texture and may cache a second
+            # native caret phase within the budget. Neither can seed another surface.
+            while len(textures) > 1 and (len(textures) > 2 or sum(map(len, textures.values())) > _TEXTURE_CACHE_BYTES):
+                del textures[next(iter(textures))]
         return pixels
 
     def _read_asset(self, digest, limit):
-        if self.digest != digest or self.picture is None or len(self.picture) > limit:
+        surface = self._rendering
+        if surface is None or surface.digest != digest or surface.picture is None or len(surface.picture) > limit:
             raise SurfaceError('missing original drawing in this resource lifetime')
-        return self.picture
+        return surface.picture
 
     @property
     def can_present(self):
-        return not self._failed and self.guard.can_present
+        # Win32 input samples readiness concurrently with the graphics reader.
+        targets = tuple(self.guard.targets.values())
+        return not self._failed and all(target.ready for target in targets)
 
     def _register(self, length):
-        if length != _IDENTITY.size or self.binding is not None:
+        if length != _IDENTITY.size or len(self._surfaces) >= self._surface_limit:
             raise SurfaceError('unexpected application binding')
         offset, session, exe, pid, instance, surface, handle, generation = _IDENTITY.unpack(
             _exact(self.source, length))
@@ -149,7 +212,8 @@ class LiveSurfaceStream:
                 or current.creation != generation or self.authorize(binding) is not True):
             raise SurfaceError('unverified or previously uploaded application resource')
         self.guard.bind_untouched_resource(binding, current.descriptor, current.creation)
-        self.binding = binding
+        self._surfaces[handle] = _LocalSurface(binding)
+        self._view_epoch += 1
 
     def _replacement(self, length, op):
         fixed = _POINT.size + mesa._TRANSFER.size
@@ -159,8 +223,8 @@ class LiveSurfaceStream:
             raise SurfaceError('invalid drawing record length')
         offset, serial = _POINT.unpack(_exact(self.source, _POINT.size))
         desc = mesa._TRANSFER.unpack(_exact(self.source, mesa._TRANSFER.size))
-        if (offset != self.offset or self.binding is None or desc[0] != self.binding.handle
-                or serial <= 0 or serial < self.last_serial):
+        surface = self._surfaces.get(desc[0])
+        if offset != self.offset or surface is None:
             raise SurfaceError('missing, stale or reordered surface commit')
         target = self.handles[desc[0]].descriptor
         _, level, stride, layer_stride, x, y, z, w, h, depth, size = desc
@@ -170,34 +234,36 @@ class LiveSurfaceStream:
                 or layer_stride not in (0, size)):
             raise SurfaceError('invalid original PUT geometry')
         self.offset += mesa._HEADER.size + mesa._TRANSFER.size + size
-        if serial != self.last_serial:
-            self.serial_digest = None
-        self.last_serial = serial
+        self.guard.wait_for_picture(desc[0])
+        digest = None if op == HOLD else _exact(self.source, 32)
+        surface.observe(serial, digest)
         if op == HOLD:
-            self.guard.wait_for_picture(desc[0])
+            self._view_epoch += 1
             self.holds += 1
             return b''
-        digest = _exact(self.source, 32)
-        if self.serial_digest is not None and self.serial_digest != digest:
-            raise SurfaceError('conflicting drawing for one application commit')
         if op in (DRAW, DRAW_DELTA):
             picture = _exact(self.source, length - DRAW_PREFIX_BYTES)
             if op == DRAW_DELTA:
                 try:
-                    picture = frame_delta.decode_frame(picture, self.picture or b'')
+                    picture = frame_delta.decode_frame(picture, surface.picture or b'')
                 except frame_delta.DeltaError as exc:
                     raise SurfaceError('invalid original drawing delta') from exc
             if hashlib.sha256(picture).digest() != digest:
                 raise SurfaceError('original drawing digest mismatch')
-            self.picture, self.digest = picture, digest
+            surface.picture, surface.digest = picture, digest
             self.drawings += 1
         else:
-            if self.picture is None or self.digest != digest:
+            if surface.picture is None or surface.digest != digest:
                 raise SurfaceError('no previous drawing for this lifetime')
             self.reuses += 1
-        self.commit = Commit(self.binding, serial, digest)
-        self.serial_digest = digest
-        layout, pixels = self.guard.local_texture(desc, digest)
+        surface.commit = Commit(surface.binding, serial, digest)
+        # ApplicationSurfaces resolves all three callbacks synchronously. Scope
+        # each lookup to this descriptor even when both windows use the same SHA.
+        self._rendering = surface
+        try:
+            layout, pixels = self.guard.local_texture(desc, digest)
+        finally:
+            self._rendering = None
         body = mesa._TRANSFER.pack(*layout) + pixels
         return mesa._HEADER.pack(len(body)//4, mesa.PUT) + body
 
@@ -259,10 +325,8 @@ class LiveSurfaceStream:
             if self.handles.pop(handle, None) is None:
                 raise SurfaceError('unreference of an unknown resource')
             self.guard.observe_unreferenced(handle)
-            if self.binding and self.binding.handle == handle:
-                self.binding = self.digest = self.picture = self.commit = self.serial_digest = None
-                self._textures.clear()
-                self.last_serial = 0
+            if self._surfaces.pop(handle, None) is not None:
+                self._view_epoch += 1
         self.offset += len(header) + len(body)
         return header + body
 
@@ -285,15 +349,15 @@ class LiveSurfaceStream:
             return data
         except Exception:
             self._failed = True
-            self.picture = self.commit = None
-            self._textures.clear()
+            self._surfaces.clear()
             raise
 
 
-def replay_live(source, on_scanout, *, session, authorize, rasterize, runtime_dir=None):
+def replay_live(source, on_scanout, *, session, authorize, rasterize, runtime_dir=None, multiple_surfaces=False):
     """Present only authoritative current scanouts through the existing PE engine."""
     from thin_client.virgl_windows import replay
-    client = LiveSurfaceStream(source, session=session, authorize=authorize, rasterize=rasterize)
+    client = LiveSurfaceStream(source, session=session, authorize=authorize, rasterize=rasterize,
+                               multiple_surfaces=multiple_surfaces)
     counts = {'presented': 0, 'held': 0}
     def show(w, h, pixels):
         if client.can_present:
@@ -317,7 +381,7 @@ class WitnessedPut:
     picture_sha256: bytes | None
 
 
-def stream_witnessed(source, sink, *, inspect_put, fetch_picture):
+def stream_witnessed(source, sink, *, inspect_put, fetch_picture, multiple_surfaces=False):
     """Strip the witnessed application's raw bytes before the first outgoing write.
 
     inspect_put(offset, ordinal, descriptor, prior CREATE ordinal, source_pixels)
@@ -328,8 +392,9 @@ def stream_witnessed(source, sink, *, inspect_put, fetch_picture):
     """
     offset = ordinal = creation = removed = pending = sent_pictures = 0
     handles = {}
-    active = previous_digest = None
-    last_serial = 0
+    surfaces = {}
+    session = None
+    surface_limit = 2 if multiple_surfaces else 1
     while (packet := mesa._request(source)) is not None:
         header, op, body = packet
         ordinal += 1
@@ -344,9 +409,7 @@ def stream_witnessed(source, sink, *, inspect_put, fetch_picture):
             handle, = mesa._WORD.unpack(body)
             if handles.pop(handle, None) is None:
                 raise SurfaceError('unknown source resource')
-            if active is not None and active.handle == handle:
-                active = previous_digest = None
-                last_serial = 0
+            surfaces.pop(handle, None)
         outgoing = header + body
         if op == mesa.PUT:
             descriptor = mesa._TRANSFER.unpack_from(body)
@@ -354,34 +417,39 @@ def stream_witnessed(source, sink, *, inspect_put, fetch_picture):
             if current is None:
                 raise SurfaceError('source upload has no live resource')
             witness = inspect_put(offset, ordinal, descriptor, current.creation, memoryview(body)[mesa._TRANSFER.size:])
+            surface = surfaces.get(descriptor[0])
             if witness is DESKTOP:
-                if active is not None and active.handle == descriptor[0]:
+                if surface is not None:
                     raise SurfaceError('missing witness for a bound application PUT')
                 current.received_put = True
             elif isinstance(witness, WitnessedPut):
                 binding = witness.binding
                 if ((binding.handle, binding.creation) != (descriptor[0], current.creation) or current.received_put
-                        or active not in (None, binding) or witness.serial <= 0 or witness.serial < last_serial):
+                        or (session is not None and session != binding.session)
+                        or (surface is not None and surface.binding != binding)):
                     raise SurfaceError('source application changed or prior upload already escaped')
                 prefix = b''
-                if active is None:
-                    active = binding
+                if surface is None:
+                    if len(surfaces) >= surface_limit:
+                        raise SurfaceError('unexpected concurrent application binding')
+                    session = binding.session
+                    surface = surfaces[binding.handle] = _SurfaceHistory(binding)
                     prefix = binding_record(offset, binding)
                 digest = witness.picture_sha256
+                surface.observe(witness.serial, digest)
                 picture = None
                 if digest is None:
                     pending += 1
-                elif digest != previous_digest:
+                elif digest != surface.digest:
                     picture = fetch_picture(digest, _MAX_ASSET)
                     if (type(picture) is not bytes or len(picture) > _MAX_ASSET or
                             hashlib.sha256(picture).digest() != digest):
                         raise SurfaceError('source drawing failed integrity verification')
                     sent_pictures += 1
-                    previous_digest = digest
+                    surface.digest = digest
                 outgoing = prefix + replacement_record(offset, witness.serial, descriptor,
                                                         digest=digest, picture=picture)
                 removed += descriptor[-1]
-                last_serial = witness.serial
             else:
                 raise SurfaceError('source observer has not classified this PUT')
         if sink.write(outgoing) != len(outgoing):
