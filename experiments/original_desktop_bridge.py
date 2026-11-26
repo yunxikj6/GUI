@@ -262,13 +262,25 @@ async def serve(channel, port, token):
             finally:
                 finished.set()
     service = DesktopService(token, source)
-    server = await asyncio.start_server(service.accept,'127.0.0.1',port,limit=1024,backlog=4)
+    closing = False
+    async def accept(reader, writer):
+        # A socket accepted just before close() can enter its callback later.
+        if closing:
+            writer.close()
+            return
+        await service.accept(reader, writer)
+
+    server = await asyncio.start_server(accept, '127.0.0.1', port, limit=1024, backlog=4)
     try:
-        async with server:
-            print(f'原厂应用私有桌面端口 {server.sockets[0].getsockname()[1]}。', flush=True)
-            await finished.wait()
+        print(f'原厂应用私有桌面端口 {server.sockets[0].getsockname()[1]}。', flush=True)
+        await finished.wait()
     finally:
+        # Python 3.12 waits for every accepted connection in wait_closed().
+        # Cancel pending logins and the source connection before awaiting it.
+        closing = True
+        server.close()
         await service.close()
+        await server.wait_closed()
 
 
 def main():

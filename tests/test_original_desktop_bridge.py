@@ -26,6 +26,43 @@ from thin_client.gnome_transport import connect_forwarded
 
 @unittest.skipUnless(os.name == 'posix', 'source bridge requires POSIX FIFOs')
 class PrivateOriginalDesktop(unittest.IsolatedAsyncioTestCase):
+    async def test_stopping_a_source_closes_an_unfinished_tcp_handshake(self):
+        from unittest.mock import patch
+        from experiments import original_desktop_bridge as bridge
+        from contextlib import redirect_stdout
+
+        accepted = asyncio.Event()
+        bound = asyncio.get_running_loop().create_future()
+        start_server = asyncio.start_server
+
+        async def listen(callback, *args, **kwargs):
+            async def accept(reader, writer):
+                accepted.set()
+                await callback(reader, writer)
+            server = await start_server(accept, *args, **kwargs)
+            bound.set_result(server.sockets[0].getsockname()[1])
+            return server
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(bridge.asyncio, 'start_server', listen),
+            redirect_stdout(io.StringIO()),
+        ):
+            task = asyncio.create_task(bridge.serve(Path(tmp), 0, 'x' * 43))
+            reader, writer = await asyncio.open_connection('127.0.0.1', await bound)
+            try:
+                await accepted.wait()
+                writer.write(b'G')
+                await writer.drain()
+                task.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await asyncio.wait_for(asyncio.shield(task), 2.5)
+                self.assertEqual(await reader.read(), b'')
+            finally:
+                writer.close()
+                await writer.wait_closed()
+                await asyncio.gather(task, return_exceptions=True)
+
     async def test_production_loopback_transport_observes_applied_pointer_and_closes_source(self):
         with tempfile.TemporaryDirectory() as temp:
             channel = Path(temp)
