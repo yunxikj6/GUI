@@ -200,7 +200,7 @@ def _run_typeface(reader):
     return reader.u32()
 
 
-def _collection_glyphs(resources, faces, factories):
+def _collection_glyphs(resources, faces, factories, *, vector_only=False):
     # Walk the SkPictureData resource table from its start. A paint/effect/path
     # can contain arbitrary bytes, including tags that look like a text blob.
     reader = _Reader(resources)
@@ -211,11 +211,17 @@ def _collection_glyphs(resources, faces, factories):
     if tag == b' htp':
         _skip_paths(reader)
         tag = reader.take(4)
-    if tag != b'bolb':
+    if tag == b'bolb':
+        blobs = reader.count()
+    elif vector_only and not faces and tag == b'guls':
+        if reader.u32() or reader.pos != len(resources):
+            raise FontError('Skia 矢量图层含有额外资源。')
+        return {}
+    else:
         raise FontError('未找到包含所需字形的 Skia 文字记录。')
     glyphs = {i: set() for i, face in enumerate(faces, 1) if face == _CJK_FACE}
     total = 0
-    for _ in range(reader.count()):
+    for _ in range(blobs):
         reader.take(16)  # text blob bounds
         while (count := reader.u32()):
             total += count
@@ -239,6 +245,8 @@ def _collection_glyphs(resources, faces, factories):
     reader.expect(b'guls')
     if reader.u32() or not all(glyphs.values()):
         raise FontError('Skia 文字资源含有尚未验证的字形引用。')
+    if vector_only and reader.pos != len(resources):
+        raise FontError('Skia 矢量图层含有额外资源。')
     if reader.pos < len(resources):
         # Encoded image assets cannot refer to Skia font indices.
         reader.expect(b'gami')

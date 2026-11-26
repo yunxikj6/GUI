@@ -26,6 +26,10 @@
 
 GNOME 可以把普通应用已经绘好的整窗纹理作为资源上传。桌面客户端只接入有绘图来源验证的界面。应用在 Ubuntu 窗口内的原厂绘制需要逐个接入，已经在两个登录前状态验证了原厂页面和原厂标题栏的本机合成。目前默认桌面中的普通应用入口会提示绘图通道尚未就绪。下列记录给出了同一个原厂窗口的画面对照和在 Windows 上持续接收原始绘图的验证结果。[原厂界面与窗口合成实测](docs/application-surface.md) · [连续绘图的测量](docs/incremental-application-surface.md)
 
+## 本机重绘原版 Claude
+
+从 Claude Desktop 自带的开发者工具导出绘图时，可在云源核对它所属的主窗口和图层，再在本机 Win32 窗口重绘原厂文字、按钮和路径。已实测原版离线界面。实时交互、登录会话和 Artifacts 仍待接入。[Claude 原版窗口的导出、打开与测量](docs/claude-original-drawing.md)
+
 ## 显式兼容入口
 
 `Start.cmd --native` 会在用户已经安装的本机 Ubuntu WSLg 内打开 GNOME。`Setup.cmd` 专用于这种模式。远端 Xfce 整屏和原有网页项目工作台分别使用 `python launcher.py --cloud-desktop`、`python launcher.py --workbench`。旧模式的桌面与官方客户端实拍保存在各自的验收记录中。[本地 WSLg 模式](docs/native-windows.md) · [云桌面与项目工作台](docs/remote-workbench.md)
