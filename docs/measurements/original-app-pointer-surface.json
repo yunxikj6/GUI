@@ -307,6 +307,52 @@
       "retainedGrantsAfterBoth": 0,
       "retainedAssets": 0
     },
-    "scope": "Conflicts between retained source observations withdraw both claims. Later distinct independently corroborated commands are required before a new sample of the disputed commands can regain eligibility. A pre-conflict draw already displayed cannot be recalled. A single temporally mispaired recording without conflicting evidence can still evade this check."
+    "scope": "Conflicts between retained source observations withdraw both claims. Later distinct independently corroborated commands are required before a new sample of the disputed commands can regain eligibility. A pre-conflict draw already displayed cannot be recalled. A single temporally mispaired recording without conflicting evidence can still evade this check.",
+    "freshLiveSource": {
+      "codeCommit": "2dac58c",
+      "method": "Independent fresh offline signed-out original source. Physical desktop routing opened the original app, menu and editable form; inert text was typed without submitting. The active index was checked for duplicate canonical commands throughout the hover observation.",
+      "sourceProcess": 261,
+      "sourceSteps": [
+        [
+          "welcome",
+          33
+        ],
+        [
+          "menu",
+          45
+        ],
+        [
+          "form",
+          57
+        ],
+        [
+          "field-edit",
+          69
+        ]
+      ],
+      "independentRecordingOcrAndSourceScreenshotOcr": [
+        "orbit",
+        "orbit I"
+      ],
+      "observedIndexStates": 28,
+      "finalUniqueDrawings": 8,
+      "conflictObserved": false,
+      "finalSource": {
+        "controllerClosed": true,
+        "lastRevision": 32,
+        "classification": {
+          "shell": 981,
+          "cursor": 4,
+          "unapproved": 55,
+          "approved": 74
+        }
+      },
+      "evidenceSha256": {
+        "scenes.json": "c1029828422947e513dae87488abe92849987f5e82cfd1c4d6a7dc77d65523b8",
+        "fresh-guarded-source.json": "10ea1006fa935ee48e8b19015505794ced9382ef4e1676a30b8f95843b4fe23d",
+        "verified-steps.json": "827f3126a978259b37232a26d9cf2bd0c9898c4c5cd83194bc80659869601dc5",
+        "live-source.json": "9567378fe77831ea6e671eea9b377c89f8eef5363b1eb5cb2d1f11b7bf560127"
+      }
+    }
   }
 }
