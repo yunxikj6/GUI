@@ -1,0 +1,258 @@
+{
+  "exactZip": "d73c6111f042c2c37cef8377cbd5a053f8589d97b05ce7d752639a48e5d1a34d",
+  "features": {
+    "offered": 62,
+    "negotiated": 62,
+    "width": 1280,
+    "height": 900,
+    "returnedBytes": 10542720,
+    "seconds": 102.464
+  },
+  "witnessedOriginalSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "boundPid": 483,
+  "verifiedGvglBlocks": 177,
+  "truncatedLastGvglBytes": 0,
+  "verifiedGvglLogicalBytes": 41914713,
+  "verifiedGvglLogicalSha256": "5152a885019fdaf0d28bce1e2f3623063b9cce217f5fa0c6394d08212158213e",
+  "rawDraws": 0,
+  "deltaDraws": 15,
+  "holds": 208,
+  "reuses": 48,
+  "ubuntuArtworkReferences": 0,
+  "rows": [
+    {
+      "digest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+      "ordinal": 1,
+      "delta": true,
+      "transportedBytes": 414766,
+      "reconstructedSourceBytes": 1526443
+    },
+    {
+      "digest": "1b3bd48b1c349bc243f4a866ff58216d2e7a068199f6a8f446ba69786353a514",
+      "ordinal": 2,
+      "delta": true,
+      "transportedBytes": 4878,
+      "reconstructedSourceBytes": 1526443
+    },
+    {
+      "digest": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+      "ordinal": 3,
+      "delta": true,
+      "transportedBytes": 13559,
+      "reconstructedSourceBytes": 2289392
+    },
+    {
+      "digest": "55829f368dece9d8a9d380484fbcadc3065e4653881696d70cd572693087153d",
+      "ordinal": 4,
+      "delta": true,
+      "transportedBytes": 4304,
+      "reconstructedSourceBytes": 2289392
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 5,
+      "delta": true,
+      "transportedBytes": 16257,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "8a7fd50e20e6bf2a99bbdf669e7b43f79d9c84b578bc4c260517f7537d7aba4f",
+      "ordinal": 6,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285475
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 7,
+      "delta": true,
+      "transportedBytes": 2388,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "8a7fd50e20e6bf2a99bbdf669e7b43f79d9c84b578bc4c260517f7537d7aba4f",
+      "ordinal": 8,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285475
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 9,
+      "delta": true,
+      "transportedBytes": 2388,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "8a7fd50e20e6bf2a99bbdf669e7b43f79d9c84b578bc4c260517f7537d7aba4f",
+      "ordinal": 10,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285475
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 11,
+      "delta": true,
+      "transportedBytes": 2388,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "8a7fd50e20e6bf2a99bbdf669e7b43f79d9c84b578bc4c260517f7537d7aba4f",
+      "ordinal": 12,
+      "delta": true,
+      "transportedBytes": 2413,
+      "reconstructedSourceBytes": 2285475
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 13,
+      "delta": true,
+      "transportedBytes": 2388,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "39ff3b65974511ad47e5439ebe9e345c2cb4998fd6d24249d3a9c70536a0c5d3",
+      "ordinal": 14,
+      "delta": true,
+      "transportedBytes": 6867,
+      "reconstructedSourceBytes": 2285435
+    },
+    {
+      "digest": "f6009f60f3214318a3134a5b1e7379093275233b6cc180f96fe99e3d75c9a20e",
+      "ordinal": 15,
+      "delta": true,
+      "transportedBytes": 5570,
+      "reconstructedSourceBytes": 2285423
+    }
+  ],
+  "independentWindowReadback": {
+    "welcome": {
+      "fullImageDigest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 714000,
+      "exactFraction": 1.0
+    },
+    "method": {
+      "fullImageDigest": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713708,
+      "exactFraction": 0.9995910364145658
+    },
+    "empty": {
+      "fullImageDigest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    },
+    "input": {
+      "fullImageDigest": "39ff3b65974511ad47e5439ebe9e345c2cb4998fd6d24249d3a9c70536a0c5d3",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    },
+    "replace": {
+      "fullImageDigest": "f6009f60f3214318a3134a5b1e7379093275233b6cc180f96fe99e3d75c9a20e",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    }
+  },
+  "windowExits": {
+    "productExit": 0,
+    "sourceExit": 0,
+    "privateDirectoryGone": true
+  },
+  "interaction": {
+    "steps": [
+      [
+        "welcome",
+        49.837
+      ],
+      [
+        "method",
+        60.511
+      ],
+      [
+        "empty",
+        71.892
+      ],
+      [
+        "input",
+        81.564
+      ],
+      [
+        "replace",
+        101.969
+      ]
+    ],
+    "typedKeys": 7,
+    "acknowledgedKeys": 7,
+    "focusEpoch": 1,
+    "submitted": false,
+    "selectedAndReplaced": true,
+    "testing": "True Win64 Python, Node and HWND under Wine and private isolated Ubuntu source",
+    "zip": "d73c6111f042c2c37cef8377cbd5a053f8589d97b05ce7d752639a48e5d1a34d",
+    "command": "Start.cmd --forwarded --port <authenticated local forward>"
+  },
+  "sourceCommit": "e1d33eb417dc9ff69ac0489b11bec9ee4690cdd3",
+  "pixels": "Full PNG captured from an independent OS display, compared against the source-witnessed original CLRP in a separate CanvasKit process. The centre 1050 \u00d7 680 region of the native software is scored; nonmatching edge/focus/cursor pixels remain in the PNG.",
+  "testRoles": {
+    "source": "Ubuntu Noble with signed official ChatGPT and original GNOME in a separate private role; external account/network submission disabled by the role.",
+    "client": "Win64 CPython, Node and native window under Wine 10; exact release ZIP, no source checkout or cloud application accessible in the client role.",
+    "connection": "Explicit forwarded loopback port; no provider API or public network used."
+  },
+  "closedEndpointChecks": {
+    "source": true,
+    "observerForwarder": true
+  },
+  "allReleasedPairingFilesGone": true,
+  "sourceAttestation": "Native probe rebuilt from the exact Mutter C source in this revision with the source run.sh build arguments, then checked by the original launcher.",
+  "screenshots": {
+    "verified-welcome.png": "e28d2227f8f00fc26b1ff9ae07e376bbf880ff5a173d21ddd594e5382b289b08",
+    "verified-method.png": "d202ee5b1a8cf1e1e0896bbec478ade28e6a679a6f4bc5f402df5619f4c7c71d",
+    "verified-empty.png": "81524ca5f09f38a4fc121451cf2151c570c8a5d2d2ab36de6ed3d36565b88165",
+    "verified-input.png": "4084b02b471836882089c859963c367c99cceb4340e080b880edfd8affe09fec",
+    "verified-replace.png": "6570a29e044b9de65a3a5d1f3f097b8460a92ed60979a72854bd6bbc7f5c7943"
+  }
+}
