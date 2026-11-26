@@ -356,3 +356,43 @@ class TwoOriginalSurfaces(unittest.TestCase):
         packets = list(iter(lambda: client.read(4096), b''))
         self.assertTrue(client.can_present)
         self.assertEqual(packets[-1][-16:], self.pixels(2))
+
+    def test_button_pair_and_text_from_first_window_do_not_carry_to_the_second(self):
+        from experiments.original_desktop import _WindowInput
+
+        self.create(self.app)
+        self.put(self.app, 4, self.app_drawing)
+        self.create(self.browser)
+        self.put(self.browser, 1, None)
+        self.source.write(self.ping)
+        self.put(self.browser, 2, self.browser_drawing)
+        self.unref(self.browser)
+        raw, _ = self.forward()
+        client = self.client(raw)
+        client.read(4096)
+        client.read(4096)
+        state = _WindowInput()
+        state.reader = client
+        state.painted(state.offer(client, b'A'))
+        events = []
+        send = state.events(events.append)
+        send(('press', 22, 40))
+        self.assertTrue(state.has_displayed_application())
+        client.read(4096)  # CREATE
+        client.read(4096)  # BIND and HOLD, then PING
+        self.assertIsNone(state.ticket())
+        self.assertFalse(state.has_displayed_application())
+        client.read(4096)
+        state.painted(state.offer(client, b'AB'))
+        send(('click', 22, 40, 'left'))
+        send(('text', 4, 'x'))
+        self.assertEqual(events, [])
+        send(('press', 22, 40))
+        client.read(4096)
+        state.painted(state.offer(client, b'A'))
+        send(('click', 22, 40, 'left'))
+        self.assertEqual(events, [])
+        self.assertTrue(state.has_displayed_application())
+        send(('press', 22, 40))
+        send(('click', 22, 40, 'left'))
+        self.assertEqual([event[0] for event in events], ['click'])
