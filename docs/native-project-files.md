@@ -4,7 +4,7 @@
 
 ## 首次连接
 
-在 Windows 上双击 `Setup.cmd` 安装 Ubuntu 桌面依赖，再双击 `Start.cmd`。在 Ubuntu 按 Super，搜索 **InstaBox 项目文件**。首次打开会出现系统连接对话框。
+在 Windows 上双击 `Setup.cmd` 安装 Ubuntu 桌面依赖，再运行 `Start.cmd --native`。在 Ubuntu 按 Super，搜索 **InstaBox 项目文件**。首次打开会出现系统连接对话框。
 
 1. 选择“输入 API 密钥”，或用机器 ID 查找 Ubuntu 密钥环里的已有密钥。输入框会隐藏密钥。
 2. 选择已运行的云机，输入已有项目的绝对目录，例如 `/data/my-project`。这个目录需要允许读取，云机上需要 Python 3。

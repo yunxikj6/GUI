@@ -1,4 +1,6 @@
-"""Verify that launching the native workspace neither requests a cloud secret nor opens the web workbench."""
+"""Check routing between the thin client and the explicit compatibility modes."""
+import contextlib
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -9,11 +11,48 @@ from unittest.mock import patch
 
 import launcher
 import native_workspace
+import thin_client_entry
 
 
 class NativeEntry(unittest.TestCase):
-    def test_default_and_check_enter_native_dispatch_before_cloud_or_http(self):
-        for options, expected in (([], (False, None, False)),
+    def test_cloud_options_are_validated_before_any_local_or_legacy_launch(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(native_workspace, 'start', side_effect=AssertionError), \
+                patch.object(launcher.getpass, 'getpass', side_effect=AssertionError), \
+                patch.object(launcher, 'LocalServer', side_effect=AssertionError), \
+                patch.object(launcher, 'InstaBox', side_effect=AssertionError), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            for options in (['--machine', 'example'], ['--no-browser'], ['--port', '8000'],
+                            ['--connect-port', '65536'], ['--connect-port', '0', '--native']):
+                with self.subTest(options=options), patch.object(sys, 'argv', ['launcher.py', *options]), self.assertRaises(SystemExit) as exit:
+                    launcher.main()
+                self.assertEqual(exit.exception.code, 2)
+
+    def test_standalone_and_full_entry_choose_the_same_cloud_transport(self):
+        from thin_client import viewer
+        cases = (
+            ([], {}, ['--instabox', '--port', '17324']),
+            ([], {'CLOUDWORKSPACE_RENDER_PORT':'4040'}, ['--port','4040']),
+            (['--connect-port','5050'], {'CLOUDWORKSPACE_RENDER_PORT':'4040'}, ['--port','5050']),
+            (['--instabox'], {'CLOUDWORKSPACE_RENDER_PORT':'4040'}, ['--instabox','--port','17324']),
+            (['--instabox', '--connect-port', '6001','--machine','m_abc'], {},
+             ['--instabox','--port','6001','--machine','m_abc']),
+            (['--machine','m_abc'], {}, ['--instabox','--port','17324','--machine','m_abc']),
+        )
+        for options, env, expected in cases:
+            with self.subTest(options=options, env=env), patch.dict(os.environ, env, clear=True), \
+                    patch.object(sys, 'argv', ['launcher.py', *options]), \
+                    patch.object(viewer, 'main', return_value=9) as view, \
+                    patch.object(launcher, 'InstaBox', side_effect=AssertionError), \
+                    patch.object(launcher, 'LocalServer', side_effect=AssertionError), \
+                    patch.object(native_workspace, 'start', side_effect=AssertionError):
+                self.assertEqual(launcher.main(), 9)
+                view.assert_called_once_with(expected)
+                view.reset_mock()
+                self.assertEqual(thin_client_entry.main(options), 9)
+                view.assert_called_once_with(expected)
+
+    def test_explicit_compatibility_flags_enter_native_dispatch_before_cloud_or_http(self):
+        for options, expected in ((['--native'], (False, None, False)),
                                   (['--check-native', '--distro', 'Ubuntu-24.04'], (True, 'Ubuntu-24.04', False)),
                                   (['--setup-native', '--distro', 'Ubuntu-24.04'], (False, 'Ubuntu-24.04', True))):
             with self.subTest(options=options), patch.object(sys, 'argv', ['launcher.py', *options]), \
@@ -26,13 +65,16 @@ class NativeEntry(unittest.TestCase):
 
     def test_windows_python_entry_uses_packaged_launcher_without_cloud_key(self):
         with patch.object(sys, 'platform', 'win32'), patch.dict(os.environ, {
-                'PROCESSOR_ARCHITECTURE': 'x86', 'PROCESSOR_ARCHITEW6432': 'ARM64', 'INSTABOX_API_KEY': 'private-test-marker'}), \
+                'PROCESSOR_ARCHITECTURE': 'x86', 'PROCESSOR_ARCHITEW6432': 'ARM64', 'INSTABOX_API_KEY': 'private-test-marker', 'CLOUDWORKSPACE_RENDER_TOKEN':'private-render-marker'}), \
                 patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as run:
             self.assertEqual(native_workspace.start(check=True, distro='Ubuntu local'), 0)
             invocation = run.call_args
             self.assertEqual(Path(invocation.args[0][0]).name, 'CloudLinuxWorkspace-arm64.exe')
             self.assertEqual(invocation.args[0][1:], ['--distro', 'Ubuntu local', '--check-native'])
             self.assertNotIn('INSTABOX_API_KEY', invocation.kwargs['env'])
+            self.assertNotIn('CLOUDWORKSPACE_RENDER_TOKEN', invocation.kwargs['env'])
+            self.assertEqual(native_workspace.start(), 0)
+            self.assertEqual(run.call_args.args[0][1:], ['--native'])
 
     def test_script_check_is_read_only_and_failed_preflight_does_not_install_or_launch(self):
         if sys.platform != 'linux':

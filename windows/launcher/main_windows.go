@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -23,6 +24,62 @@ var setupHandler = syscall.NewCallback(func(event uint32) uintptr {
 	return 0
 })
 var messageBox = syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW")
+
+// Match the layout of CREDUI_INFOW on both supported Windows architectures.
+type credentialPromptInfo struct {
+	size    uint32
+	parent  uintptr
+	message *uint16
+	caption *uint16
+	banner  uintptr
+}
+
+func withCredential(env []string, key, title, instruction, credentialTarget string) ([]string, int) {
+	// A GUI-subsystem process launched from Explorer has no terminal for
+	// Python's getpass. Ask for the ephemeral pairing code in CredUI.
+	for i, entry := range env {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok && strings.EqualFold(name, key) {
+			if value != "" {
+				return env, 0
+			}
+			env = append(env[:i:i], env[i+1:]...)
+			break
+		}
+	}
+	dir := windowsDirectory()
+	if !filepath.IsAbs(dir) {
+		return nil, 1
+	}
+	prompt := syscall.NewLazyDLL(filepath.Join(dir, "System32", "credui.dll")).NewProc("CredUIPromptForCredentialsW")
+	if prompt.Find() != nil {
+		return nil, 1
+	}
+	message, _ := syscall.UTF16PtrFromString(instruction)
+	caption, _ := syscall.UTF16PtrFromString(title)
+	target, _ := syscall.UTF16PtrFromString(credentialTarget)
+	info := credentialPromptInfo{message: message, caption: caption}
+	info.size = uint32(unsafe.Sizeof(info))
+	username, _ := syscall.UTF16FromString("云端应用")
+	var password [256]uint16
+	defer clear(password[:])
+	var save int32
+	// GENERIC_CREDENTIALS | KEEP_USERNAME | ALWAYS_SHOW_UI | DO_NOT_PERSIST.
+	// Do not offer to save or retrieve an application's cloud credential.
+	result, _, _ := prompt.Call(
+		uintptr(unsafe.Pointer(&info)), uintptr(unsafe.Pointer(target)), 0, 0,
+		uintptr(unsafe.Pointer(&username[0])), uintptr(len(username)),
+		uintptr(unsafe.Pointer(&password[0])), uintptr(len(password)),
+		uintptr(unsafe.Pointer(&save)), 0x40000|0x100000|0x80|0x2,
+	)
+	if result == 1223 { // ERROR_CANCELLED
+		return nil, 130
+	}
+	if result != 0 {
+		return nil, 1
+	}
+	return append(env, key+"="+syscall.UTF16ToString(password[:])), 0
+}
 
 func windowsDirectory() string {
 	buf := make([]uint16, 32768)
@@ -71,6 +128,19 @@ func runSetup(program string, args, env []string) runResult {
 func runProcess(program string, args, env []string, mode runMode) runResult {
 	if mode == setupRun {
 		return runSetup(program, args, env)
+	}
+	if mode == rendererRun || mode == instaboxRendererRun {
+		var code int
+		if mode == instaboxRendererRun {
+			env, code = withCredential(env, "INSTABOX_API_KEY", "连接 InstaBox", "请在密码栏输入有权连接此云机的 InstaBox API 密钥。", "CloudLinuxWorkspace.InstaBox")
+			if code != 0 {
+				return runResult{exit: code}
+			}
+		}
+		env, code = withCredential(env, "CLOUDWORKSPACE_RENDER_TOKEN", "连接云端应用", "请在密码栏输入云端应用绘图服务生成的本次会话配对码。", "CloudLinuxWorkspace.Render")
+		if code != 0 {
+			return runResult{exit: code}
+		}
 	}
 	ctx := context.Background()
 	var timeout time.Duration
@@ -160,6 +230,9 @@ func main() {
 		}
 	}
 	if problem != nil {
+		if problem.code == "render-cancelled" {
+			os.Exit(problem.exit)
+		}
 		if problem.code == "setup-cancelled" {
 			report(problem.message, false, true)
 			os.Exit(130)
@@ -179,7 +252,7 @@ func main() {
 		os.Exit(1)
 	}
 	if opt.setup {
-		report("Ubuntu GNOME 桌面依赖已就绪。双击 Start.cmd 打开工作区。", false, false)
+		report("Ubuntu GNOME 桌面依赖已就绪。运行 Start.cmd --native 打开本机桌面。", false, false)
 	}
 	if opt.check {
 		report("Ubuntu、WSLg 和本机工作区依赖检查通过。", false, true)

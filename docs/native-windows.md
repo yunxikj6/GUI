@@ -1,12 +1,12 @@
-# Windows 上的本机 Linux 工作区
+# Windows 本机 Ubuntu 兼容模式
 
-解压整个源码包并双击 `Start.cmd`。启动器会调用 Windows 系统的 `wsl.exe`，在已安装的本机 Ubuntu 中打开一个 GNOME Shell 窗口。这个窗口里进行的桌面搜索、菜单绘制和文件操作发生在本机。用户可以在未连接 InstaBox 的情况下使用桌面。Windows 主入口附带 x64 和 ARM64 两个程序，随包提供 Go 源码。两个程序当前均未使用 Authenticode 签名；可以对照验收文件中的 SHA-256，或用 Go 1.26.11 和 `windows/launcher/build.sh` 重建。[启动器源码](../windows/launcher/)
+解压整个源码包并运行 `Start.cmd --native` 选择本机 Ubuntu。启动器会调用 Windows 系统的 `wsl.exe`，在已安装的本机 Ubuntu 中打开一个 GNOME Shell 窗口。这个窗口里进行的桌面搜索、菜单绘制和文件操作发生在本机。用户可以在未连接 InstaBox 的情况下使用桌面。Windows 主入口附带 x64 和 ARM64 两个程序，随包提供 Go 源码。两个程序当前均未使用 Authenticode 签名；可以对照验收文件中的 SHA-256，或用 Go 1.26.11 和 `windows/launcher/build.sh` 重建。[启动器源码](../windows/launcher/)
 
 ## 第一次准备
 
 1. 在 Windows 11 上运行 `wsl --version` 和 `wsl --list --verbose`，确认有 WSLg，并且要用的 Ubuntu 是版本 2。还没有 Ubuntu 时，可按微软说明安装，例如 `wsl --install -d Ubuntu-24.04`。首次启动发行版时完成 Linux 用户设置。[微软 WSLg 文档](https://learn.microsoft.com/windows/wsl/tutorials/gui-apps)
 2. 双击 `Setup.cmd`。安装程序在交互终端列出所选 Ubuntu 24.04 LTS 缺少的桌面组件，通过该发行版已有的 APT 源安装。Ubuntu 的提权提示也在这个终端输入。有多个 Ubuntu 时可运行 `Setup.cmd --distro Ubuntu-24.04`。已具备依赖的机器可以直接打开工作区。
-3. 在 Windows 解压目录运行 `Start.cmd --check-native` 检查依赖，再双击 `Start.cmd`。存在多个 Ubuntu 时可指定 `Start.cmd --distro Ubuntu-24.04`。启动时会在当前 Ubuntu 用户的“活动”中注册应用入口，并在启用了桌面图标时首次建立快捷方式。可以移动或删除图标。以后解压到新目录并运行新版启动器，现有快捷方式仍可使用。新版创建的快捷方式会在下次启动工作区时更新应用图标。旧版创建的桌面文件保留原有图标和启动权限，切换到 Linux 版后会打开对应的本机客户端。
+3. 在 Windows 解压目录运行 `Start.cmd --check-native` 检查依赖，再运行 `Start.cmd --native`。存在多个 Ubuntu 时可指定 `Start.cmd --distro Ubuntu-24.04`。启动时会在当前 Ubuntu 用户的“活动”中注册应用入口，并在启用了桌面图标时首次建立快捷方式。可以移动或删除图标。以后解压到新目录并运行新版启动器，现有快捷方式仍可使用。新版创建的快捷方式会在下次启动工作区时更新应用图标。旧版创建的桌面文件保留原有图标和启动权限，切换到 Linux 版后会打开对应的本机客户端。
 
 若想从 Ubuntu 终端自行安装，同一套软件包如下。
 
@@ -35,7 +35,7 @@ Ubuntu 中已有可用的网页浏览器时，安装器沿用它。如果 HTTP �
 - **项目数据**。需要在应用内读取云项目时，从 GNOME “活动”打开 **连接 InstaBox 到官方客户端**，选择应用并核对项目。默认可列目录、读文本及查询 Git 状态。需要在原厂对话中审阅代码改动时，在同一确认页选择“包含 Git 差异”。要保存文件，可用下述文件管理器操作。Claude 的聊天历史及 Artifacts、ChatGPT 的聊天历史继续受各自的账号与功能权限控制。[连接与验证方法](official-client-workspace.md)
 - **在 Ubuntu 直接编辑项目文件**。完成绑定后，在“活动”打开 InstaBox 项目文件，从云端选一个文件，双击本地工作副本即可用系统编辑器修改。客户端会话和文件管理器可以独立使用。[原生文件操作](native-project-files.md)
 
-在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py` 启动本地会话。Ubuntu 桌面上的 ChatGPT 和 Claude 快捷方式也可用于首次安装。Windows 应用入口在 WSL 中注册。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。
+在有图形会话的 Linux 上，可用 `python3 launcher.py --check-native` 检查前置条件，再运行 `python3 launcher.py --native` 启动本地会话。Ubuntu 桌面上的 ChatGPT 和 Claude 快捷方式也可用于首次安装。Windows 应用入口在 WSL 中注册。已有远端 Xfce 和浏览器项目工作台分别从 `--cloud-desktop` 与 `--workbench` 进入。
 
 Ubuntu 24.04 的 GNOME Shell 46 启动时读取父显示的可用区域，给桌面边框和任务栏留出空间。Linux 嵌套窗口实测在 1920×1080 显示上得到 1888×1016 的桌面，在 1280×720 上得到 1248×656。这个版本的 Mutter 在运行中固定嵌套窗口大小，更换显示后可关闭再打开。Windows 的显示缩放仍需实机验证。[逐项测量](measurements/native-gnome-window-size.json)
 

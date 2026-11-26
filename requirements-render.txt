@@ -1,0 +1,2 @@
+# Cloud host only. The local display client uses the Python standard library.
+playwright==1.62.0

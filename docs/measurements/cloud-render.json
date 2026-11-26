@@ -1,0 +1,161 @@
+{
+  "observedDate": "2026-11-26",
+  "platform": {
+    "cloud": "Authorized InstaBox, Debian 13 x86_64. Separate private display, user profile and signed-out official ChatGPT for Linux.",
+    "client": "Separate Linux computer, local system Chromium and bundled CanvasKit 0.42.0.",
+    "windows11Tested": false
+  },
+  "application": {
+    "Version": "26.1120.50957",
+    "officialLatest": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb",
+    "downloadBytes": 501426562,
+    "sha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
+    "signedIndexMatched": true,
+    "entry": "app://-/index.html",
+    "runningBinarySha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+    "hostProcessUnchanged": true,
+    "rendererSandbox": {
+      "count": 4,
+      "noNewPrivileges": true,
+      "seccompMode": 2
+    },
+    "windowReadback": {
+      "before": {
+        "processId": 109662,
+        "windowId": 2097155,
+        "sha256": "eeda371b2cc08b536b86c35b74f7af7067b0dcb889dd626243007b78ac268034",
+        "observation": "read actual visible window with XGetImage on private production X server"
+      },
+      "after": {
+        "processId": 109662,
+        "windowId": 2097155,
+        "sha256": "7bfc0b0ae77df219453beae65c14480f8e4346677f322c6c4ea25606a3ad0f9b",
+        "observation": "read actual visible window with XGetImage on private production X server"
+      }
+    }
+  },
+  "cloudRoundTrip": {
+    "transport": "InstaBox HTTPS exec and private files, loopback-only CLRP service; control-plane credentials stay outside the local display browser.",
+    "publicPortOpened": false,
+    "firstFrame": {
+      "seq": 1,
+      "bytes": 1525280,
+      "sha256": "3193f6e03609fc93cc303b12dd2e8fa95655a07a62cd8708b5c248a832c29fdc",
+      "size": [
+        1090,
+        760
+      ],
+      "layers": [
+        225,
+        1524993
+      ]
+    },
+    "nextFrame": {
+      "seq": 2,
+      "bytes": 2288229,
+      "sha256": "0155c3086a3a2f288b7f0d259569fa4894e2d093f5cb1b91d0cd759df760421c",
+      "size": [
+        1090,
+        760
+      ],
+      "layers": [
+        225,
+        2287942
+      ]
+    },
+    "localClick": [
+      545,
+      435
+    ],
+    "httpStatusAfterCloudAck": 204,
+    "nextWindowContains": "Amazon Bedrock",
+    "displayBrowserExternalNetworkRequests": 0,
+    "firstFrameSecondsOneSample": 2.18,
+    "clickToUpdatedViewSecondsOneSample": 2.11,
+    "acceptanceCleanup": {
+      "ownerChecked": true,
+      "scopedProcessesTerminated": 23,
+      "temporaryPackageProfileDependenciesRemoved": true,
+      "localTemporaryPairingRemoved": true
+    }
+  },
+  "sameProcessCloudToClientRendering": {
+    "before": {
+      "image": "../cloud-render-chatgpt-welcome.png",
+      "sha256": "df752b2bef1c3ae29d656547567d2d2c706f9ae4dba2bdbc5db501783ef4420b",
+      "referenceSha256": "eeda371b2cc08b536b86c35b74f7af7067b0dcb889dd626243007b78ac268034",
+      "meanAbsoluteRGBChannelError": 0.09418,
+      "percentChannelSamplesWithin10": 99.737
+    },
+    "after": {
+      "image": "../cloud-render-chatgpt-options.png",
+      "sha256": "2c7d2fb3168acdd7eea92a9b1606f945ddf132fbdac30273c821093b1ebc313e",
+      "referenceSha256": "7bfc0b0ae77df219453beae65c14480f8e4346677f322c6c4ea25606a3ad0f9b",
+      "meanAbsoluteRGBChannelError": 0.09691,
+      "percentChannelSamplesWithin10": 99.668,
+      "referenceImage": "../cloud-render-source-options.png"
+    }
+  },
+  "disconnectedLocalReplay": {
+    "scope": "Additional isolated Linux end-to-end session with the same official package and a fresh signed-out profile. Resized after disconnect.",
+    "size": [
+      960,
+      640
+    ],
+    "stillVisible": "Amazon Bedrock",
+    "image": "../cloud-render-offline-resize.png",
+    "sha256": "491739d77a64b242e8ac1b3dbdc9d36aca29010dd432357ca252156375426a98"
+  },
+  "limits": [
+    "Primary click only. No keyboard or IME protocol in this release.",
+    "Account sign-in, conversations and Artifacts were not exercised.",
+    "The certified capture path covers supported SkPicture v110 app surfaces and verified fonts. Claude and the whole GNOME desktop are separate pending surfaces.",
+    "Actual Windows 11 display, keyboard and focus remain unverified."
+  ],
+  "clientBinaries": {
+    "x64": "1e9fbfbcdf63e68f67f836ef9622d24dba92377898dd889912fbd06173b842b8",
+    "arm64": "dbe157e6570d14c896cefae0a41c1a327e7d8ba363871eccf3a728e30b10c01a"
+  },
+  "gnomeResearch": {
+    "scope": "Separate exploratory test in an isolated Ubuntu 24.04 guest. Not part of the delivered client.",
+    "compositor": "GNOME Shell 46.0, Mutter 46.2",
+    "observed": "An independent Mesa virgl renderer received 24 command submissions including 236 draws, 16 shaders and 84 2D textures from GNOME Shell. The original implementation still returns the completed pixels to X11. Network resource transfer and direct local presentation are pending."
+  },
+  "claudeResearch": {
+    "scope": "Isolated, original, unmodified Claude Desktop 6.28899.6 with a clean profile.",
+    "result": "The application rejected the debug-enabled launch. The ChatGPT capture adapter does not attach to Claude."
+  },
+  "windowsCompatibility": {
+    "scope": "Debian Wine 10 and official Windows CPython 3.13.9. The x64 release PE, standalone entry and current-user Windows credential prompts were exercised.",
+    "interactiveWindows11": false,
+    "nativeWindowsAppWindowVerified": false,
+    "x64": "1e9fbfbcdf63e68f67f836ef9622d24dba92377898dd889912fbd06173b842b8",
+    "arm64": "dbe157e6570d14c896cefae0a41c1a327e7d8ba363871eccf3a728e30b10c01a"
+  },
+  "standalonePackage": {
+    "download": "../../releases/thin-windows/cloud-workspace.zip",
+    "bytes": 5181625,
+    "sha256": "81387b6bb6772b89402dfe728796f742ed03f2b2b1bd7b4b93bea4e2885643f0",
+    "entries": 23,
+    "windowsCompatibilityCheck": "Unmodified independently unpacked standalone ZIP on Debian Wine 10. No project tree mounted, no WSL installed. Forwarded route used real package Python viewer, Windows 3.13 runtime and a recording loopback CLRP peer. Peer closed after authenticated handshake. Real system credential prompts were cancelled before any Internet access. No Windows 11 GUI rendering verified here.",
+    "privateWindowOnLinux": {
+      "image": "../cloud-render-window.png",
+      "sha256": "5f0e9dce6ba4c6a3a8b47f1f4491ff4f3e86fccd679b2ea832306d7392d80791",
+      "action": "An independent extraction connected to the existing cloud application through InstaBox. A real pointer click on Back returned to the original welcome page.",
+      "cloudReadbackAfterBack": {
+        "processId": 109662,
+        "windowId": 2097155,
+        "referenceSha256": "09fd587511b6836e847afaf393e1ae159b619bee412af297a595b5c2d30b3d18",
+        "originalWelcomeVisible": true
+      }
+    },
+    "cloudBackTestArchiveSha256": "b60fea303114516343446387c179430ac3721e81a65854d3eb2845eef3577eae",
+    "finalWindowLifecycle": {
+      "platform": "System Chromium app window on Linux with Xfwm4",
+      "altF4Seconds": 0.145,
+      "browserKilledSeconds": 0.026,
+      "reloadThenAltF4Seconds": 0.088,
+      "externalXDestroyWindow": "Forcibly destroying only the X11 surface bypassed the browser close protocol. The process and target can stay active; closing the dedicated browser process releases the connection."
+    }
+  }
+}

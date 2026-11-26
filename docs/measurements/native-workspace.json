@@ -158,17 +158,18 @@
     "windowsChatGptWindowObserved": false,
     "windowsClaudeWindowObserved": false,
     "launcherSha256": {
-      "x64": "1f55dcfc8d8f8015104c26a4ec10913534088a26e641aa71cb22ccd6fbac1af9",
-      "arm64": "f814906903b02321e27727aa58ef270a5b2f67c7ad0c33b6f496024878ffb016"
+      "x64": "1e9fbfbcdf63e68f67f836ef9622d24dba92377898dd889912fbd06173b842b8",
+      "arm64": "dbe157e6570d14c896cefae0a41c1a327e7d8ba363871eccf3a728e30b10c01a"
     },
     "workspaceWindowVerifierRecord": "native-windows-verifier.json",
-    "applicationWindowVerifierRecord": "native-app-window-verifier.json"
+    "applicationWindowVerifierRecord": "native-app-window-verifier.json",
+    "currentDefaultEntryRecord": "cloud-render.json"
   },
   "pythonRegression": {
-    "archiveRevision": "39944870b940bf96b6ab01042d8b2772df0aa718",
-    "passed": 344,
+    "archiveRevision": "f38fd5a0d170d50006448f7ca85c369c0b415155",
+    "passed": 347,
     "skipped": 0,
-    "snapshotFiles": 236,
+    "snapshotFiles": 240,
     "verification": "Exact public source archive compared to Git, then three isolated Linux test shards. Interactive Windows testing is recorded separately."
   }
 }

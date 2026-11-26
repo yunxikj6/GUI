@@ -1,13 +1,16 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-if "%~1"=="" goto native
-if /i "%~1"=="--native" goto native
-if /i "%~1"=="--distro" goto native
-if /i "%~1"=="--check-native" goto native
-if /i "%~1"=="--setup-native" goto native
-if /i "%~1"=="--help" goto native
-if /i "%~1"=="--open-app" goto native
+if "%~1"=="" goto windows_launcher
+if /i "%~1"=="--connect-port" goto windows_launcher
+if /i "%~1"=="--instabox" goto windows_launcher
+if /i "%~1"=="--native" goto windows_launcher
+if /i "%~1"=="--distro" goto windows_launcher
+if /i "%~1"=="--check-native" goto windows_launcher
+if /i "%~1"=="--setup-native" goto windows_launcher
+if /i "%~1"=="--help" goto windows_launcher
+if /i "%~1"=="--open-app" goto windows_launcher
+if not exist "%~dp0launcher.py" goto windows_launcher
 where py >nul 2>nul
 if errorlevel 1 (
   python launcher.py %*
@@ -18,7 +21,7 @@ set "result=%errorlevel%"
 if not "%result%"=="0" pause
 exit /b %result%
 
-:native
+:windows_launcher
 set "target="
 set "arch=%PROCESSOR_ARCHITECTURE%"
 if defined PROCESSOR_ARCHITEW6432 set "arch=%PROCESSOR_ARCHITEW6432%"
@@ -29,11 +32,6 @@ if not defined target (
   pause
   exit /b 2
 )
-if not "%~1"=="" goto native_args
-start "" "%~dp0windows\CloudLinuxWorkspace-%target%.exe"
-exit /b %errorlevel%
-
-:native_args
 if /i "%~1"=="--open-app" goto open_app
 "%~dp0windows\CloudLinuxWorkspace-%target%.exe" %*
 exit /b %errorlevel%

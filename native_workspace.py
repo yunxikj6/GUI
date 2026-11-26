@@ -22,6 +22,8 @@ def start(check=False, distro=None, setup=False):
             command.append('--setup-native')
         elif check:
             command.append('--check-native')
+        elif not distro:
+            command.append('--native')
     elif sys.platform.startswith('linux') and not distro:
         if setup and not os.environ.get('WSL_DISTRO_NAME'):
             print('桌面依赖安装入口适用于 Windows 上的 Ubuntu 24.04 WSLg。', file=sys.stderr)
@@ -37,6 +39,7 @@ def start(check=False, distro=None, setup=False):
         return 2
     env = os.environ.copy()
     env.pop('INSTABOX_API_KEY', None)
+    env.pop('CLOUDWORKSPACE_RENDER_TOKEN', None)
     try:
         return subprocess.run(command, cwd=ROOT, env=env).returncode
     except KeyboardInterrupt:

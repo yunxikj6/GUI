@@ -1,27 +1,27 @@
 # Cloud Linux Workspace
 
-Windows 上的主入口会在本机 Ubuntu WSL 2 中启动 GNOME Shell。桌面、应用菜单和文件管理器由本机的 Linux 进程绘制。运行桌面无需 InstaBox 密钥，项目数据通过单独配置的工作区连接传输。
+Windows 本机运行轻量绘图客户端。应用进程、账号会话和项目文件放在云服务器上。云端从原程序正在显示的窗口取得 Skia 绘图指令，本机按显示比例重新绘制这些指令，点击则送回创建该窗口的云端进程。
 
-在 Windows 11 上解压整个源码包。首次使用时，准备好带 WSLg 的 Ubuntu 24.04 WSL 2，双击 `Setup.cmd` 安装桌面依赖。以后直接双击 `Start.cmd` 进入 GNOME。启动程序会选择 x64 或 ARM64 版本。有多个 Ubuntu 时用 `Start.cmd --distro Ubuntu-24.04` 指定发行版。[Windows 准备和验收](docs/native-windows.md)
+当前接入的是 **ChatGPT for Linux** 的登录前窗口。客户端需要 Python 3.10+ 和已有的现代浏览器。浏览器在本机加载随包的 CanvasKit，显示并缩放云端原程序的画面。Ubuntu、ChatGPT 及其登录资料保存在云侧。Claude、整个 GNOME 桌面和登录后的对话仍在开发验收范围内。[绘图客户端](thin_client/) · [云端绘图服务](cloud_render/)
 
-进入 GNOME 后，双击桌面的 **Claude** 或 **ChatGPT**。首次使用时，未安装的应用显示 Ubuntu 的软件安装图标，终端会写明要安装的客户端。确认后由 APT 安装，完成后直接打开该应用的原厂窗口。以后双击同一位置即可启动。也可从“活动”搜索 **安装官方客户端**，一次选择两款。两个 Linux 客户端都使用厂商提供的桌面程序和图标，窗口由同一个本机 GNOME 桌面管理。ChatGPT 的登录链接会打开 Ubuntu 浏览器，Claude 的欢迎按钮会在原窗口显示登录选项。各自的账户负责聊天和登录。InstaBox 提供授权项目的文件和计算。[Ubuntu 安装与启动](docs/native-windows.md#打开原版应用) · [官方客户端的项目连接](docs/official-client-workspace.md)
+![本机独立窗口显示由 InstaBox 上原版 ChatGPT 生成的登录页](docs/cloud-render-window.png)
 
-![Ubuntu GNOME 桌面实拍，Claude for Linux 的官方欢迎窗口已打开，旁边可见桌面图标和 Dock](docs/native-floating-claude.png)
+上图来自轻量客户端。另从同一云端窗口读取原画面，用来逐像素对照。真实测试覆盖了登录前窗口，断开连接后仍可在本机缩放已收到的画面。[点击后的本机画面](docs/cloud-render-chatgpt-options.png) · [同一云端窗口对照图](docs/cloud-render-source-options.png) · [首次出现的原厂登录页](docs/cloud-render-chatgpt-welcome.png) · [断线后的本机缩放](docs/cloud-render-offline-resize.png) · [真云操作与画面测量](docs/measurements/cloud-render.json)
 
-上图实拍自 Linux 上的本机 GNOME，Claude 以普通窗口打开。ChatGPT 也可从同一桌面打开，窗口归属已用 Mutter 和原厂安装包的程序摘要核对。[ChatGPT 浮窗实拍](docs/native-floating-chatgpt.png) · [两个原厂窗口同屏](docs/native-ubuntu-official-welcome.png) · [进程与截图记录](docs/measurements/native-floating-clients.json)
+## 连接工作区
 
-在 Ubuntu 24.04.5 上，已核对两款程序与厂商安装包，并用窗口管理器确认窗口归属。最小化整个工作区时，两款应用都随之隐藏。ChatGPT 在断网的全新用户目录里也能打开登录方式面板。Claude 在相同条件下会显示连接错误页，仍能展开 File 菜单。[两款应用的 GNOME 桌面实拍](docs/native-ubuntu-official-apps.png) · [断网后点击 ChatGPT 登录选项](docs/native-ubuntu-chatgpt-offline-options.png) · [Claude 原版窗口](docs/native-ubuntu-claude-menu.png)
+[下载 Windows 轻量客户端](releases/thin-windows/cloud-workspace.zip)（x64 和 ARM64）
 
-Ubuntu 24.04 上的桌面窗口现在显示为 **Cloud Linux Workspace**。在 Windows 11 安装两款 Ubuntu 客户端后，可运行 `powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1 -VerifyApps`。它通过日常入口打开桌面，先验证文件管理器，再记录每款应用在整个工作区最小化、还原前后的窗口和进程。当前公开的实拍来自 Linux。Windows 11 上的 WSLg 宿主窗口、Microsoft Store 应用及两款应用登录后的对话仍待实机验收。[带窗口标题的离线 Claude 实拍](docs/native-ubuntu-branded-claude.png) · [Windows 操作步骤](docs/native-windows.md#在-windows-上验证桌面窗口) · [实测记录](docs/measurements/native-windows-verifier.json)
+在云机的图形会话中运行 `python3 -m cloud_render.service`。Windows 上解压轻量客户端并双击 `Start.cmd`，按提示输入 InstaBox 凭证和当前绘图服务的配对码。客户端通过 InstaBox 私有接口接收云端绘图并发回点击。已有私有 TCP 转发时，也可以用 `Start.cmd --connect-port 端口号` 连接。[云端准备与客户端操作](docs/thin-client.md)
 
-## 工作区连接
+当前版本支持本地重绘、缩放、云端主动更新与鼠标主键单击。登录后的输入和对话、Claude Artifacts、完整 GNOME 桌面及 Windows 11 真机仍需验收。
+
+## 显式兼容入口
+
+`Start.cmd --native` 会在用户已经安装的本机 Ubuntu WSLg 内打开 GNOME。`Setup.cmd` 专用于这种模式。远端 Xfce 整屏和原有网页项目工作台分别使用 `python launcher.py --cloud-desktop`、`python launcher.py --workbench`。旧模式的桌面与官方客户端实拍保存在各自的验收记录中。[本地 WSLg 模式](docs/native-windows.md) · [云桌面与项目工作台](docs/remote-workbench.md)
+
+### 兼容模式的项目文件
 
 在“活动”里打开 **InstaBox 项目文件**，首次使用时选择云机和项目目录。选中的云端文本会出现在 Ubuntu 文件管理器里。双击即可用本机编辑器打开。Ctrl+S 保存到本机，在文件上右键选 **脚本 → 保存到 InstaBox** 才会更新云端。实际云机已独立核对编辑后的字节。[首次连接与使用方法](docs/native-project-files.md) · [编辑器实拍](docs/native-cloud-file-edit.png)
 
 在 GNOME 的“活动”里搜索 **连接 InstaBox 到官方客户端**，选择 Claude 或 ChatGPT 的本地 Codex 项目，再确认云机与项目目录。首次使用会引导你选择项目，并按需准备连接组件。重新打开所选客户端后，请从其 MCP 设置查看 `instabox-workspace`。默认可以列目录、读文本和查询 Git 状态。选择“包含 Git 差异”后，也可以在原厂客户端里问“这个云项目最近一次提交改了什么”，或查看尚未提交的代码。账户、聊天记录和工具授权仍由厂商管理。[连接步骤与权限](docs/official-client-workspace.md)
-
-## 开发与验收
-
-显式选用 Windows Store 客户端时，启动器按当前用户注册的应用身份唤起厂商程序。默认的本机 Ubuntu 工作区使用发行版的 GNOME Shell、Ubuntu Dock、Nautilus 和 Wayland。官方 ChatGPT 和 Claude 的登录前窗口与 Ubuntu 文件管理器已在 Linux 测试环境运行。Windows 11 实机窗口可用随包的验收脚本核对所有者。[Windows 启动器源码](windows/launcher/) · [Linux 会话源码](linux/) · [实测数据](docs/measurements/native-workspace.json)
-
-如需使用已有的云端 Xfce，运行 `python3 launcher.py --cloud-desktop`；项目工作台使用 `python3 launcher.py --workbench`。这两个可选入口及历史版本的使用方法仍有完整记录。[远端桌面与工作台](docs/remote-workbench.md) · [开发交接](AGENTS.md)

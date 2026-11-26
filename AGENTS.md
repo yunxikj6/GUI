@@ -1,6 +1,6 @@
 # 云端工作台开发交接
 
-Windows 正常入口启动本机 Ubuntu GNOME，并从系统启动厂商提供的应用。验收要区分本机 UI 的真实进程、云端文件与计算、厂商账户会话三者。参考图用于核对交互布局，产品界面及验收截图必须来自实际运行。[Windows 本机入口](docs/native-windows.md) · [云工作区连接](docs/official-client-workspace.md)
+Windows 默认进入云端原程序绘图客户端。云端拥有应用、会话、文件与计算。本机按原厂程序的绘图指令重绘，只将用户交互回传。验收须分别核对云端真正的官方进程、轻量端的实际绘制、两个进程之间的传输和 Windows 实机。原有本机 Ubuntu、远端整屏和网页工作台通过显式兼容参数启动。[当前启动方式](README.md)
 
 ## 当前基线
 
@@ -69,7 +69,7 @@ Git 差异可按 `staged` 和 `unstaged` 分开读取。状态中的 `diffScopes
 
 实时桌面接管输入后提供双向文本剪贴板。查看器按 noVNC 协商结果选择发送方式，保留经典 RFB 无法表示的 Unicode 草稿。发送文字后，用户还需在目标应用里粘贴。云端发来的文本仅在用户主动复制时写入本机系统剪贴板。[实机往返与兼容性记录](docs/validation-desktop-clipboard.md)
 
-## 接下来的验收
+## 本机 Ubuntu 兼容模式的后续验收
 
 1. 在真实 Windows 11、Ubuntu WSL 2 和 WSLg 上运行 `powershell.exe -NoProfile -File .\windows\Test-NativeWorkspace.ps1`。脚本通过日常入口启动桌面，按提示用 Nautilus 创建文件夹并保存 JSON 验收记录。Ubuntu 侧已有窗口和磁盘回读实测，Windows 宿主待验。[操作步骤](docs/native-windows.md#在-windows-上验证桌面窗口)
 2. 在已授权的厂商账户中核对 Claude 的会话与 Artifacts、ChatGPT 的侧栏与输入框。验证官方应用通过已配置连接访问指定 InstaBox 项目，独立在云端复核数据。分别记录官方客户端自身的会话归属及工作区文件版本。

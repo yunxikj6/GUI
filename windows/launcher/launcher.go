@@ -1,4 +1,4 @@
-// Cloud Linux Workspace starts the repository's installed Ubuntu GNOME workspace through WSL.
+// Cloud Linux Workspace launcher for Windows.
 package main
 
 import (
@@ -7,7 +7,10 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -16,9 +19,13 @@ import (
 const limit = 64 * 1024
 const help = `Cloud Linux Workspace
 
-双击启动本机已安装的 Ubuntu GNOME 工作区。
+云端应用工作区
 
-  --native          使用本机工作区（默认）
+  --instabox        通过 InstaBox 连接云端应用（默认云端端口 17324）
+  --machine ID      选用指定的 InstaBox 实例
+  --connect-port N  指定本地转发端口，与 --instabox 同用时指定云端端口
+  CLOUDWORKSPACE_RENDER_PORT 设置默认的本地转发端口
+  --native          兼容模式，启动本机 Ubuntu GNOME 工作区
   --distro 名称     使用 wsl --list --quiet 中的完整发行版名称
   --check-native    检查本机 Ubuntu、WSLg 和桌面依赖后退出
   --setup-native    在交互终端为 Ubuntu 24.04 安装缺少的 GNOME 依赖
@@ -27,8 +34,10 @@ const help = `Cloud Linux Workspace
   --help            显示本说明`
 
 type options struct {
-	distro, app                          string
-	check, setup, showHelp, offerInstall bool
+	distro, app                                  string
+	renderPort, machine                          string
+	direct                                       bool
+	native, check, setup, showHelp, offerInstall bool
 }
 type failure struct {
 	code, message string
@@ -42,7 +51,22 @@ func parse(args []string) (options, *failure) {
 	var opt options
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--instabox":
+			opt.direct = true
+		case "--machine":
+			i++
+			if i >= len(args) || opt.machine != "" || !machineID.MatchString(args[i]) {
+				return opt, fail("arguments", "--machine 需要有效的 InstaBox 实例 ID。")
+			}
+			opt.machine = args[i]
+		case "--connect-port":
+			i++
+			if i >= len(args) || opt.renderPort != "" || !validRenderPort(args[i]) {
+				return opt, fail("arguments", "--connect-port 需要 1 到 65535 之间的本地转发端口。")
+			}
+			opt.renderPort = args[i]
 		case "--native":
+			opt.native = true
 		case "--offer-install":
 			opt.offerInstall = true
 		case "--check-native":
@@ -76,7 +100,24 @@ func parse(args []string) (options, *failure) {
 	if opt.app != "" && opt.distro != "" {
 		return opt, fail("arguments", "--open-app 使用 Windows 应用，不能与 --distro 同时使用。")
 	}
+	if (opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
+		return opt, fail("arguments", "云端绘图与本地兼容模式不能同时使用。")
+	}
 	return opt, nil
+}
+
+func (opt options) localDesktop() bool {
+	return opt.native || opt.setup || opt.check || opt.distro != ""
+}
+
+var machineID = regexp.MustCompile(`^m_[A-Za-z0-9_]+$`)
+
+func validRenderPort(value string) bool {
+	if len(value) > 5 {
+		return false
+	}
+	port, err := strconv.ParseUint(value, 10, 16)
+	return err == nil && port != 0
 }
 
 func validName(s string) bool {
@@ -180,27 +221,31 @@ func systemWSL(root string) string {
 	}
 	return ""
 }
-func project(exe string) string {
+func project(exe, marker string) string {
 	dir := filepath.Dir(exe)
 	for _, root := range []string{dir, filepath.Dir(dir)} {
-		if regular(filepath.Join(root, "linux", "start-workspace.sh")) {
+		if regular(filepath.Join(root, marker)) {
 			return root
 		}
 	}
 	return ""
 }
+func renderSecret(key string) bool {
+	return strings.EqualFold(key, "INSTABOX_API_KEY") || strings.EqualFold(key, "CLOUDWORKSPACE_RENDER_TOKEN")
+}
+
 func childEnv(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, pair := range env {
 		key, value, ok := strings.Cut(pair, "=")
-		if strings.EqualFold(key, "INSTABOX_API_KEY") {
+		if renderSecret(key) {
 			continue
 		}
 		if ok && strings.EqualFold(key, "WSLENV") {
 			keep := []string{}
 			for _, entry := range strings.Split(value, ":") {
 				name, _, _ := strings.Cut(entry, "/")
-				if entry != "" && !strings.EqualFold(name, "INSTABOX_API_KEY") {
+				if entry != "" && !renderSecret(name) {
 					keep = append(keep, entry)
 				}
 			}
@@ -222,12 +267,83 @@ const (
 	workspaceRun runMode = iota
 	listRun
 	setupRun
+	rendererRun
+	instaboxRendererRun
 )
 
 type runner func(program string, args, env []string, mode runMode) runResult
 
+func launchRenderer(opt options, exe string, env []string, lookup func(string) (string, error), run runner) *failure {
+	port := opt.renderPort
+	direct := opt.direct || opt.machine != ""
+	if port == "" && !direct {
+		for _, pair := range env {
+			key, value, found := strings.Cut(pair, "=")
+			if found && strings.EqualFold(key, "CLOUDWORKSPACE_RENDER_PORT") {
+				if !validRenderPort(value) {
+					return fail("arguments", "CLOUDWORKSPACE_RENDER_PORT 需要设置为 1 到 65535 之间的本地转发端口。")
+				}
+				port = value
+				break
+			}
+		}
+	}
+	if port == "" {
+		port = "17324"
+		direct = true
+	}
+	root := project(exe, filepath.Join("thin_client", "viewer.py"))
+	if root == "" || !regular(filepath.Join(root, "thin_client_entry.py")) {
+		return fail("package-layout", "找不到云端绘图客户端。请将启动器和完整项目一起解压。")
+	}
+	args := []string{"-E", "-s", "-X", "utf8", filepath.Join(root, "thin_client_entry.py")}
+	mode := rendererRun
+	if direct {
+		args = append(args, "--instabox")
+		mode = instaboxRendererRun
+	}
+	args = append(args, "--connect-port", port)
+	if opt.machine != "" {
+		args = append(args, "--machine", opt.machine)
+	}
+	interpreter, err := lookup("py.exe")
+	if err == nil {
+		args = append([]string{"-3"}, args...)
+	} else if interpreter, err = lookup("python.exe"); err != nil {
+		return fail("no-python", "云端绘图客户端需要 Python 3。请先在此 Windows 用户下安装 Python 3，再打开工作区。")
+	}
+	trustedEnv := childEnv(env)
+	for _, pair := range env {
+		name, _, ok := strings.Cut(pair, "=")
+		if ok && (strings.EqualFold(name, "CLOUDWORKSPACE_RENDER_TOKEN") || (direct && strings.EqualFold(name, "INSTABOX_API_KEY"))) {
+			trustedEnv = append(trustedEnv, pair)
+		}
+	}
+	// Only run an existing runtime. Recent py launchers can offer to
+	// install a missing runtime, which belongs outside ordinary startup.
+	var child []string
+	for _, pair := range trustedEnv {
+		key, _, _ := strings.Cut(pair, "=")
+		if !strings.EqualFold(key, "PYLAUNCHER_ALLOW_INSTALL") && !strings.EqualFold(key, "PYLAUNCHER_ALWAYS_INSTALL") && !strings.EqualFold(key, "PYTHON_MANAGER_AUTOMATIC_INSTALL") {
+			child = append(child, pair)
+		}
+	}
+	child = append(child, "PYTHON_MANAGER_AUTOMATIC_INSTALL=false")
+	result := run(interpreter, args, child, mode)
+	if result.exit == 130 {
+		return &failure{"render-cancelled", "已取消连接。", 130}
+	}
+	if result.exit != 0 {
+		return &failure{"cloud-render-exit", "云端应用绘图连接未能运行。请核对云机、端口与配对码。可在终端用同样参数运行 python thin_client_entry.py 查看详情。", result.exit}
+	}
+	return nil
+}
+
 func execute(opt options, exe, windows string, env []string, run runner) *failure {
-	root := project(exe)
+	if !opt.localDesktop() {
+		return launchRenderer(opt, exe, env, exec.LookPath, run)
+	}
+	root := project(exe, filepath.Join("linux", "start-workspace.sh"))
 	if root == "" {
 		return fail("package-layout", "找不到 linux/start-workspace.sh。请将启动器和项目一起解压，再从项目目录或 windows 子目录运行。")
 	}

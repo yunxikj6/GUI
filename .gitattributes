@@ -3,3 +3,4 @@ Setup.cmd text eol=crlf
 linux/*.sh text eol=lf
 windows/launcher/*.sh text eol=lf
 windows/*.exe binary
+thin_client/vendor/DejaVu-COPYRIGHT.txt -whitespace

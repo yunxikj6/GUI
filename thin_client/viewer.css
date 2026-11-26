@@ -1,0 +1,18 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; overflow: hidden; background: Canvas; color: CanvasText; }
+canvas { display: block; width: 100vw; height: 100vh; outline: 0; }
+p[role="status"] {
+  position: fixed;
+  inset-inline: 12px;
+  bottom: 12px;
+  width: fit-content;
+  max-width: calc(100% - 48px);
+  margin: 0 auto;
+  padding: 8px 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: Canvas;
+  color: CanvasText;
+  pointer-events: none;
+}
+p[hidden] { display: none; }
