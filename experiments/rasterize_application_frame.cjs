@@ -1,10 +1,93 @@
-// Render the original cloud SkPictures with the same pinned full CanvasKit
-// runtime as the application viewer. No window image is accepted as input.
+// Replay original application SkPictures with the viewer's pinned CanvasKit.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
+
+const frameLimit = (32 << 20) + 12;
+
+function draw(kit, bytes) {
+  if (bytes.length < 22 || bytes.toString('ascii', 0, 4) !== 'CLRP' || bytes[4] !== 1 || bytes[5] !== 1 ||
+      bytes.readUInt16BE(6) || bytes.readUInt32BE(8) !== bytes.length - 12) throw Error('invalid Frame');
+  const width = bytes.readUInt16BE(16), height = bytes.readUInt16BE(18), count = bytes.readUInt16BE(20);
+  if (!width || !height || width * height * 4 > 32 << 20 || !count || count > 128) throw Error('invalid dimensions');
+  const surface = kit.MakeSurface(width, height);
+  if (!surface) throw Error('unavailable graphics surface');
+  try {
+    const canvas = surface.getCanvas();
+    canvas.clear(kit.TRANSPARENT);
+    let offset = 22;
+    for (let i = 0; i < count; i++) {
+      const x = bytes.readFloatBE(offset), y = bytes.readFloatBE(offset + 4);
+      const w = bytes.readFloatBE(offset + 8), h = bytes.readFloatBE(offset + 12);
+      const size = bytes.readUInt32BE(offset + 16);
+      offset += 20;
+      if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0 ||
+          size > (16 << 20) || offset + size > bytes.length) throw Error('invalid picture');
+      const picture = kit.MakePicture(bytes.subarray(offset, offset + size));
+      if (!picture) throw Error('unsupported original SkPicture');
+      try {
+        const [l, t, r, b] = picture.cullRect();
+        if (![l, t, r, b].every(Number.isFinite) || r <= l || b <= t) throw Error('invalid picture bounds');
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.clipRect([0, 0, w, h], kit.ClipOp.Intersect, false);
+        canvas.scale(w / (r - l), h / (b - t));
+        canvas.translate(-l, -t);
+        canvas.drawPicture(picture);
+        canvas.restore();
+      } finally {
+        picture.delete();
+      }
+      offset += size;
+    }
+    if (offset !== bytes.length) throw Error('trailing bytes');
+    surface.flush();
+    const image = surface.makeImageSnapshot();
+    if (!image) throw Error('graphics snapshot failed');
+    try {
+      const pixels = image.readPixels(0, 0, {width, height, colorType: kit.ColorType.RGBA_8888,
+        alphaType: kit.AlphaType.Unpremul, colorSpace: kit.ColorSpace.SRGB});
+      if (!pixels || pixels.length !== width * height * 4) throw Error('incomplete local render');
+      return pixels;
+    } finally {
+      image.delete();
+    }
+  } finally {
+    surface.dispose();
+  }
+}
+
+function readExact(buffer, offset, allowEOF) {
+  const start = offset;
+  while (offset < buffer.length) {
+    const received = fs.readSync(0, buffer, offset, buffer.length - offset);
+    if (!received) {
+      if (allowEOF && offset === start) return false;
+      throw Error('truncated original drawing');
+    }
+    offset += received;
+  }
+  return true;
+}
+
+function paintPipe(kit) {
+  const header = Buffer.alloc(12);
+  while (readExact(header, 0, true)) {
+    const size = 12 + header.readUInt32BE(8);
+    if (size > frameLimit) throw Error('frame too large');
+    const bytes = Buffer.allocUnsafe(size);
+    header.copy(bytes);
+    readExact(bytes, 12, false);
+    const pixels = draw(kit, bytes);
+    for (let offset = 0; offset < pixels.length;) {
+      const written = fs.writeSync(1, pixels, offset, pixels.length - offset);
+      if (written <= 0) throw Error('graphics pipe closed');
+      offset += written;
+    }
+  }
+}
 
 async function main() {
   const [vendor, input, output] = process.argv.slice(2);
@@ -19,43 +102,12 @@ async function main() {
     const local = path.join(dir, 'canvaskit.wasm');
     fs.writeFileSync(local, wasm);
     const kit = await require(loader)({locateFile: () => local});
-    if (fs.statSync(input).size > (32 << 20) + 12) throw Error('frame too large');
-    const bytes = fs.readFileSync(input);
-    if (bytes.length < 22 || bytes.toString('ascii', 0, 4) !== 'CLRP' || bytes[4] !== 1 || bytes[5] !== 1 ||
-        bytes.readUInt16BE(6) || bytes.readUInt32BE(8) !== bytes.length - 12) throw Error('invalid Frame');
-    const width = bytes.readUInt16BE(16), height = bytes.readUInt16BE(18), count = bytes.readUInt16BE(20);
-    if (!width || !height || width * height * 4 > 32 << 20 || !count || count > 128) throw Error('invalid dimensions');
-    const surface = kit.MakeSurface(width, height), canvas = surface.getCanvas();
-    canvas.clear(kit.TRANSPARENT);
-    let offset = 22;
-    for (let i = 0; i < count; i++) {
-      const x = bytes.readFloatBE(offset), y = bytes.readFloatBE(offset + 4);
-      const w = bytes.readFloatBE(offset + 8), h = bytes.readFloatBE(offset + 12);
-      const size = bytes.readUInt32BE(offset + 16);
-      offset += 20;
-      if (size > (16 << 20) || offset + size > bytes.length) throw Error('invalid picture length');
-      const picture = kit.MakePicture(bytes.subarray(offset, offset + size));
-      if (!picture) throw Error('unsupported original SkPicture');
-      const [l, t, r, b] = picture.cullRect();
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.clipRect([0, 0, w, h], kit.ClipOp.Intersect, false);
-      canvas.scale(w / (r - l), h / (b - t));
-      canvas.translate(-l, -t);
-      canvas.drawPicture(picture);
-      canvas.restore();
-      picture.delete();
-      offset += size;
+    if (input === '--pipe' && output === undefined) {
+      paintPipe(kit);
+    } else {
+      if (fs.statSync(input).size > frameLimit) throw Error('frame too large');
+      fs.writeFileSync(output, draw(kit, fs.readFileSync(input)));
     }
-    if (offset !== bytes.length) throw Error('trailing bytes');
-    surface.flush();
-    const image = surface.makeImageSnapshot();
-    const pixels = image.readPixels(0, 0, {width, height, colorType: kit.ColorType.RGBA_8888,
-      alphaType: kit.AlphaType.Unpremul, colorSpace: kit.ColorSpace.SRGB});
-    if (!pixels || pixels.length !== width * height * 4) throw Error('incomplete local render');
-    fs.writeFileSync(output, pixels);
-    image.delete();
-    surface.dispose();
   } finally {
     fs.rmSync(dir, {recursive: true, force: true});
   }

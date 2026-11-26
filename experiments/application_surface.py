@@ -73,8 +73,13 @@ class ApplicationSurfaces:
         binding = self.binding_for(self.session, handle, self.creation)
         if binding is None:
             return
-        if (not isinstance(binding, Binding) or binding.session != self.session
-                or binding.handle != handle or binding.creation != self.creation
+        self.bind_untouched_resource(binding, descriptor, self.creation)
+
+    def bind_untouched_resource(self, binding, descriptor, creation):
+        """The stream parser must verify the current CREATE and absence of prior uploads."""
+        handle, target, fmt, _, width, height, depth, layers, mip, samples = descriptor
+        if (handle in self.targets or not isinstance(binding, Binding) or binding.session != self.session
+                or binding.handle != handle or binding.creation != creation
                 or type(binding.executable_sha256) is not bytes or len(binding.executable_sha256) != 32
                 or type(binding.process_instance) is not bytes or len(binding.process_instance) != 32
                 or min(binding.pid, binding.surface_id) <= 0):

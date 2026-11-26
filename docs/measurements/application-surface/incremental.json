@@ -1,0 +1,111 @@
+{
+  "scope": "Fresh isolated Ubuntu GNOME original ChatGPT source; independent sequential pipe carrying sanitized GNOME + original SkPictures. Win64 Node v24.22.3 + Win64 Python and VirGL under Wine 10. Recorded source witness resolved before streaming. No live InstaBox or Windows 11 hardware assertion.",
+  "commandSha256": "27bab4c49ee422c851ebc02f6b0e8008f0000812605ae8e5486b36ec1a645bfd",
+  "source": {
+    "originalBytes": 173511360,
+    "removedApplicationBytes": 99966080,
+    "drawings": 2,
+    "pending": 53
+  },
+  "client": {
+    "scanouts": 98,
+    "held": 51,
+    "pictures": 2,
+    "reused": 8,
+    "pending": 53,
+    "states": {
+      "before": {
+        "width": 1280,
+        "height": 900,
+        "ordinal": 89,
+        "sha256": "1333eb5e3925c0fad6b015e4fb4caf6c84f7ee9b9c22a1fe0e4fa8c2a779003a"
+      },
+      "after": {
+        "width": 1280,
+        "height": 900,
+        "ordinal": 98,
+        "sha256": "a4b5bbba333a3f5f45fbcce63e69170fbceab1a25a069be367a00f1410403948"
+      }
+    }
+  },
+  "measuredLocalNodePaintSeconds": [
+    0.1099,
+    0.0579
+  ],
+  "sourceFrameHashesMatched": 98,
+  "comparison": {
+    "before": {
+      "size": [
+        1280,
+        900
+      ],
+      "desktop": {
+        "pixels": 1152000,
+        "differentPixels": 4884,
+        "meanAbsoluteChannelError": 0.10479832175925925
+      },
+      "regions": [
+        {
+          "region": [
+            63,
+            32,
+            1153,
+            792
+          ],
+          "pixels": 828400,
+          "differentPixels": 4884,
+          "meanAbsoluteChannelError": 0.14573595686463867
+        }
+      ],
+      "outsideAllRegions": {
+        "pixels": 323600,
+        "differentPixels": 0,
+        "meanAbsoluteChannelError": 0.0
+      },
+      "differenceBounds": [
+        441,
+        46,
+        1144,
+        527
+      ],
+      "ocrLabel": "Sign in to ChatGPT"
+    },
+    "after": {
+      "size": [
+        1280,
+        900
+      ],
+      "desktop": {
+        "pixels": 1152000,
+        "differentPixels": 4213,
+        "meanAbsoluteChannelError": 0.10075925925925926
+      },
+      "regions": [
+        {
+          "region": [
+            63,
+            32,
+            1153,
+            792
+          ],
+          "pixels": 828400,
+          "differentPixels": 4213,
+          "meanAbsoluteChannelError": 0.14011910510220504
+        }
+      ],
+      "outsideAllRegions": {
+        "pixels": 323600,
+        "differentPixels": 0,
+        "meanAbsoluteChannelError": 0.0
+      },
+      "differenceBounds": [
+        441,
+        46,
+        1144,
+        528
+      ],
+      "ocrLabel": "Bedrock"
+    },
+    "sourceGpuHashCount": 98
+  }
+}
