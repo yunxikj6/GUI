@@ -1,0 +1,78 @@
+{
+  "scope": "Original Ubuntu GNOME Shell search and a local Win32 HWND on an isolated loopback connection",
+  "clientSource": "0b8a4168a87fa1841b506e92677b83e1da9bbd64",
+  "sourceAndTransport": "226bb30e46e39f9c0163ae0d1322a110eec14733",
+  "host": "Wine 10, Windows x64 CPython 3.13.17, WGL VirGL",
+  "ime": "System Fcitx 5.1.12 Pinyin, XIM on-the-spot, IMM32",
+  "testTextIsSynthetic": true,
+  "providerApiUsed": false,
+  "sourceFrames": 115,
+  "windowsInput": {
+    "nativeApplication": "Windows x64 CPython 3.13.17 through Wine 10; real Win32 HWND/IMM32",
+    "source": "Isolated Ubuntu GNOME Shell and its native search field",
+    "loopbackOnly": true,
+    "fcitx": "Fcitx 5.1.12 XIM/Pinyin on-the-spot",
+    "privateSourceFocus": true,
+    "asciiAccepted": true,
+    "preeditTextCommands": 0,
+    "preeditFieldChangeEvents": 0,
+    "preeditSeconds": 2,
+    "committedTextCommands": 1,
+    "sourceFieldMatchedExpected": true,
+    "sourceBackspaceObserved": true,
+    "sourceSelectAllAcknowledged": true,
+    "originalSelectionReplacedWithExpectedChinese": true,
+    "realImeCancelTextCommands": 0,
+    "realImeCancelFieldChangeEvents": 0,
+    "unfocusedWmCharTextCommands": 0,
+    "normalClose": true,
+    "width": 800,
+    "height": 520
+  },
+  "verifiedCommit": {
+    "asciiCommands": 3,
+    "preeditSeconds": 2,
+    "preeditTextCommands": 0,
+    "preeditFieldEvents": 0,
+    "commitCommands": 1,
+    "cloudAcknowledged": true,
+    "originalGnomeBufferMatched": true,
+    "sourceFrameAtCommit": 72,
+    "windowSize": [
+      800,
+      520
+    ],
+    "pixelMatch": {
+      "sourceFrameSequence": 74,
+      "fullFrameSha256": "4aaafc7e8ecd12bd0e31929344feaf4c9c264310a06bcb8d4b403134fbacff1c",
+      "rgbPixels": 416000,
+      "sourceAlpha": 255
+    }
+  },
+  "nativeImeMessages": {
+    "269": 1,
+    "270": 1,
+    "271": 8,
+    "258": 1,
+    "646": 0
+  },
+  "acknowledgedInputKinds": {
+    "T": 5,
+    "A": 1,
+    "K": 2,
+    "L": 1,
+    "M": 16,
+    "S": 2
+  },
+  "image": {
+    "file": "windows-client.png",
+    "method": "Read back the visible Win32 client area through XGetImage; archive its RGB values losslessly as PNG",
+    "size": [
+      800,
+      520
+    ],
+    "rgbSha256": "e280f7d348d6017db8afef579be50225d8df19807fb608ba872b13e7e7bb1786",
+    "pngSha256": "faf1d08699aadb66b8067ac11f8feff2b2ef231fd0e6609ff6d5327ff4cdccc9",
+    "originalSourceFrameBgraSha256": "4aaafc7e8ecd12bd0e31929344feaf4c9c264310a06bcb8d4b403134fbacff1c"
+  }
+}
