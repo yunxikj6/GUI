@@ -8,6 +8,7 @@ import os
 import re
 import select
 import subprocess
+import tempfile
 import time
 from collections import OrderedDict
 from io import BytesIO
@@ -17,6 +18,7 @@ from PIL import Image, ImageGrab
 
 from cloud_render.chatgpt_process import APP_PAGE, open_chatgpt
 from cloud_render.chromium_capture import CaptureError, _exclusive_page, _read_trace, capture_frame
+from cloud_render.system_browser import SystemBrowserRegistration
 from cloud_render.wire import Frame, encode_message
 
 from .controls import ORIGINAL_SHA256, caption_layers, require
@@ -398,7 +400,17 @@ async def collect(out, *, live=False, interactive=False, pair=None):
         xid.isdigit() or (xid.startswith('0x') and all(c in '0123456789abcdef' for c in xid[2:])),
         'invalid private display window',
     )
-    async with open_chatgpt(Path(os.environ.get('CW_APP_PROFILE', out / 'profile')), executable=out / 'bin' / 'wayland-original') as page:
+    system_browser = None
+    chromium = Path('/usr/lib/chromium/chromium')
+    if chromium.is_file() and os.access(chromium, os.X_OK):
+        # This runtime directory belongs to the nested desktop and disappears
+        # with its namespace, including any still-open Chromium window.
+        runtime = Path(tempfile.mkdtemp(prefix='cw-browser-', dir=os.environ['XDG_RUNTIME_DIR']))
+        system_browser = SystemBrowserRegistration.create(runtime / 'xdg', executable=chromium, platform='wayland')
+    async with open_chatgpt(
+        Path(os.environ.get('CW_APP_PROFILE', out / 'profile')), executable=out / 'bin' / 'wayland-original',
+        system_browser=system_browser,
+    ) as page:
         require(page.url == APP_PAGE and _exclusive_page(page), 'expected unique original page')
         browser = await page.context.browser.new_browser_cdp_session()
         details = await browser.send('SystemInfo.getProcessInfo')

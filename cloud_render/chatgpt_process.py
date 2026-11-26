@@ -83,7 +83,7 @@ async def _original_window(context):
 
 
 @asynccontextmanager
-async def open_chatgpt(profile: Path, *, executable: Path = Path('/usr/bin/chatgpt')):
+async def open_chatgpt(profile: Path, *, executable: Path = Path('/usr/bin/chatgpt'), system_browser=None):
     from playwright.async_api import async_playwright
 
     if not executable.is_absolute() or not executable.is_file() or not os.access(executable, os.X_OK):
@@ -96,12 +96,15 @@ async def open_chatgpt(profile: Path, *, executable: Path = Path('/usr/bin/chatg
         home = root / 'home'
         home.mkdir(mode=0o700, exist_ok=True)
         user_data = root / 'chromium'
+        env = _cloud_environment(home)
+        if system_browser is not None:
+            env = system_browser.environment(env)
         async with async_playwright() as owner:
             # Use only the private pipe and the app profile. Playwright's ordinary test
             # switches would change the vendor password store, features and renderer sandbox.
             context = await owner.chromium.launch_persistent_context(
                 str(user_data), executable_path=str(executable), headless=False, chromium_sandbox=True,
-                no_viewport=True, ignore_default_args=True, env=_cloud_environment(home),
+                no_viewport=True, ignore_default_args=True, env=env,
                 args=['--remote-debugging-pipe', '--user-data-dir=' + str(user_data)], timeout=30000,
             )
             browser = context.browser
