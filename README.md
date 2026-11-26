@@ -4,7 +4,9 @@
 
 ## 连接 Ubuntu 桌面
 
-在具备 Ubuntu 桌面依赖的云机上运行 `python3 -m cloud_render.gnome_relay --port 17325`。在 Windows 解压完整客户端，打开 `Start.cmd`，输入 InstaBox 密钥和本次桌面配对码。服务仅监听云机回环，连接使用 InstaBox 的私有 HTTPS 通道。本机窗口支持指针移动、左右点击、导航键和 Ctrl+Esc 活动概览。可用 `--desktop-size 1920x1080` 请求全高清桌面，按默认参数启动时使用 800×520。Ubuntu 官方壁纸作为静态资源随包提供，匹配到相同源纹理时通过摘要引用。x64 使用内置运行时。ARM64 需要 Windows 11 x64 仿真，实机兼容性待验证。
+如果你的 InstaBox 是 Debian 13 amd64，可在云机的本仓库目录运行 `python3 -m cloud_render.provision`，由云机校验 Ubuntu 官方软件包，启动一次性桌面。终端显示端口后即可配对，关闭该命令会回收本次 Ubuntu 环境。[Debian 云机的空间、启动与回收](cloud_render/provision/README.md)
+
+在已具备 Ubuntu 桌面依赖的云机上运行 `python3 -m cloud_render.gnome_relay --port 17325`。在 Windows 解压完整客户端，打开 `Start.cmd`，输入 InstaBox 密钥和本次桌面配对码。服务仅监听云机回环，连接使用 InstaBox 的私有 HTTPS 通道。本机窗口支持指针移动、左右点击、导航键和 Ctrl+Esc 活动概览。可用 `--desktop-size 1920x1080` 请求全高清桌面，按默认参数启动时使用 800×520。Ubuntu 官方壁纸作为静态资源随包提供，匹配到相同源纹理时通过摘要引用。x64 使用内置运行时。ARM64 需要 Windows 11 x64 仿真，实机兼容性待验证。
 
 下面是实际 Windows 程序显示云机 Ubuntu 的窗口内容。鼠标点开顶栏的快速设置，按 Escape 后菜单关闭。Win64 程序运行于 Wine 10，通过私有 HTTPS 连接真实 InstaBox。在这次传输对照测试中，本机绘出的 105 帧逐帧匹配云端原始回读。[窗口和输入记录](docs/measurements/ubuntu-quick-settings-win64.json) · [其他会话的逐帧结果](docs/gnome-command-stream.md)
 
