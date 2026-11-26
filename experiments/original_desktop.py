@@ -250,7 +250,12 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='打开云端 Ubuntu 和原厂应用的本地 Win32 窗口。')
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == '--browser-viewport':
+        from experiments.live_browser_viewport import main as open_browser_viewport
+        return open_browser_viewport(argv[1:])
+    parser = argparse.ArgumentParser(description='打开云端 Ubuntu 和原厂应用的本地 Win32 窗口。',
+                                     epilog='连接独立云端 Chromium 离线视口可用 Start.cmd --browser-viewport --help。')
     route = parser.add_mutually_exclusive_group()
     route.add_argument('--instabox', action='store_true', help='通过 InstaBox 官方私有通道连接云源')
     route.add_argument('--forwarded', action='store_true', help='通过已转发的本机回环端口连接云源')

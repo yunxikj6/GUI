@@ -9,6 +9,7 @@ if /i "%~1"=="--desktop-port" goto windows_launcher
 if /i "%~1"=="--desktop-size" goto windows_launcher
 if /i "%~1"=="--desktop-forwarded-port" goto windows_launcher
 if /i "%~1"=="--cloud-app" goto windows_launcher
+if /i "%~1"=="--browser-viewport" goto windows_launcher
 if /i "%~1"=="--native" goto windows_launcher
 if /i "%~1"=="--distro" goto windows_launcher
 if /i "%~1"=="--check-native" goto windows_launcher

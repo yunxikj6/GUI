@@ -72,14 +72,14 @@ func TestSourceCheckoutUsesItsExactReleaseAndCleansUp(t *testing.T) {
 	}
 }
 
-func TestCheckoutSelectsOriginalOnlyForDefault(t *testing.T) {
+func TestCheckoutSelectsTheRequiredRenderer(t *testing.T) {
 	root := t.TempDir()
 	// An older portable runtime unpacked into the checkout still requires archive verification.
 	touch(t, filepath.Join(root, "launcher.py"))
 	touch(t, filepath.Join(root, "windows", "runtime", "python.exe"))
 	touch(t, filepath.Join(root, "thin_client_entry.py"))
 	exe := filepath.Join(root, "windows", "CloudLinuxWorkspace-x64.exe")
-	originalPath, original := writeTestClient(t, root, "original-win64", "windows/runtime/python.exe", "experiments/original_desktop.py", originalNode)
+	originalPath, original := writeTestClient(t, root, "original-win64", "windows/runtime/python.exe", "experiments/original_desktop.py", "experiments/live_browser_viewport.py", originalNode)
 	_, standard := writeTestClient(t, root, "thin-windows", "windows/runtime/python.exe", "thin_client_entry.py")
 	writeReceipt(t, root, map[string]map[string]string{
 		"originalDesktopPackage": {"sha256": fmt.Sprintf("%x", sha256.Sum256(original))},
@@ -91,6 +91,8 @@ func TestCheckoutSelectsOriginalOnlyForDefault(t *testing.T) {
 		wantOriginal bool
 	}{
 		{options{}, desktopRendererRun, true},
+		{options{browserViewport: true, browserPort: "19191"}, rendererRun, true},
+		{options{browserViewport: true, direct: true}, instaboxRendererRun, true},
 		{options{direct: true}, desktopRendererRun, false},
 		{options{desktopForwardedPort: "9011"}, forwardedDesktopRun, false},
 		{options{cloudApp: true}, instaboxRendererRun, false},
@@ -102,7 +104,17 @@ func TestCheckoutSelectsOriginalOnlyForDefault(t *testing.T) {
 				t.Fatalf("expected private interpreter and selected mode: %v %v", program, mode)
 			}
 			if tc.wantOriginal {
-				if !regular(filepath.Join(dir, originalNode)) || !reflect.DeepEqual(args, []string{"-I", "-X", "utf8", "-m", "experiments.original_desktop", "--instabox"}) {
+				expected := []string{"-I", "-X", "utf8", "-m", "experiments.original_desktop"}
+				if tc.opt.browserViewport {
+					expected = append(expected, "--browser-viewport")
+				}
+				if tc.mode != rendererRun {
+					expected = append(expected, "--instabox")
+				}
+				if tc.opt.browserPort != "" {
+					expected = append(expected, "--port", tc.opt.browserPort)
+				}
+				if !regular(filepath.Join(dir, originalNode)) || !reflect.DeepEqual(args, expected) {
 					t.Fatalf("expected the original desktop with its bundled Node: %v", args)
 				}
 			} else if !regular(filepath.Join(dir, "thin_client_entry.py")) || args[3] != filepath.Join(dir, "thin_client_entry.py") {
@@ -122,5 +134,21 @@ func TestCheckoutSelectsOriginalOnlyForDefault(t *testing.T) {
 	}
 	if problem := execute(options{}, exe, "", nil, nil); problem == nil || problem.code != "package-layout" {
 		t.Fatal("default route fell through to another release")
+	}
+}
+
+func TestBrowserViewportArguments(t *testing.T) {
+	opt, err := parse([]string{"--browser-viewport", "--machine", "m_example", "--port", "17328"})
+	if err != nil || !opt.browserViewport || opt.browserPort != "17328" || opt.machine != "m_example" {
+		t.Fatalf("invalid native browser route: %+v %v", opt, err)
+	}
+	for _, flags := range [][]string{
+		{"--port", "17328"}, {"--browser-viewport", "--port", "0"},
+		{"--browser-viewport", "--native"}, {"--browser-viewport", "--cloud-app"},
+		{"--browser-viewport", "--desktop-forwarded-port", "17328"},
+	} {
+		if _, problem := parse(flags); problem == nil {
+			t.Fatalf("accepted conflicting route %v", flags)
+		}
 	}
 }

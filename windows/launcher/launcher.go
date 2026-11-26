@@ -25,6 +25,7 @@ const help = `Cloud Linux Workspace
   --desktop-port N  指定云端 GNOME 服务端口，默认 17325
   --desktop-forwarded-port N  使用本机回环上已有的 GNOME 私有转发
   --cloud-app       打开单独的云端 ChatGPT 程序，默认云端端口 17324
+  --browser-viewport  在原生窗口打开云端 Chromium 离线视口，默认本地转发端口 17328
   --machine ID      选用指定的 InstaBox 实例
   --connect-port N  指定本地转发端口，与 --instabox 同用时指定云端端口
   CLOUDWORKSPACE_RENDER_PORT 设置 --cloud-app 的本地转发端口
@@ -39,7 +40,8 @@ const help = `Cloud Linux Workspace
 type options struct {
 	distro, app                                                         string
 	renderPort, desktopPort, desktopSize, machine, desktopForwardedPort string
-	direct, cloudApp                                                    bool
+	direct, cloudApp, browserViewport                                   bool
+	browserPort                                                         string
 	native, check, setup, showHelp, offerInstall                        bool
 }
 type failure struct {
@@ -56,6 +58,14 @@ func parse(args []string) (options, *failure) {
 		switch args[i] {
 		case "--cloud-app":
 			opt.cloudApp = true
+		case "--browser-viewport":
+			opt.browserViewport = true
+		case "--port":
+			i++
+			if i >= len(args) || opt.browserPort != "" || !validRenderPort(args[i]) {
+				return opt, fail("arguments", "--port 需要 1 到 65535 之间的端口。")
+			}
+			opt.browserPort = args[i]
 		case "--desktop-size":
 			i++
 			if i >= len(args) || opt.desktopSize != "" || (args[i] != "800x520" && args[i] != "1280x900" && args[i] != "1920x1080") {
@@ -116,6 +126,13 @@ func parse(args []string) (options, *failure) {
 	}
 	if opt.offerInstall && opt.app == "" {
 		return opt, fail("arguments", "--offer-install 需要与 --open-app 一起使用。")
+	}
+	if opt.browserPort != "" && !opt.browserViewport {
+		return opt, fail("arguments", "--port 与 --browser-viewport 一起使用。")
+	}
+	if opt.browserViewport && (opt.cloudApp || opt.renderPort != "" || opt.desktopSize != "" ||
+		opt.desktopPort != "" || opt.desktopForwardedPort != "" || opt.localDesktop() || opt.app != "") {
+		return opt, fail("arguments", "请单独选择 Chromium 视口，可并用 --instabox、--machine 或 --port。")
 	}
 	if opt.setup && (opt.app != "" || opt.check) {
 		return opt, fail("arguments", "--setup-native 是交互式安装操作，请单独运行，可用 --distro 选择 Ubuntu。")
@@ -305,7 +322,7 @@ const (
 type runner func(program string, args, env []string, mode runMode) runResult
 
 func launchRenderer(opt options, exe string, env []string, run runner) *failure {
-	desktop := !opt.cloudApp && opt.renderPort == ""
+	desktop := !opt.cloudApp && !opt.browserViewport && opt.renderPort == ""
 	direct := (desktop && opt.desktopForwardedPort == "") || opt.direct || opt.machine != ""
 	if opt.cloudApp && opt.renderPort == "" && !direct {
 		direct = true
@@ -324,7 +341,7 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 	if root == "" {
 		return fail("package-layout", "找不到客户端入口。请完整解压发行 ZIP 后打开 Start.cmd。")
 	}
-	original := opt == (options{}) && !unpackedPortableClient(root)
+	original := opt.browserViewport || (opt == (options{}) && !unpackedPortableClient(root))
 	root, cleanup, problem := packagedClient(root, original)
 	if problem != nil {
 		return problem
@@ -334,6 +351,12 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 	args := []string{"-I", "-X", "utf8"}
 	if original {
 		args = append(args, "-m", "experiments.original_desktop")
+		if opt.browserViewport {
+			if !regular(filepath.Join(root, "experiments", "live_browser_viewport.py")) {
+				return fail("package-layout", "请下载含有 Chromium 视口的原厂应用 Windows 客户端。")
+			}
+			args = append(args, "--browser-viewport")
+		}
 	} else {
 		args = append(args, filepath.Join(root, "thin_client_entry.py"))
 	}
@@ -356,6 +379,10 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 		if opt.desktopPort != "" {
 			args = append(args, "--desktop-port", opt.desktopPort)
 		}
+	} else if opt.browserViewport {
+		if opt.browserPort != "" {
+			args = append(args, "--port", opt.browserPort)
+		}
 	} else {
 		args = append(args, "--cloud-app")
 		if opt.renderPort != "" {
@@ -377,6 +404,9 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 		return &failure{"render-cancelled", "已取消连接。", 130}
 	}
 	if result.exit != 0 {
+		if opt.browserViewport {
+			return &failure{"cloud-render-exit", "无法打开 Chromium 视口。请核对浏览器绘图服务、端口和配对码。", result.exit}
+		}
 		if original {
 			return &failure{"cloud-render-exit", "无法打开原厂应用桌面。请核对云端原厂桌面服务、InstaBox 连接及本次配对码。", result.exit}
 		}

@@ -1,0 +1,39 @@
+{
+  "sourceArtifact": "source.png",
+  "commandsArtifact": "browser.clrp",
+  "width": 900,
+  "height": 633,
+  "sourcePngSha256": "d52990cd5dbf0099d3f66bc78316ce8816476528f95997e22e50e7383f310868",
+  "commandsSha256": "cc801a4339d76bda6144587c0451513653a144da8b1d87037d3ba16c167ebb19",
+  "nativeWin32PngSha256": "0b878101fbaa2cf231a3aeafdce83f23bd91a6b47b48db0207a65e34c994331d",
+  "win32Readback": {
+    "win32Pid": 88,
+    "hwnd": 131150,
+    "width": 900,
+    "height": 633,
+    "rgbSha256": "216c83ccbead10dde9121e5403f837ca8f2428dffe2c989d7d80476e55d4914d",
+    "win32SecondsToStable": 1.22,
+    "method": "Win32 GetClientRect/GetDC/BitBlt/CreateDIBSection read from another Win64 process"
+  },
+  "nativeVersusSource": {
+    "identicalPixels": 565513,
+    "allPixels": 569700,
+    "channelsWithinTwo": 566517,
+    "differentBounds": [
+      150,
+      212,
+      538,
+      351
+    ],
+    "meanAbsoluteChannelDifference": 0.06402
+  },
+  "nativeVersusIndependentCanvasKit": {
+    "identicalPixels": 569700,
+    "allPixels": 569700,
+    "channelsWithinTwo": 569700,
+    "differentBounds": null,
+    "meanAbsoluteChannelDifference": 0.0
+  },
+  "sourceImageWasMountedInWindows": false,
+  "sourceViewportAndClientAreaOnly": true
+}
