@@ -6,6 +6,10 @@ GNOME Shell 与 Mutter 在应用侧完成布局、焦点和动画。Mesa 的 vir
 
 ![独立 Linux 窗口通过 GNOME 的原始 GPU 命令重绘活动概览](gnome-command-window.png)
 
+一次实时测试把采集侧和显示侧放在独立的 Linux 命名空间，两者通过同一物理机上的 TCP 连接传输 8,678,236 字节绘图请求。本机两次按下 Super，两个按键分别到达源端 GNOME，活动概览关闭后再次展开。源端与显示端各自运行软件 GPU。48 次输出逐字节相同，从本机实际窗口读回的 48 次像素也全部吻合。该次测试使用专用的 Super 键回传通道，完整桌面输入与真实跨网时延仍需验收。
+
+![本机窗口用实时绘图指令显示原版 GNOME 活动概览](gnome-live-overview.png)
+
 ## 在独立 Linux 显示环境复现
 
 采集侧需要已运行的独立 X11 测试会话、GNOME Shell 46、Mesa virpipe、virgl-server 和 Python 3.10+。显示侧需要 virgl-server、支持软件 EGL 的 Mesa 及 Python。以下命令用于自己的专用图形会话。捕获内容包含窗口上呈现的文字和图形，应保存在私人目录。

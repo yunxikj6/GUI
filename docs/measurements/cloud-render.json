@@ -140,6 +140,32 @@
       "nativeWindow": "An Xfwm-managed 800x520 client window presented all 11 independently regenerated scanouts. X11 readback matched their RGB values 11/11.",
       "image": "../gnome-command-window.png",
       "imageSha256": "52283e30ed3429528cd72e9f5f0f819eba83c612afb3957a62b514779ecc60df"
+    },
+    "interactiveLoopbackTCP": {
+      "transport": "two connected loopback TCP sockets; isolated source and destination processes, mount/PID/network namespaces, separate local virgl graphics processes",
+      "sourceModuleSha": "99a15c612977327b6de7bc2167f4fba4fbe35da40c12504d4ee0a6adf8a19114",
+      "commandWireBytes": 8678236,
+      "commandSha256": "6785348b902c3e474c9ea00b4593e8451a9446914173b9ff38d46d9aab4de97f",
+      "resourceUploads": 855,
+      "drawCalls": 1191,
+      "wholeScreenUploads": 0,
+      "controlWireBytes": 2,
+      "keys": "2 Super_L (0x53 on control wire)",
+      "verbatimScanoutsComparedToSource": 48,
+      "nativeXWindowReadbacksVerified": 48,
+      "distinct": 33,
+      "nativeWidthHeight": [
+        800,
+        520
+      ],
+      "firstPresentedBeforeSourceExitSeconds": 7.525,
+      "image": "../gnome-live-overview.png",
+      "imageSha256": "32864a4c871c63953ca666f4d479f87f7b6d62b9e7968f80b473dcc56c6daaa4",
+      "independentFinalWindowComparison": {
+        "overlapPixels": 414440,
+        "equalRGBPixels": 414440,
+        "horizontalOriginAdjustment": 3
+      }
     }
   },
   "claudeResearch": {
