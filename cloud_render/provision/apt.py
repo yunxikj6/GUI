@@ -45,7 +45,7 @@ PACKAGES = (
 )
 
 
-def resolve(base, keyring):
+def resolve(base, keyring, extra=()):
     if hashlib.file_digest(keyring.open("rb"), "sha256").hexdigest() != KEYRING:
         raise ValueError("unexpected Ubuntu archive keyring")
     base = base.resolve()
@@ -123,7 +123,7 @@ def resolve(base, keyring):
         return result.stdout
 
     apt(["apt-get", "-o", "APT::Update::Error-Mode=any", "update"])
-    specs = apt(["apt-get", "--yes", "--print-uris", "--download-only", "install", *PACKAGES])
+    specs = apt(["apt-get", "--yes", "--print-uris", "--download-only", "install", *PACKAGES, *extra])
     rows = []
     for line in specs.splitlines():
         m = re.fullmatch(r"'(https://[^']+)' (\S+) (\d+) (?:\S+)", line)

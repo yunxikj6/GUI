@@ -20,7 +20,7 @@ def _exited(pid):
     return os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
 
 
-def supervise(port, lifetime):
+def supervise(port, lifetime, app=()):
     token = sys.stdin.buffer.readline(46)
     if not re.fullmatch(rb"[A-Za-z0-9_-]{43}\n", token):
         raise ValueError("配对输入无效。")
@@ -28,7 +28,7 @@ def supervise(port, lifetime):
     # Losing the terminal controller closes its pipe even after SIGKILL.
     with tempfile.TemporaryDirectory(prefix="ubuntu-workspace-", dir="/tmp") as workspace:
         proc = subprocess.Popen(
-            [sys.executable, "-m", MODULE, "worker", workspace, str(port)],
+            [sys.executable, "-m", MODULE, "worker", workspace, str(port), *app],
             stdin=subprocess.PIPE,
             start_new_session=True,
         )
@@ -66,15 +66,17 @@ def supervise(port, lifetime):
 
 
 def main():
-    if len(sys.argv) == 4 and sys.argv[1] == "watch":
-        return supervise(int(sys.argv[2]), int(sys.argv[3]))
-    if len(sys.argv) == 4 and sys.argv[1] == "worker":
+    if len(sys.argv) in (4, 5) and sys.argv[1] == "watch":
+        return supervise(int(sys.argv[2]), int(sys.argv[3]), sys.argv[4:])
+    if len(sys.argv) in (4, 5) and sys.argv[1] == "worker":
         from .worker import run
 
         token = sys.stdin.buffer.readline(46)
         if not re.fullmatch(rb"[A-Za-z0-9_-]{43}\n", token):
             raise ValueError("配对输入无效。")
-        run(Path(sys.argv[2]), int(sys.argv[3]), token.rstrip().decode("ascii"))
+        archive = Path(sys.argv[4]) if len(sys.argv) == 5 else None
+        run(Path(sys.argv[2]), int(sys.argv[3]), token.rstrip().decode("ascii"), archive)
+        return 0
     raise ValueError("请使用 python3 -m cloud_render.provision 启动。")
 
 

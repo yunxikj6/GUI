@@ -47,12 +47,23 @@ def _terminal():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--port", type=int, default=17325, help="云机回环端口，默认 17325，0 表示使用空闲端口"
+        "--port", type=int, help="云机回环端口，桌面默认 17325，应用桌面默认 17326，0 表示使用空闲端口"
     )
     parser.add_argument(
         "--lifetime-minutes", type=int, default=240, help="从准备开始计算的最长存活分钟数，默认 240"
     )
+    parser.add_argument("--chatgpt-deb", type=Path, metavar="FILE",
+                        help="在云机的临时 Ubuntu 桌面运行已核对的原版 Linux amd64 安装包")
     args = parser.parse_args(argv)
+    if args.port is None:
+        args.port = 17326 if args.chatgpt_deb else 17325
+    extra = []
+    if args.chatgpt_deb:
+        from .chatgpt import PACKAGE
+        source = args.chatgpt_deb.absolute()
+        if not source.is_file() or source.stat().st_size != PACKAGE["size"]:
+            parser.error("请提供已核对版本的云端 ChatGPT Linux amd64 .deb。")
+        extra = [str(source)]
     if not 0 <= args.port <= 65535 or not 1 <= args.lifetime_minutes <= 1440:
         parser.error("端口须在 0 至 65535 之间，生命周期须在 1 至 1440 分钟之间。")
     handles = contextlib.ExitStack()
@@ -78,7 +89,7 @@ def main(argv=None):
                 child_env[key] = os.environ[key]
         child_env["PYTHONPATH"] = str(repo)
         proc = subprocess.Popen(
-            [sys.executable, "-B", "-m", MODULE, "watch", str(args.port), str(args.lifetime_minutes * 60)],
+            [sys.executable, "-B", "-m", MODULE, "watch", str(args.port), str(args.lifetime_minutes * 60), *extra],
             cwd=repo,
             env=child_env,
             stdin=subprocess.PIPE,
