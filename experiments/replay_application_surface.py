@@ -8,7 +8,7 @@ import struct
 import subprocess
 import tempfile
 
-from cloud_render.wire import encode_message
+from cloud_render.wire import Frame, Layer, encode_message, read_message
 from experiments import gnome_command_stream as mesa
 from experiments.application_surface import ApplicationSurfaces, Binding, Commit, SurfaceError
 from thin_client.virgl_windows import replay
@@ -33,6 +33,36 @@ def _verify_file(path, wanted):
             raise SurfaceError('capture file digest mismatch: ' + path.name)
 
 
+def _frame(path):
+    with path.open('rb') as stream:
+        frame = read_message(stream, expected=Frame)
+        if frame is None or stream.read(1):
+            raise SurfaceError('expected exactly one application drawing')
+        return frame
+
+
+def with_native_controls(page, controls, receipt, binding, style):
+    """Join the exact browser-owned drawings at the verified WCO geometry."""
+    if (receipt['pid'] != binding['pid'] or receipt['actualStyle'] != style
+            or not style['visible'] or style['dpr'] != 1 or style['viewport'] != [page.width, page.height]
+            or len(receipt['layers']) != 3 or len(controls.layers) != 3):
+        raise SurfaceError('native control surface evidence mismatch')
+    rect = style['titlebarRect']
+    if (rect['left'], rect['top'], rect['right'] + controls.width, rect['height']) != (0, 0, page.width, controls.height):
+        raise SurfaceError('control region does not match source window')
+    placed = []
+    for index, (layer, proof) in enumerate(zip(controls.layers, receipt['layers'])):
+        x, y = rect['right'] + layer.x, layer.y
+        w, h = layer.width, layer.height
+        if (proof['sourceName'] != ('ChromeNodeCaptionButtonContainer' if index == 0 else 'ChromeNodeCaptionButton')
+                or proof['quad'] != [x, y, x+w, y, x+w, y+h, x, y+h]
+                or proof['bytes'] != len(layer.skp) or proof['sha256'] != hashlib.sha256(layer.skp).hexdigest()
+                or layer.x < 0 or layer.y < 0 or layer.x+w > controls.width or layer.y+h > controls.height):
+            raise SurfaceError('native control drawing provenance mismatch')
+        placed.append(Layer(x, y, w, h, layer.skp))
+    return Frame(page.sequence, page.width, page.height, page.layers + tuple(placed))
+
+
 def prepare(source, output):
     spec = json.loads(SPEC.read_text())
     for name, pin in spec['inputHash'].items():
@@ -53,8 +83,14 @@ def prepare(source, output):
                      instance=process, surface=binding['waylandSurface'], creation=binding['vtestCreateOrdinal'],
                      handle=handle, commits={}, actions={})
     approvals = {}
+    controls = _frame(source / 'original-controls.clrp')
+    receipt = json.loads((source / 'original-controls.json').read_bytes())
     for phase in STATES:
-        wire = (source / f'broker-{phase}.clrp').read_bytes()
+        page = _frame(source / f'broker-{phase}.clrp')
+        style = json.loads((source / f'stable-wco-{phase}.json').read_bytes())
+        wire = encode_message(with_native_controls(page, controls, receipt, binding, style))
+        if wire != (source / spec['drawingFiles'][phase]).read_bytes():
+            raise SurfaceError('complete drawing differs from traced original layers')
         (output / f'{phase}.clrp').write_bytes(wire)
         state = spec['verifiedStates'][phase]
         digest = hashlib.sha256(wire).digest()
@@ -102,7 +138,7 @@ def prepare(source, output):
 def _verify_prepared(directory, spec):
     _verify_file(directory/'authority.json', spec['preparedAuthoritySha256'])
     for phase in STATES:
-        _verify_file(directory/f'{phase}.clrp', spec['inputHash'][f'broker-{phase}.clrp'])
+        _verify_file(directory/f'{phase}.clrp', spec['inputHash'][spec['drawingFiles'][phase]])
     with gzip.open(directory/'desktop.commands.gz', 'rb') as stream:
         if _hash(stream) != spec['preparedDesktopSha256']:
             raise SurfaceError('desktop command digest mismatch')

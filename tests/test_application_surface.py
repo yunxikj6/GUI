@@ -10,6 +10,7 @@ from PIL import Image
 from cloud_render.wire import Frame, Layer, encode_message
 from experiments.application_surface import ApplicationSurfaces, Binding, Commit, CommitTracker, SurfaceError, SurfaceStamp, capture_stable
 from experiments.application_surface_diff import compare
+from experiments.replay_application_surface import with_native_controls
 
 
 class WindowTexture(unittest.TestCase):
@@ -129,3 +130,30 @@ class WindowTexture(unittest.TestCase):
             self.assertEqual(report['regions'][0]['differentPixels'], 1)
             self.assertEqual(report['outsideAllRegions']['differentPixels'], 1)
             self.assertEqual(report['desktop']['differentPixels'], 2)
+
+
+class NativeCaptionSource(unittest.TestCase):
+    def test_original_layers_require_matching_process_viewport_and_browser_quads(self):
+        page = Frame(2, 96, 40, (Layer(0, 0, 96, 40, b'skiapictpage'),))
+        controls = Frame(1, 64, 36, (Layer(0, 0, 64, 36, b'skiapictbg'),
+                                     Layer(0, 0, 32, 36, b'skiapictleft'),
+                                     Layer(32, 0, 32, 36, b'skiapictright')))
+        style = dict(visible=True, dpr=1, viewport=[96, 40],
+                     titlebarRect=dict(left=0, top=0, right=32, height=36))
+        proofs = []
+        for i, layer in enumerate(controls.layers):
+            x, w = 32 + layer.x, layer.width
+            proofs.append(dict(sourceName='ChromeNodeCaptionButtonContainer' if i == 0 else 'ChromeNodeCaptionButton',
+                               quad=[x, 0, x+w, 0, x+w, 36, x, 36], bytes=len(layer.skp),
+                               sha256=hashlib.sha256(layer.skp).hexdigest()))
+        receipt = dict(pid=13, actualStyle=style, layers=proofs)
+        joined = with_native_controls(page, controls, receipt, {'pid':13}, style)
+        self.assertEqual(joined.layers[:1], page.layers)
+        self.assertEqual([(layer.x, layer.skp) for layer in joined.layers[1:]],
+                         [(32, b'skiapictbg'), (32, b'skiapictleft'), (64, b'skiapictright')])
+        cases = [dict(pid=14), dict(actualStyle={**style, 'dpr':2}),
+                 dict(layers=[*proofs[:2], {**proofs[2], 'quad': proofs[1]['quad']}]),
+                 dict(layers=[*proofs[:2], {**proofs[2], 'sha256': '0'*64}])]
+        for change in cases:
+            with self.subTest(change=change.keys()), self.assertRaises(SurfaceError):
+                with_native_controls(page, controls, {**receipt, **change}, {'pid':13}, style)

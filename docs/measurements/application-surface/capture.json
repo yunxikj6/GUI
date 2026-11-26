@@ -1,20 +1,27 @@
 {
-  "scope": "Same-session official signed-out ChatGPT running on isolated Ubuntu GNOME, Linux graphics source; separate Win64 VirGL engine under Wine. Capture and display hosts were not a Windows 11 hardware pair.",
+  "scope": "One signed-out official ChatGPT running on isolated Ubuntu GNOME. Its original page and browser-owned captions are rasterized by Windows x64 Node+WASM and composed by Win64 VirGL in Wine, not yet tested on Windows hardware.",
   "inputHash": {
-    "owner.log": "c6dc2268b74dd3bfbd527d2959db4cf1d4c97d7b034cf38eae490836d7ccbf11",
-    "transfer-identity-table.json": "d5c38164fc386dee8b2668060925e9935b9763cd2d8aab77d25a6644a8d5c718",
+    "owner.log": "072e6271161a9c5743039f55d0043b1daa580bf5cbb647ea58338d73c9f8e1f7",
+    "transfer-identity-table.json": "14fce9c5a09de50489eca7405deb7e18577c58b7f74d28243999287bccbec55f",
     "broker-before.clrp": "ce52f766547993c93a7a86a8bc4d3c794c395ed643e6fbeb5618f0381bb78b86",
     "broker-after.clrp": "7d265db50bf9208507616816aa0896e9ef08a418939ab10f563e8a08bba77a40",
-    "visible.json": "57e6ff789ead4e4fb8218195dbf2dc6be3c3689014d42017462f48fb7d3c13b1",
-    "gpu-local.json": "34741c99ee21f20d1558b399aa9ac5d84ef2b5a6c8aa562933637f1f00cdb356",
-    "commands.virgl.gz": "ce73e7d668d5dca9d0fb2b5eb15414e36dd6f13d81b48d11a798a52ef3619031",
-    "validated-session.json": "1622bbd06fbc678c9fedb35394ec469f6507b8bf8b83f462ab4c17a6497a6349",
-    "broker-peer.json": "7d3ce02f41aba2f921321e661176c096054f14576126d986360575febda2388b"
+    "visible.json": "378646d4947c6b9ea4f5cc5ebbe0d364a0dd401f43b369315a8b91428199b821",
+    "gpu-local.json": "198934f099437087a52d59e31c1e3d748b6d72a0ca5a7c941926179dadbf75ef",
+    "commands.virgl.gz": "b18d21932384ed18a78290ebe4e5e58ac35ef9bf96115aeb65baa3820a338ee7",
+    "validated-session.json": "88ab341f46027de20b7e7c8cfa0ea09481a5189826f45ff4465d4ae6a4b8e650",
+    "broker-peer.json": "69a701930a5ed0e178deb9f21c801dc299cba930cce5f11edc9c2fb2b976b32a",
+    "original-controls.clrp": "c5dd8698894b2dea0807e48cdbc2b5e1395fd733aac133e6d5fb5d643ce3c977",
+    "original-controls.json": "2a56a576d9dea80b70b7cc7ab2722155a85328267e31f15fd30dd93107c1a645",
+    "native-controls-comparison.json": "79eb3beb2469a773f1fa352da24bebe3cd067db719db0304b18737ec8f2108df",
+    "stable-wco-before.json": "0d0240758a3e3c8dda60acefbcceec3ad07f852cc66eb142b5f3e4113485de9e",
+    "stable-wco-after.json": "0d0240758a3e3c8dda60acefbcceec3ad07f852cc66eb142b5f3e4113485de9e",
+    "complete-original-before.clrp": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+    "complete-original-after.clrp": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a"
   },
-  "commandSha256": "4b8bd232433a481f8212bab5438acde7b9aeb3b19a10eea0d37b7058b187dca3",
+  "commandSha256": "776baafff7cafcc7a386fd1dfcd66539fdf29dd4469fd89b572280252d2e28af",
   "binding": {
-    "pid": 282,
-    "processStartTicks": 6566390,
+    "pid": 288,
+    "processStartTicks": 6581434,
     "device": 27,
     "inode": 3438921,
     "waylandConnectionSerial": 1,
@@ -22,73 +29,78 @@
     "xdgSurface": 40,
     "xdgToplevel": 41,
     "appId": "chatgpt",
-    "glTexture": 25,
-    "coglObject": "0x55556547e150",
-    "vtestHandle": 209,
-    "vtestCreateOrdinal": 209,
-    "wireCreateCommand": 1882,
+    "glTexture": 31,
+    "coglObject": "0x55556a4396b0",
+    "vtestHandle": 213,
+    "vtestCreateOrdinal": 213,
+    "wireCreateCommand": 1949,
     "sourceExecutableSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7"
   },
   "verifiedStates": {
     "before": {
-      "sha256": "ce52f766547993c93a7a86a8bc4d3c794c395ed643e6fbeb5618f0381bb78b86",
+      "sha256": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
       "transferOrdinals": [
-        2034,
-        2053,
-        2061,
-        2148,
-        2183
+        2176,
+        2333,
+        2658,
+        2827,
+        2880,
+        2903
       ],
       "actualCommits": [
-        14,
-        15,
-        16,
-        18,
-        19
+        22,
+        23,
+        44,
+        52,
+        54,
+        55
       ]
     },
     "after": {
-      "sha256": "7d265db50bf9208507616816aa0896e9ef08a418939ab10f563e8a08bba77a40",
+      "sha256": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a",
       "transferOrdinals": [
-        2411,
-        2449
+        3032,
+        3070
       ],
       "actualCommits": [
-        25,
-        27
+        60,
+        62
       ]
     }
   },
-  "nativeNonPagePixels": 95,
-  "preparedAuthoritySha256": "6973fbaba8e3314bdddc04766f086a85495edb1a95a2ff095ac078dca28c130a",
-  "preparedDesktopSha256": "18f614ad3ab4b68ed7e0e7be58ef97b970825ad5c872de582bb5cc2f4273d88c",
+  "preparedAuthoritySha256": "6329b7feebf34db287e2d9bb94e3368ccdf0e1be2b1b67056ffe8cb23c8674d8",
+  "preparedDesktopSha256": "e0bf420e80d071ed04ca9f58cb6b0dad6ff2180414467da8a4900ed298085bab",
   "transport": {
-    "originalCommandBytes": 103958888,
-    "removedWindowPixelBytes": 63010720,
+    "originalCommandBytes": 131373860,
+    "removedWindowPixelBytes": 90391520,
     "receivedWindowPixelBytes": 0,
-    "fullWindowUploadsRemoved": 18,
-    "partialWindowUploadsRemoved": 10,
-    "drawingReferences": 7,
-    "preparedDesktopGzipBytes": 8514644,
-    "bothSkPictureFramesBytes": 3813509
+    "fullWindowUploadsRemoved": 25,
+    "partialWindowUploadsRemoved": 36,
+    "drawingReferences": 8,
+    "preparedDesktopGzipBytes": 8502364,
+    "bothSkPictureFramesBytes": 3815835
   },
   "visibility": {
-    "captured": {
+    "states": {
       "before": {
-        "w": 1280,
-        "h": 900,
-        "ordinal": 44,
-        "sha256": "6a480fed2cf2acdadec802c3c38631163edee2f1f7153afc6d16115a20b38122"
+        "size": [
+          1280,
+          900
+        ],
+        "ordinal": 70,
+        "sha256": "8b2f637d1363b3b919d1973308b666808eef461d8dc93c53b7eb7a6d3bebc1ee"
       },
       "after": {
-        "w": 1280,
-        "h": 900,
-        "ordinal": 54,
-        "sha256": "8dfb73e2e9d0e56ea76d23c1590adf4791ce0d97309a848d1672c87edcb3df6a"
+        "size": [
+          1280,
+          900
+        ],
+        "ordinal": 78,
+        "sha256": "f94c9cbf487d272c13722319c293213978c66242d7394102b75505ff93e30823"
       }
     },
-    "scanouts": 55,
-    "held": 13
+    "scanouts": 79,
+    "held": 23
   },
   "rgbComparison": {
     "before": {
@@ -98,8 +110,8 @@
       ],
       "desktop": {
         "pixels": 1152000,
-        "differentPixels": 4957,
-        "meanAbsoluteChannelError": 0.11351967592592592
+        "differentPixels": 4884,
+        "meanAbsoluteChannelError": 0.10479832175925925
       },
       "regions": [
         {
@@ -110,8 +122,8 @@
             827
           ],
           "pixels": 828400,
-          "differentPixels": 4957,
-          "meanAbsoluteChannelError": 0.15786415580234991
+          "differentPixels": 4884,
+          "meanAbsoluteChannelError": 0.14573595686463867
         }
       ],
       "outsideAllRegions": {
@@ -122,10 +134,23 @@
       "differenceBounds": [
         502,
         81,
-        1206,
+        1205,
         562
       ],
-      "ocrLabel": "Sign in to ChatGPT"
+      "ocrLabel": "Sign in to ChatGPT",
+      "nativeCaptionAtScanout": {
+        "rect": [
+          1150,
+          67,
+          1214,
+          103
+        ],
+        "pixels": 2304,
+        "exactPixels": 2282,
+        "differentPixels": 22,
+        "maximumAbsoluteChannelError": 1,
+        "meanAbsoluteChannelError": 0.009548611111111112
+      }
     },
     "after": {
       "size": [
@@ -134,8 +159,8 @@
       ],
       "desktop": {
         "pixels": 1152000,
-        "differentPixels": 4251,
-        "meanAbsoluteChannelError": 0.1082421875
+        "differentPixels": 4178,
+        "meanAbsoluteChannelError": 0.09952083333333334
       },
       "regions": [
         {
@@ -146,8 +171,8 @@
             827
           ],
           "pixels": 828400,
-          "differentPixels": 4251,
-          "meanAbsoluteChannelError": 0.15052510864316757
+          "differentPixels": 4178,
+          "meanAbsoluteChannelError": 0.1383969097054563
         }
       ],
       "outsideAllRegions": {
@@ -158,15 +183,190 @@
       "differenceBounds": [
         502,
         81,
-        1206,
+        1205,
         563
       ],
-      "ocrLabel": "Bedrock"
+      "ocrLabel": "Bedrock",
+      "nativeCaptionAtScanout": {
+        "rect": [
+          1150,
+          67,
+          1214,
+          103
+        ],
+        "pixels": 2304,
+        "exactPixels": 2282,
+        "differentPixels": 22,
+        "maximumAbsoluteChannelError": 1,
+        "meanAbsoluteChannelError": 0.009548611111111112
+      }
     },
-    "sourceGpuHashCount": 55
+    "sourceGpuHashCount": 79
   },
   "independentSourceFramesSha256": {
-    "before": "f20c9cd967c3147bd85a0b6ee76ed32f1b591aefeb9f58c04251f91a6985202a",
-    "after": "aea84d6a132fb28979e8cbbe6dcb659ea7c2660c26548143c5b1d8a7ca1fd122"
+    "before": "9fe3b60e7af97201a0873d9510c6bf346e2297f70b5fb1223ed66d6c0b547fc1",
+    "after": "d07bc45e3c353ab99179e0109dfbe16e4fca0e0152e0b41192509faad1c4c2e4"
+  },
+  "drawingFiles": {
+    "before": "complete-original-before.clrp",
+    "after": "complete-original-after.clrp"
+  },
+  "nativeDecorations": {
+    "layers": [
+      {
+        "sourceName": "ChromeNodeCaptionButtonContainer",
+        "layer": 9,
+        "quad": [
+          1026,
+          0,
+          1090,
+          0,
+          1090,
+          36,
+          1026,
+          36
+        ],
+        "pictureId": "0x28fc06127300",
+        "pictureTimestamp": 65831461467,
+        "bytes": 157,
+        "sha256": "093be95b3e6a1641d2531edfcc200f1668d5b63a8159b360bea1043bbad25e96",
+        "originalSkiaDrawOperations": [
+          "SAVE",
+          "CLIP_RECT",
+          "DRAW_PAINT",
+          "RESTORE"
+        ]
+      },
+      {
+        "sourceName": "ChromeNodeCaptionButton",
+        "layer": 5,
+        "quad": [
+          1026,
+          0,
+          1058,
+          0,
+          1058,
+          36,
+          1026,
+          36
+        ],
+        "pictureId": "0x28fc06167e00",
+        "pictureTimestamp": 65831421233,
+        "bytes": 433,
+        "sha256": "b41a1710394ee45dfd3fb353a9edf452af4b888385a301120a3b051370ca2f4d",
+        "originalSkiaDrawOperations": [
+          "SAVE",
+          "CLIP_RECT",
+          "DRAW_RECT",
+          "SAVE",
+          "CONCAT44",
+          "SAVE",
+          "CONCAT44",
+          "DRAW_PATH",
+          "RESTORE",
+          "RESTORE",
+          "RESTORE"
+        ]
+      },
+      {
+        "sourceName": "ChromeNodeCaptionButton",
+        "layer": 8,
+        "quad": [
+          1058,
+          0,
+          1090,
+          0,
+          1090,
+          36,
+          1058,
+          36
+        ],
+        "pictureId": "0x28fc06386400",
+        "pictureTimestamp": 65831082376,
+        "bytes": 513,
+        "sha256": "0e3423ff6bdc1942e5f9e5d28170a00ef299ec4e885ccbbec975c02eb64adca4",
+        "originalSkiaDrawOperations": [
+          "SAVE",
+          "CLIP_RECT",
+          "DRAW_RECT",
+          "SAVE",
+          "CONCAT44",
+          "SAVE",
+          "CONCAT44",
+          "DRAW_PATH",
+          "RESTORE",
+          "RESTORE",
+          "RESTORE"
+        ]
+      }
+    ],
+    "style": {
+      "visible": true,
+      "titlebarRect": {
+        "x": 0,
+        "y": 0,
+        "width": 1026,
+        "height": 36,
+        "top": 0,
+        "right": 1026,
+        "bottom": 36,
+        "left": 0
+      },
+      "dpr": 1,
+      "viewport": [
+        1090,
+        760
+      ],
+      "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
+      "scheme": "light"
+    },
+    "states": {
+      "before": {
+        "sourceCommit": 22,
+        "wireCommandOrdinal": 2176,
+        "sourceCanonicalShmSha256": "819222cc4663d17267a62c12b4f6454f88d8edd7ec85e7d403abf5c043d71cf6",
+        "localComposedCLRP": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+        "sourceReservedRegionSha256": "1d33223cedfb68917cbf807cd1664b20a46466ad61093dd292c6d0da70aec0a7",
+        "reservedRegionPixels": 2304,
+        "nativeControlShapePixels": 95,
+        "reservedRegionExactRGB": 2282,
+        "reservedRegionMaxChannelError": 1,
+        "reservedRegionMeanAbsoluteChannelError": 0.009548611,
+        "totalWindowExactRGB": 823516,
+        "totalWindowPixels": 828400,
+        "meanAbsoluteFullWindowChannelError": 0.145735957,
+        "maxWindowChannelError": 117
+      },
+      "after": {
+        "sourceCommit": 60,
+        "wireCommandOrdinal": 3032,
+        "sourceCanonicalShmSha256": "5d49be37508d222c9e33c35999cddd05893c19f2ed5e28f0cd31df42f8cc9c9b",
+        "localComposedCLRP": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a",
+        "sourceReservedRegionSha256": "1d33223cedfb68917cbf807cd1664b20a46466ad61093dd292c6d0da70aec0a7",
+        "reservedRegionPixels": 2304,
+        "nativeControlShapePixels": 95,
+        "reservedRegionExactRGB": 2282,
+        "reservedRegionMaxChannelError": 1,
+        "reservedRegionMeanAbsoluteChannelError": 0.009548611,
+        "totalWindowExactRGB": 824187,
+        "totalWindowPixels": 828400,
+        "meanAbsoluteFullWindowChannelError": 0.140119105,
+        "maxWindowChannelError": 118
+      }
+    }
+  },
+  "windowsRuntime": {
+    "winPython": "win-amd64",
+    "pythonVersion": "3.13.9 (tags/v3.13.9:8183fa5, Oct 14 2025, 14:09:13) [MSC v.1944 64 bit (AMD64)]",
+    "node": {
+      "arch": "x64",
+      "platform": "win32",
+      "version": "v24.22.3"
+    },
+    "nodeExeSha256": "86fc4785327db5f5c7558dc6156c543b433c313e813a222e088086222ab4afa6",
+    "nodeArchiveSha256": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f",
+    "nodeOfficialPins": "https://nodejs.org/dist/v24.22.3/SHASUMS256.txt",
+    "graphicsAbi": "Win64 WGL VirGL 1.3 in an isolated Wine 10 prefix",
+    "windowsHardwareVerified": false
   }
 }
