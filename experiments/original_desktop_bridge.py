@@ -1,0 +1,240 @@
+"""Expose one verified interactive source on its paired private loopback endpoint."""
+import argparse
+import asyncio
+from contextlib import asynccontextmanager
+import errno
+import json
+import os
+from pathlib import Path
+import stat
+
+from cloud_render import gnome_commands as mesa
+from cloud_render.gnome_input import decode_input
+from cloud_render.gnome_relay import DesktopService, TOKEN
+from experiments.application_surface import SurfaceError
+from experiments.live_application_surface import BIND, DRAW, HOLD, REUSE, binding_record
+from experiments.original_desktop_protocol import SIZE, approved_binding, source_hello
+
+
+def _private(path, predicate):
+    info = path.lstat()
+    if info.st_uid != os.getuid() or info.st_mode & 0o077 or not predicate(info.st_mode):
+        raise SurfaceError('the original application channel must be owner-private')
+
+
+def _metadata(path):
+    _private(path, stat.S_ISREG)
+    with path.open('rb') as source:
+        body = source.read(2049)
+    if len(body) > 2048:
+        raise SurfaceError('source identity exceeds the supported size')
+    return json.loads(body)
+
+
+class _Graphics:
+    """Forward only whole, session-bound records from the source's private FIFO."""
+    def __init__(self, channel, reader, config, eof):
+        self.channel, self.reader, self.eof = channel, reader, eof
+        self.buffer = memoryview(source_hello(config))
+        self.task = None
+
+    async def _packet(self):
+        try:
+            header = await self.reader.readexactly(mesa._HEADER.size)
+        except asyncio.IncompleteReadError as exc:
+            if exc.partial:
+                raise SurfaceError('truncated application graphics header') from exc
+            self.eof()
+            return b''
+        size, op = mesa._HEADER.unpack(header)
+        if op == BIND:
+            if size != 120:  # The original live binding format is <Q32s32sI32sIII.
+                raise SurfaceError('invalid application identity record length')
+            body = await self.reader.readexactly(size)
+            offset = int.from_bytes(body[:8], 'little')
+            independent = approved_binding(_metadata(self.channel/'binding.json'))
+            if binding_record(offset, independent) != header + body:
+                raise SurfaceError('graphics binding and independent Wayland witness disagree')
+            return header + body
+        if op in (DRAW, HOLD, REUSE):
+            if not 60 <= size <= (32 << 20) + 104:
+                raise SurfaceError('invalid native drawing size')
+        elif op == mesa.PUT:
+            descriptor = await self.reader.readexactly(mesa._TRANSFER.size)
+            count = mesa._TRANSFER.unpack(descriptor)[-1]
+            if count > 32 << 20 or size != 11 + (count + 3)//4:
+                raise SurfaceError('invalid original texture length')
+            return header + descriptor + await self.reader.readexactly(count)
+        elif op == mesa.RENDERER:
+            if not 0 < size <= 64:
+                raise SurfaceError('invalid native renderer record')
+        elif op in mesa._LENGTHS or op == mesa.SUBMIT:
+            if op in mesa._LENGTHS and size != mesa._LENGTHS[op]:
+                raise SurfaceError('invalid Mesa command header')
+            size *= 4
+            if size > 32 << 20:
+                raise SurfaceError('excessive Mesa command size')
+        else:
+            raise SurfaceError('unsupported application-aware GNOME command')
+        return header + await self.reader.readexactly(size)
+
+    async def read(self, size):
+        if not self.buffer:
+            if self.task is None:
+                self.task = asyncio.create_task(self._packet())
+            # The production block packer imposes short coalescing deadlines.
+            # A cancelled partial block must not discard part of a source packet.
+            self.buffer = memoryview(await asyncio.shield(self.task))
+            self.task = None
+        data = self.buffer[:size].tobytes()
+        self.buffer = self.buffer[len(data):]
+        return data
+
+
+class _Pointer:
+    def __init__(self, channel, events):
+        self.channel, self.events = channel, events
+        self.fd = None
+        self.sequence = 0
+        self.pending = None
+
+    async def open(self):
+        deadline = asyncio.get_running_loop().time() + 90
+        while self.fd is None:
+            try:
+                self.fd = os.open(self.channel/'input.fifo', os.O_WRONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+            except OSError as exc:
+                if exc.errno != errno.ENXIO or asyncio.get_running_loop().time() >= deadline:
+                    raise
+                await asyncio.sleep(.05)
+        self.events.feed_data(b'{"event":"ready","width":1280,"height":900}\n')
+
+    def write(self, command):
+        op, _ = decode_input(command, size=SIZE)
+        if op not in (b'M', b'L') or self.pending is not None or self.fd is None:
+            raise SurfaceError('unsupported or unacknowledged native pointer input')
+        self.pending = command
+
+    async def drain(self):
+        command, self.pending = self.pending, None
+        if self.fd is None or command is None or os.write(self.fd, command) != len(command):
+            raise SurfaceError('incomplete native pointer input')
+        self.sequence += 1
+        while True:
+            try:
+                ack = _metadata(self.channel/'last-input.json')
+            except FileNotFoundError:
+                ack = None
+            if ack is not None:
+                number = ack.get('sequence')
+                if type(number) is not int or not 0 < number <= self.sequence:
+                    raise SurfaceError('native input acknowledgement out of order')
+                if number == self.sequence:
+                    if ack.get('applied') is not True:
+                        raise SurfaceError('original pointer event was not accepted')
+                    event = dict(event='input', sequence=number)
+                    self.events.feed_data(json.dumps(event).encode() + b'\n')
+                    return
+            await asyncio.sleep(.01)
+
+    def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+
+class _Peer:
+    def __init__(self, stdout, stdin, finished):
+        self.stdout, self.stdin, self.finished = stdout, stdin, finished
+
+    async def wait(self):
+        await self.finished.wait()
+        return 0
+
+
+@asynccontextmanager
+async def interactive_fifos(channel, *, size=SIZE, wallpaper=False):
+    if size != SIZE or wallpaper:
+        raise SurfaceError('unsupported application desktop configuration')
+    _private(channel, stat.S_ISDIR)
+    for name in ('graphics.fifo','input.fifo'):
+        _private(channel/name, stat.S_ISFIFO)
+    config = _metadata(channel/'session.json')
+    source_hello(config)
+    finished = asyncio.Event()
+    events = asyncio.StreamReader()
+    reader = asyncio.StreamReader(limit=128 << 10)
+    source_fd = os.open(channel/'graphics.fifo', os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    with os.fdopen(source_fd, 'rb', buffering=0) as pipe:
+        transport, _ = await asyncio.get_running_loop().connect_read_pipe(
+            lambda: asyncio.StreamReaderProtocol(reader), pipe)
+        def eof():
+            finished.set()
+            events.feed_eof()
+        graphics = _Graphics(channel, reader, config, eof)
+        pointer = _Pointer(channel, events)
+        opening = asyncio.create_task(pointer.open())
+        def opened(task):
+            if not task.cancelled() and task.exception() is not None:
+                events.set_exception(task.exception())
+        opening.add_done_callback(opened)
+        try:
+            yield _Peer(graphics, pointer, finished), events
+        finally:
+            opening.cancel()
+            if graphics.task:
+                graphics.task.cancel()
+            await asyncio.gather(*filter(None,(opening,graphics.task)), return_exceptions=True)
+            pointer.close()
+            transport.close()
+
+
+async def serve(channel, port, token):
+    # Each source directory is one ephemeral live desktop, including its
+    # independent native binding and input acknowledgement sequence.
+    finished = asyncio.Event()
+    claimed = False
+    @asynccontextmanager
+    async def source(**options):
+        nonlocal claimed
+        if claimed:
+            raise SurfaceError('the private application session has ended')
+        deadline = asyncio.get_running_loop().time() + 45
+        while not (channel/'session.json').is_file():
+            if asyncio.get_running_loop().time() >= deadline:
+                raise SurfaceError('application source did not initialize')
+            await asyncio.sleep(.05)
+        async with interactive_fifos(channel, **options) as endpoint:
+            claimed = True
+            try:
+                yield endpoint
+            finally:
+                finished.set()
+    service = DesktopService(token, source)
+    server = await asyncio.start_server(service.accept,'127.0.0.1',port,limit=1024,backlog=4)
+    try:
+        async with server:
+            print(f'原厂应用私有桌面端口 {server.sockets[0].getsockname()[1]}。', flush=True)
+            await finished.wait()
+    finally:
+        await service.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('channel', type=Path)
+    parser.add_argument('--port', type=int, default=17326)
+    args = parser.parse_args()
+    token = os.environ.pop('CLOUDWORKSPACE_GNOME_TOKEN', '')
+    if not TOKEN.fullmatch(token):
+        parser.error('请设置 43 位随机 CLOUDWORKSPACE_GNOME_TOKEN。')
+    if not 0 < args.port <= 65535:
+        parser.error('无效的私有端口。')
+    try:
+        asyncio.run(serve(args.channel, args.port, token))
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == '__main__':
+    main()

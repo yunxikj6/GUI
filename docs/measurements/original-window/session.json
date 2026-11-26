@@ -1,0 +1,99 @@
+{
+  "sourceRole": "Isolated Ubuntu GNOME + original ChatGPT PID277. Empty desktop DING extension disabled. Exclusive real-time native app, no prerecorded stream.",
+  "display": "Official Win64 Node 24.22.3, CanvasKit full 0.42.0, Win64 Python, original Win64 VirGL and HWND under Wine 10",
+  "wire": {
+    "bytes": 44898735,
+    "end": "source-eof"
+  },
+  "source": {
+    "originalBytes": 138919700,
+    "removedApplicationBytes": 97838400,
+    "drawings": 2,
+    "pending": 56,
+    "classification": {
+      "shell": 846,
+      "cursor": 4,
+      "unapproved": 56,
+      "before": 5,
+      "after": 7
+    }
+  },
+  "sourceInput": {
+    "x": 672,
+    "y": 502,
+    "button": 1
+  },
+  "beforeCommit": 60,
+  "afterCommit": 70,
+  "window": {
+    "hwnd": 131150,
+    "paintCount": 38,
+    "clicks": [
+      {
+        "x": 672,
+        "y": 502,
+        "nativeCommit": 60,
+        "digest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+        "t": 67521.0115702
+      }
+    ],
+    "seen": [
+      {
+        "digest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+        "serial": 56,
+        "scanout": 75,
+        "t": 67519.3755445
+      },
+      {
+        "digest": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a",
+        "serial": 63,
+        "scanout": 83,
+        "t": 67522.7005439
+      }
+    ],
+    "errors": [],
+    "available": true,
+    "commit": 70,
+    "digest": "9d23182efb88f0d87e4a61440fde64653b5c01771c2476e405b82210ab2df79a",
+    "scanouts": 90,
+    "held": 50
+  },
+  "independentCapture": {
+    "sourceReturned": "Sign in another way, OpenAI API Key, Amazon Bedrock",
+    "readFromWindow": "5:31\n\n-\n\n©\n\nSign in another way\n\nOpendl API Key\n\nawe\n\nAmazonMedrock",
+    "clickInDisplayedDesktop": [
+      672,
+      502
+    ],
+    "title": "Cloud Linux Workspace",
+    "captureSize": [
+      1460,
+      1040
+    ],
+    "beforeSha256": "a72409f4e12407c134edcb5ac26f331e42c61ec7f845d873610eb6d0c2bf003d",
+    "afterSha256": "0d33e7a921bdbbae002ae61866fe8a86c155a3bc8625b24a6b85eed8f19acbef",
+    "validation": "Independent X11 frame; source pointer overlaps first character of Bedrock. Visible Amazon…edrock and API Key independently verified on displayed screen."
+  },
+  "manualUserEntry": {
+    "route": "Fresh extracted x64 ZIP; production paired GNOME TCP and real native HWND under Wine; user manually selected the Dock icon after viewing the desktop. Test observer clicked the original menu and sent Alt+F4.",
+    "actions": {
+      "dock": [
+        32,
+        66
+      ],
+      "windowClick": [
+        672,
+        502
+      ],
+      "menuMillis": 4569
+    },
+    "sourceInputAck": {
+      "sequence": 4,
+      "applied": true
+    },
+    "originalWelcomeCommit": 27,
+    "originalMenuCommit": 50,
+    "windowExit": 0,
+    "sourceControllerClosed": true
+  }
+}

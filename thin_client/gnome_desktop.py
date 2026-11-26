@@ -54,7 +54,7 @@ class InputQueue:
             self.condition.notify_all()
 
 
-def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
+def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_on_disconnect=False):
     """Keep the Win32 message pump independent of the GPU, source and input ACKs."""
     width, height = checked_size(size)
     inputs = InputQueue()
@@ -70,6 +70,19 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
             if not stop.is_set():
                 errors.append(exc)
                 stop.set()
+            else:
+                return
+        inputs.close()
+        # When the window remains open the input or GPU thread may still be
+        # waiting on the other half of this connection. Close the transport once.
+        threading.Thread(target=close_failed_peer, name='gnome-detach', daemon=True).start()
+
+    def close_failed_peer():
+        try:
+            close_peer()
+        except Exception:
+            # The primary fault already stopped the input queue and renderer.
+            pass
 
     def submit(event):
         try:
@@ -81,7 +94,9 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
 
     def send_input(session):
         try:
-            while (event := inputs.get()) is not None:
+            while not stop.is_set() and (event := inputs.get()) is not None:
+                if stop.is_set():
+                    break
                 kind, *args = event
                 if kind == 'super':
                     session.send_super()
@@ -95,13 +110,14 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
             fail(exc)
 
     def present(width, height, pixels):
-        if stop.is_set():
-            raise InterruptedError('窗口已关闭。')
-        if (width, height) != size:
-            raise ValueError('云端桌面的尺寸与当前会话不匹配。')
-        if not window.present(pixels):
-            raise InterruptedError('本机窗口已关闭。')
-        got_scene.set()
+        with lock:
+            if stop.is_set():
+                raise InterruptedError('窗口已关闭。')
+            if (width, height) != size:
+                raise ValueError('云端桌面的尺寸与当前会话不匹配。')
+            if not window.present(pixels):
+                raise InterruptedError('本机窗口已关闭。')
+            got_scene.set()
 
     def close_peer():
         nonlocal peer
@@ -137,8 +153,22 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
     drawing.start()
     has_title = False
     status_until = 0.0
+    retained = False
     try:
-        while window.pump() and not stop.is_set() and not finished.is_set():
+        while window.pump():
+            if stop.is_set() or finished.is_set():
+                if not retain_on_disconnect or not got_scene.is_set():
+                    break
+                if not retained:
+                    with lock:
+                        invalid = bool(errors and isinstance(errors[0], ValueError))
+                    reason = '源端绘图或输入未通过校验' if invalid else '连接已断开'
+                    window.set_title(f'{TITLE} · {reason} · 只读')
+                    retained = True
+                # Native WM_PAINT/resize may redraw the last locally completed
+                # buffer. No network read or input submission is available now.
+                time.sleep(.025)
+                continue
             if not has_title and got_scene.is_set():
                 window.set_title(f'{TITLE} · Ubuntu')
                 has_title = True
@@ -163,7 +193,7 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
         cleanup.start()
         cleanup.join(2)
         drawing.join(2)
-    if errors:
+    if errors and (not retained or not isinstance(errors[0], OSError)):
         raise errors[0]
 
 
