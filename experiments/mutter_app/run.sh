@@ -132,7 +132,7 @@ fi
     --gpu "$XDG_RUNTIME_DIR/gpu" "${mode[@]}" > "$raw" 2>"$out/relay.log" &
 relay=$!
 wait_for 8 test -S "$XDG_RUNTIME_DIR/source"
-env CW_MUTTER_WITNESS="$out/owner.log" GALLIUM_DRIVER=virpipe VTEST_SOCKET_NAME="$XDG_RUNTIME_DIR/source" \
+env CW_MUTTER_WINDOW_WITNESS="$out/native-windows.log" CW_MUTTER_WITNESS="$out/owner.log" GALLIUM_DRIVER=virpipe VTEST_SOCKET_NAME="$XDG_RUNTIME_DIR/source" \
     /lib64/ld-linux-x86-64.so.2 --preload "$out/witness.so" /usr/bin/gnome-shell \
     --mode=ubuntu --nested --wayland --no-x11 --wayland-display=gnome-vgpu >"$out/shell.log" 2>&1 &
 shell=$!

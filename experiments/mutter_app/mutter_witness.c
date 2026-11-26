@@ -55,6 +55,7 @@ struct connection {
 #ifdef CW_POINTER_DIAGNOSTICS
 static void say(const char *fmt, ...);
 #endif
+static int window_log = -1;
 static struct connection connections[32];
 static uint32_t next_connection;
 static void client_gone(struct listener *l, void *d) {
@@ -62,6 +63,7 @@ static void client_gone(struct listener *l, void *d) {
 #ifdef CW_POINTER_DIAGNOSTICS
     say("POINTER_DISCONNECT %u\n", c->seq);
 #endif
+    if (window_log >= 0) dprintf(window_log, "DISCONNECT %u\n", c->seq);
     c->client = NULL;
 }
 struct ownership {
@@ -128,12 +130,86 @@ typedef void *(*one)(void *);
 typedef uint32_t (*idfn)(void *);
 typedef const char *(*strfn)(void *);
 typedef void (*creds)(void *, pid_t *, uid_t *, gid_t *);
-static int vendor(pid_t pid) {
+static int executable_is(pid_t pid, const char *binary) {
     struct stat candidate, installed;
     char path[80];
     snprintf(path, sizeof path, "/proc/%d/exe", pid);
-    return stat(path, &candidate) == 0 && stat("/usr/lib/chatgpt/ChatGPT", &installed) == 0 &&
+    return stat(path, &candidate) == 0 && stat(binary, &installed) == 0 &&
            candidate.st_ino == installed.st_ino && candidate.st_dev == installed.st_dev;
+}
+static int vendor(pid_t pid) { return executable_is(pid, "/usr/lib/chatgpt/ChatGPT"); }
+
+static unsigned long long process_start(pid_t pid) {
+    char path[64], row[1024];
+    snprintf(path, sizeof path, "/proc/%d/stat", pid);
+    unsigned long long start = 0;
+    FILE *st = fopen(path, "r");
+    if (st) {
+        if (fgets(row, sizeof row, st)) {
+            char *cp = strrchr(row, ')');
+            char *save = NULL;
+            char *t = cp ? strtok_r(cp + 2, " ", &save) : NULL;
+            int field = 3;
+            while (t && field < 22) {
+                t = strtok_r(NULL, " ", &save);
+                field++;
+            }
+            if (t) start = strtoull(t, NULL, 10);
+        }
+        fclose(st);
+    }
+    return start;
+}
+
+/* Record only protocol objects and keyboard focus in the private compositor.
+ * In particular, do not inspect keyboard events, window titles or page content.
+ * This log cannot authorize a graphics transfer or deliver input. */
+static void note_window(int direction, const struct msg *m, const char *type, const char *op) {
+    const char *event;
+    void *surface = NULL;
+    unsigned object = 0;
+    if (direction == 1 && !strcmp(type, "wl_keyboard") &&
+        (!strcmp(op, "enter") || !strcmp(op, "leave")) && m->argc >= 2) {
+        surface = m->args[1].o;
+        if (!surface) return;
+        event = !strcmp(op, "enter") ? "ENTER" : "LEAVE";
+    } else if (direction == 0 && !strcmp(type, "xdg_wm_base") &&
+               !strcmp(op, "get_xdg_surface") && m->argc == 2) {
+        surface = m->args[1].o;
+        if (!surface) return;
+        object = m->args[0].u;
+        event = "XDG";
+    } else if (direction == 0 && !strcmp(type, "xdg_surface") &&
+               !strcmp(op, "get_toplevel") && m->argc == 1) {
+        object = m->args[0].u;
+        event = "TOP";
+    } else if (direction == 0 && !strcmp(op, "destroy") && !strcmp(type, "xdg_toplevel")) {
+        event = "DROP_TOP";
+    } else if (direction == 0 && !strcmp(op, "destroy") && !strcmp(type, "xdg_surface")) {
+        event = "DROP_XDG";
+    } else if (direction == 0 && !strcmp(op, "destroy") && !strcmp(type, "wl_surface")) {
+        event = "DROP_SURFACE";
+    } else {
+        return;
+    }
+    FN(one, wl_resource_get_client);
+    FN(idfn, wl_resource_get_id);
+    FN(creds, wl_client_get_credentials);
+    void *client = wl_resource_get_client(m->resource);
+    if (surface && wl_resource_get_client(surface) != client) return;
+    uid_t uid = (uid_t)-1;
+    pid_t pid = 0;
+    wl_client_get_credentials(client, &pid, &uid, NULL);
+    if (uid != geteuid()) return;
+    const char *role = vendor(pid) ? "app" :
+                       executable_is(pid, "/usr/lib/chromium/chromium") ? "browser" : NULL;
+    if (!role) return;
+    uint32_t connection = client_seq(client);
+    unsigned long long start = process_start(pid);
+    if (!connection || !start) return;
+    unsigned resource = surface ? wl_resource_get_id(surface) : wl_resource_get_id(m->resource);
+    dprintf(window_log, "%s %s %d %llu %u %u %u\n",
+            event, role, pid, start, connection, resource, object);
 }
 #ifdef CW_POINTER_DIAGNOSTICS
 /* Optional source-only diagnostics for the supported Mutter 46 ABI. All functions
@@ -207,9 +283,6 @@ static void note_pointer(const struct msg *m, const char *op, uint32_t client, p
 #endif
 
 static void observe(void *data, int direction, const struct msg *m) {
-#ifndef CW_POINTER_DIAGNOSTICS
-    if (direction != 0) return;
-#endif
     if (!m || !m->resource || !m->message || !m->message->name) return;
     FN(strfn, wl_resource_get_class);
     FN(one, wl_resource_get_client);
@@ -217,8 +290,11 @@ static void observe(void *data, int direction, const struct msg *m) {
     FN(idfn, wl_resource_get_id);
     FN(one, wl_shm_buffer_get);
     const char *type = wl_resource_get_class(m->resource), *op = m->message->name;
+    if (window_log >= 0) note_window(direction, m, type, op);
 #ifdef CW_POINTER_DIAGNOSTICS
     if (direction != 0 && (direction != 1 || strcmp(type, "wl_pointer"))) return;
+#else
+    if (direction != 0) return;
 #endif
     if (strcmp(type, "wl_surface") && strcmp(type, "xdg_wm_base") && strcmp(type, "xdg_surface") &&
         strcmp(type, "xdg_toplevel") && strcmp(type, "zxdg_toplevel_decoration_v1") &&
@@ -315,24 +391,7 @@ static void observe(void *data, int direction, const struct msg *m) {
     attach_con[j] = seq;
     struct stat fi;
     if (stat("/usr/lib/chatgpt/ChatGPT", &fi)) return;
-    char path[64], row[1024];
-    snprintf(path, sizeof path, "/proc/%d/stat", pid);
-    unsigned long long start = 0;
-    FILE *st = fopen(path, "r");
-    if (st) {
-        if (fgets(row, sizeof row, st)) {
-            char *cp = strrchr(row, ')');
-            char *save = NULL;
-            char *t = cp ? strtok_r(cp + 2, " ", &save) : NULL;
-            int field = 3;
-            while (t && field < 22) {
-                t = strtok_r(NULL, " ", &save);
-                field++;
-            }
-            if (t) start = strtoull(t, NULL, 10);
-        }
-        fclose(st);
-    }
+    unsigned long long start = process_start(pid);
     say("PEER %u %d %llu %lu %lu %u %u %lu\n", seq, pid, start, (unsigned long)fi.st_dev,
         (unsigned long)fi.st_ino, table[j].surface, table[j].buffer, table[j].attach);
     say("ATTACH %d %u %u %lu\n", pid, table[j].surface, table[j].buffer, table[j].attach);
@@ -345,6 +404,9 @@ void *wl_display_create(void) {
     void *d = wl_display_create();
     const char *log = getenv("CW_MUTTER_WITNESS");
     if (log && out < 0) out = open(log, O_WRONLY | O_CLOEXEC | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
+    const char *windows = getenv("CW_MUTTER_WINDOW_WITNESS");
+    if (windows && window_log < 0)
+        window_log = open(windows, O_WRONLY | O_CLOEXEC | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
     if (d) wl_display_add_protocol_logger(d, observe, NULL);
     return d;
 }
