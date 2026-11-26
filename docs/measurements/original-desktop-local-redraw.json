@@ -1,0 +1,18 @@
+{
+  "displayPackageSha256": "ceec7cf2251129e8060157b31c1326d8a8cdf9a3eabb9b8ffcf7f57baf96f6f1",
+  "testedEntry": "present_original_desktop from the unmodified extracted Win64 archive, with a file-backed acceptance transport",
+  "environment": "Win64 CPython, Node, CanvasKit, VirGL and HWND on Wine 10, isolated from the network; independent X11 reader",
+  "cloudSource": "Ubuntu GNOME and ChatGPT running together on a real InstaBox",
+  "cloudCommandFileSha256": "9274424814c2da0f65d32b92cc0d1a3def83cf8797d23c4955c1ebca2f527f85",
+  "originalApplicationRasterBytesRemovedOnSource": 152582560,
+  "liveVisibleScanouts": 102,
+  "visibleUpdatesDuringOfflineReplay": 1,
+  "sourceFileClosedAndUnlinkedBeforeOfflineReplay": true,
+  "observerVerifiedClearedBlackClientAreaBeforeReplay": true,
+  "recomputedBgrxBeforeAndAfter": "07e5390b01496ebfc02e150af106f5c6559fd17541438bac6bdc2cda84aff8a6",
+  "independentWin32WindowRgbBeforeAndAfter": "3dcde12cd7d5e9ffa11043b905423b92066baf43ade741d0e39a2452717ec8f4",
+  "matchingRgbPixels": 1152000,
+  "width": 1280,
+  "height": 900,
+  "caveats": "One recorded real source session and its signed-out login menu. The experiment resets the source and deliberately paints the native window black before the second execution; it does not reconnect or modify the cloud session."
+}

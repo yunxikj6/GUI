@@ -118,27 +118,52 @@ class _PointerDesktop:
 def present_original_desktop(connect, open_window, *, node='node', runtime_dir=None):
     """Use the standard Win32 message loop, GPU thread and acknowledged input queue."""
     from thin_client.gnome_desktop import present_session
+    from thin_client.scene_cache import SceneCache
     from thin_client.virgl_windows import replay
     state = _WindowInput()
+    cache = None
 
     def native_window(title, width, height, submit):
         return open_window(title, width, height, state.events(submit))
 
-    def render(connection, present):
+    def draw(connection, present, *, live):
         nonce, exe = read_hello(connection)
+
         def authorized(binding):
-            # The authenticated bridge checked the entire binding against the
-            # independently published live Wayland/process witness on the source.
+            # The paired bridge binds this stream to its observed Linux process and Wayland surface.
             return binding.session == nonce and binding.executable_sha256 == exe
+
         with OriginalPicturePainter(node=node) as painter:
             source = LiveSurfaceStream(connection, session=nonce, authorize=authorized, rasterize=painter)
-            state.reader = source
-            def display(width, height, pixels):
-                if state.presented(source):
-                    present(width, height, pixels)
-            replay(source, display, runtime_dir=runtime_dir)
+            if live:
+                state.reader = source
 
-    present_session(lambda: _PointerDesktop(connect(), state), render, native_window, size=SIZE, retain_on_disconnect=True)
+            def display(width, height, pixels):
+                allowed = state.presented(source) if live else source.can_present
+                if allowed:
+                    present(width, height, pixels)
+                    if live:
+                        cache.presented(width, height, pixels)
+
+            try:
+                replay(source, display, runtime_dir=runtime_dir)
+            finally:
+                if live:
+                    with state.lock:
+                        state.reader = None
+
+    def render(connection, present):
+        nonlocal cache
+        # Cache the source records, before the local engine expands SkPictures into textures.
+        cache = SceneCache(connection)
+        draw(cache, present, live=True)
+
+    def restore(present, cancelled):
+        if cache is not None:
+            cache.redraw(lambda stream, emit: draw(stream, emit, live=False), present, cancelled)
+
+    present_session(lambda: _PointerDesktop(connect(), state), render, native_window,
+                    size=SIZE, retain_on_disconnect=True, restore=restore)
 
 
 def main(argv=None):

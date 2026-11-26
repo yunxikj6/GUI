@@ -11,6 +11,7 @@ NODE_ARCHIVE = 'e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f
 NODE_EXE = '86fc4785327db5f5c7558dc6156c543b433c313e813a222e088086222ab4afa6'
 # The original desktop feature requires no local copy of Ubuntu or the cloud application.
 MODULES = (
+    'thin_client/scene_cache.py',
     'cloud_render/gnome_commands.py',
     'cloud_render/gnome_input.py',
     'cloud_render/gnome_wire.py',
