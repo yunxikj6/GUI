@@ -24,7 +24,7 @@ python3 -m cloud_render.provision
 python3 -m cloud_render.provision --chatgpt-deb /path/to/chatgpt_amd64.deb
 ```
 
-云机可访问厂商软件仓库时，也可使用 `python3 -m cloud_render.provision --chatgpt` 获取已固定版本的安装包。若厂商镜像对整个文件的请求返回 403，可通过上面的 `--chatgpt-deb` 指定已有的官方文件。两种方式都核对包大小和 SHA-256。
+云端 APT 缓存中已有该版本，或云机可访问厂商仓库时，也可运行 `python3 -m cloud_render.provision --chatgpt`。它优先读取云机的已下载包，两个来源使用相同的校验。一次真实 InstaBox 请求收到厂商 HTTP 403。遇到此情况可通过上面的 `--chatgpt-deb` 指定已有的官方文件。两种方式都核对包大小和 SHA-256。
 
 当前适配版本为 26.1120.50957。云机在下载 Ubuntu 前先把软件包复制到本次会话的私有目录，校验与厂商签名索引匹配的 SHA-256。它在临时 Ubuntu 中安装原版软件、输入与字体依赖和绘图观测器，由云端 GCC 编译 Mutter 图面来源的记录组件。四个云端 Python wheel 的文件、尺寸及摘要固定在随包清单中。启动前的空间检查包含原软件 1,560,353 KiB 的安装大小。[原版软件来源](https://learn.chatgpt.com/docs/linux/linux-app)
 
