@@ -12,6 +12,8 @@ python3 -m experiments.original_desktop_source --port 17326
 
 在同一台 InstaBox 上对比两个发布包，首次显示 Ubuntu 桌面所需的已压缩绘图数据从 9,887,960 字节降至 430,337 字节（减少 95.65%，未计外层 HTTPS 开销）。Windows 根据一条 84 字节引用，用随包的 Ubuntu 官方壁纸还原了 33,177,600 字节的原始纹理，并校验了全部四个通道。同一位置的 1200×750 个壁纸像素在两个版本中完全一致。此次从双击到看见桌面用时 20.44 秒，点击 Dock 后，在启动第 40.94 秒看见 ChatGPT 欢迎页。[首屏测量](docs/measurements/instabox-win64/first-desktop-5fe9.json) · [本次桌面实拍](docs/measurements/instabox-win64/5fe9-desktop.png) · [本次 ChatGPT 窗口](docs/measurements/instabox-win64/5fe9-welcome.png) · [断开后在本机重建绘图](docs/measurements/original-desktop-local-redraw.json)
 
+两个发布 ZIP 也在独立 Ubuntu 与 Win64 之间配套验证过。从 Windows 打开同一扇窗口，依次点击 Dock、登录方式、原版表单，输入七个字符，再全选替换。七次增量绘图都还原出云端原程序提供的完整绘图指令。关闭窗口后，两端正常退出并释放本次会话。[两个发布包的验证记录](docs/measurements/paired-release-win64/receipt.json) · [全选替换后的原窗口](docs/measurements/paired-release-win64/native-replace.png)
+
 ## 连接基础 Ubuntu 桌面
 
 只使用 GNOME 桌面、概览搜索和独立应用通道时，可以选用同时支持多种桌面分辨率的基础客户端。[下载基础桌面客户端](releases/thin-windows/cloud-workspace.zip)

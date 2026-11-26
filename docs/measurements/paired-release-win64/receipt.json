@@ -1,0 +1,206 @@
+{
+  "exactZip": "5fe9e1a405c24a10a0c6afcada83fe15145e7ed3ed4fdc5bab5afa220b674858",
+  "features": {
+    "offered": 190,
+    "negotiated": 190,
+    "width": 1280,
+    "height": 900,
+    "returnedBytes": 1004613,
+    "seconds": 77.255
+  },
+  "witnessedOriginalSha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "boundPid": 428,
+  "verifiedGvglBlocks": 109,
+  "truncatedLastGvglBytes": 0,
+  "verifiedGvglLogicalBytes": 8557854,
+  "verifiedGvglLogicalSha256": "5ad47571b60aefbced7591d13f284a05cbc6b45f0d2b436a6bf9b1c279855438",
+  "rawDraws": 0,
+  "deltaDraws": 7,
+  "holds": 123,
+  "reuses": 49,
+  "ubuntuArtworkReferences": 1,
+  "ubuntuArtworkDigests": {
+    "b4da4262ad652769b76d6d97c46514ea7e611362f436be6f965edf90c9330ca1": 1
+  },
+  "rows": [
+    {
+      "digest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+      "ordinal": 1,
+      "delta": true,
+      "transportedBytes": 414766,
+      "reconstructedSourceBytes": 1526443
+    },
+    {
+      "digest": "1b3bd48b1c349bc243f4a866ff58216d2e7a068199f6a8f446ba69786353a514",
+      "ordinal": 2,
+      "delta": true,
+      "transportedBytes": 4878,
+      "reconstructedSourceBytes": 1526443
+    },
+    {
+      "digest": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+      "ordinal": 3,
+      "delta": true,
+      "transportedBytes": 13559,
+      "reconstructedSourceBytes": 2289392
+    },
+    {
+      "digest": "55829f368dece9d8a9d380484fbcadc3065e4653881696d70cd572693087153d",
+      "ordinal": 4,
+      "delta": true,
+      "transportedBytes": 4304,
+      "reconstructedSourceBytes": 2289392
+    },
+    {
+      "digest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "ordinal": 5,
+      "delta": true,
+      "transportedBytes": 16257,
+      "reconstructedSourceBytes": 2285431
+    },
+    {
+      "digest": "7babca5e4d26c43c50d63f06de5c5f13d97284f796d92a3fe16a74ab48213df4",
+      "ordinal": 6,
+      "delta": true,
+      "transportedBytes": 6845,
+      "reconstructedSourceBytes": 2285391
+    },
+    {
+      "digest": "c8f11049aa80740347f6ab680a011fecb8824a0bf925b2f452b2aa55e7a7c6fe",
+      "ordinal": 7,
+      "delta": true,
+      "transportedBytes": 5545,
+      "reconstructedSourceBytes": 2285379
+    }
+  ],
+  "independentWindowReadback": {
+    "welcome": {
+      "fullImageDigest": "19629427412db187c28097607b4e2b76be979c47896db991bdf3b5eecfb246bf",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 714000,
+      "exactFraction": 1.0
+    },
+    "method": {
+      "fullImageDigest": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713708,
+      "exactFraction": 0.9995910364145658
+    },
+    "empty": {
+      "fullImageDigest": "3a264aa4e70a74fdcac684820905fdea3d7d621b23dcaf9e2b61c014cd68a8e8",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    },
+    "input": {
+      "fullImageDigest": "7babca5e4d26c43c50d63f06de5c5f13d97284f796d92a3fe16a74ab48213df4",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    },
+    "replace": {
+      "fullImageDigest": "c8f11049aa80740347f6ab680a011fecb8824a0bf925b2f452b2aa55e7a7c6fe",
+      "origin": [
+        217,
+        146
+      ],
+      "sourceSize": [
+        1090,
+        760
+      ],
+      "interiorCompared": 714000,
+      "interiorExact": 713724,
+      "exactFraction": 0.9996134453781512
+    }
+  },
+  "windowExits": {
+    "productExit": 0,
+    "sourceExit": 0,
+    "privateDirectoryGone": true
+  },
+  "interaction": {
+    "steps": [
+      [
+        "welcome",
+        34.769
+      ],
+      [
+        "method",
+        40.329
+      ],
+      [
+        "empty",
+        46.109
+      ],
+      [
+        "input",
+        60.127
+      ],
+      [
+        "replace",
+        78.136
+      ]
+    ],
+    "typedKeys": 7,
+    "acknowledgedKeys": 7,
+    "focusEpoch": 1,
+    "submitted": false,
+    "selectedAndReplaced": true,
+    "testing": "True Win64 Python, Node and HWND under Wine and private isolated Ubuntu source",
+    "zip": "5fe9e1a405c24a10a0c6afcada83fe15145e7ed3ed4fdc5bab5afa220b674858",
+    "command": "Start.cmd --forwarded --port <authenticated local forward>"
+  },
+  "sourceArchiveSha": "664767b479e87f027dee59b449bbc178e74421c9cf2641e9ed90cbbfa84b04b6",
+  "clientArchiveSha": "5fe9e1a405c24a10a0c6afcada83fe15145e7ed3ed4fdc5bab5afa220b674858",
+  "verifiedClientFiles": 93,
+  "verifiedSourceFiles": 53,
+  "sourceGitRevision": "fbb89f962af828bc84a8d21fad78eaa6790ebe4a",
+  "closedEndpointChecks": {
+    "source": true,
+    "observerForwarder": true
+  },
+  "pairingFileRemoved": true,
+  "mode": "Actual cmd.exe /d /c Start.cmd --forwarded --port <temporary local port> in isolated Wine 10 Win64, with private OS input and an isolated Ubuntu Noble role running the signed original application. Neither role accessed an account or used InstaBox credentials. Physical Windows 11 and public network were not part of this test.",
+  "source": "Exact published candidate server ZIP extracted byte-for-byte, with the original executable/cloud OS installed on the separate Ubuntu role. Owner supplied a verified x86-64 native probe built with the packaged Mutter source and its own build flags. The operator used the bundled one-shot original_desktop_source module.",
+  "windowReadback": "Independent OS display capture against a separate CanvasKit execution of original CLRP retained by the source. Scores cover the central 1050 \u00d7 680 pixels of the original software surface.",
+  "submittedCredentials": false,
+  "screenshots": {
+    "native-welcome.png": "37909806c018bd90af678b6eae16640354636baeaa00ec058be0a954059472af",
+    "native-method.png": "4adbae45444d167e7e93e6a17ccfdf48af69e8e0f520ff815d661c9d7357efd0",
+    "native-empty.png": "1d397aa624e2e3234674b9397ea255e0b47c56044cbc46d8fa892242e3bbab24",
+    "native-input.png": "874fbcdfb6dd1931c55e91d5acb31cad88aef221230bafabc8a9edd907e4fec9",
+    "native-replace.png": "d59755fe13a0766d4b2db11b0b7b69aa81d7580a754d0409f825f8278074183a"
+  }
+}
