@@ -1,0 +1,253 @@
+{
+  "method": "Fresh private profile, Chromium 156.0.8078.79, a dedicated X server and loopback-only network namespace. The selected page was the browser-provided network error for the query-free https://auth.openai.com/. The launch process supplied the private browser pipe. The browser root process, sole visible X11 window and CDP target were independently checked. For each layer, a Browser DoUpdateLayers(source_frame_number) scope contains UpdateLayer(layerTreeId, layerId) and its exact original SkPicture. The active tree with the same source frame number appeared inside DrawLayers.FrameViewerTracing on this same native UI thread. A retained picture must keep its layer id and reference across observed consecutive source frames.",
+  "browserPid": 22,
+  "originals": {
+    "DesktopNativeWidgetAura - content window": {
+      "sourceFrame": 11,
+      "tree": 1,
+      "thread": 22,
+      "layer": 37,
+      "updateTs": 81872493983,
+      "nativeSkpEventTs": 81872502070,
+      "activeTreeTs": 81872504390,
+      "originalSkpSha256": "524a59778f69364fb34b5136a7a88a92f0b9997b4d754de97a8eca6319b66dd7",
+      "quad": [
+        0,
+        0,
+        900,
+        0,
+        900,
+        720,
+        0,
+        720
+      ],
+      "portableSkpSha256": "524a59778f69364fb34b5136a7a88a92f0b9997b4d754de97a8eca6319b66dd7"
+    },
+    "LocationBarView": {
+      "sourceFrame": 3,
+      "tree": 1,
+      "thread": 22,
+      "layer": 57,
+      "updateTs": 81872298797,
+      "nativeSkpEventTs": 81872304896,
+      "activeTreeTs": 81872319097,
+      "originalSkpSha256": "2b6ac7675a9c159814f0b66e3425193fdc0d51bb4aea98fbb645d612a650cc3d",
+      "quad": [
+        121,
+        46,
+        851,
+        46,
+        851,
+        80,
+        121,
+        80
+      ],
+      "portableSkpSha256": "2b6ac7675a9c159814f0b66e3425193fdc0d51bb4aea98fbb645d612a650cc3d"
+    },
+    "TabStripControlButton": {
+      "sourceFrame": 0,
+      "tree": 1,
+      "thread": 22,
+      "layer": 25,
+      "updateTs": 81872064487,
+      "nativeSkpEventTs": 81872064535,
+      "activeTreeTs": 81872131079,
+      "originalSkpSha256": "62876d26e03d2831582ea8bed4910648ad73747fc6f566f64e6db366ea6f41ae",
+      "quad": [
+        278,
+        0,
+        306,
+        0,
+        306,
+        41,
+        278,
+        41
+      ],
+      "portableSkpSha256": "62876d26e03d2831582ea8bed4910648ad73747fc6f566f64e6db366ea6f41ae"
+    },
+    "TabStripComboButton": {
+      "sourceFrame": 3,
+      "tree": 1,
+      "thread": 22,
+      "layer": 26,
+      "updateTs": 81872306426,
+      "nativeSkpEventTs": 81872306504,
+      "activeTreeTs": 81872319097,
+      "originalSkpSha256": "8ff3c75478a1a6a8e6b7dcb7734feb26830e0ebaffae20b8ed7cfc13ff458f3a",
+      "quad": [
+        6,
+        0,
+        34,
+        0,
+        34,
+        41,
+        6,
+        41
+      ],
+      "portableSkpSha256": "8ff3c75478a1a6a8e6b7dcb7734feb26830e0ebaffae20b8ed7cfc13ff458f3a"
+    },
+    "ImageView": {
+      "sourceFrame": 0,
+      "tree": 1,
+      "thread": 22,
+      "layer": 159,
+      "updateTs": 81872064566,
+      "nativeSkpEventTs": 81872064586,
+      "activeTreeTs": 81872131079,
+      "originalSkpSha256": "c749af724aaf84ecb56ee28ceef05604e85ebda553bad3ad12015cf9cec5e1d5",
+      "quad": [
+        11,
+        11,
+        29,
+        11,
+        29,
+        29,
+        11,
+        29
+      ],
+      "portableSkpSha256": "c749af724aaf84ecb56ee28ceef05604e85ebda553bad3ad12015cf9cec5e1d5"
+    }
+  },
+  "unresolvedTop": [
+    {
+      "name": "Textfield:CursorView",
+      "id": 62,
+      "bounds": [
+        158,
+        53,
+        159,
+        53,
+        159,
+        73,
+        158,
+        73
+      ],
+      "type": "cc::LayerImpl"
+    },
+    {
+      "name": "MultiContentsBackgroundView",
+      "id": 1,
+      "bounds": [
+        0,
+        86,
+        900,
+        86,
+        900,
+        720,
+        0,
+        720
+      ],
+      "type": "cc::LayerImpl"
+    },
+    {
+      "name": "ContentsSeparator",
+      "id": 46,
+      "bounds": [
+        0,
+        86,
+        900,
+        86,
+        900,
+        87,
+        0,
+        87
+      ],
+      "type": "cc::LayerImpl"
+    }
+  ],
+  "viewport": [
+    900,
+    87
+  ],
+  "topClrpSha256": "379c2775318ab9f58f1107ebf8ac5ac432f311ff439d895a85b632d67b971635",
+  "snapshots": {
+    "chromeSource": "source-chrome.png",
+    "windows": "win32-chrome.png",
+    "sourceRgbSha256": "d64fd88939eecc9066eef681dbd17822a09bb934080976e352bad402ffdc8c96",
+    "win32RgbSha256": "a6571cc4c550c8a745991a4a5461eee758301dcf505c449d5fd76df9bb495298"
+  },
+  "input": {
+    "traceStartedBeforeFirstWindowCreation": true,
+    "originalApplication": "/usr/lib/chromium/chromium",
+    "protocolValidation": "Only one non-account, unreachable public URL. No request parameters, no user data, no credential entry.",
+    "traceSha256": "9d6167756e359cefe65324df726cfea1340ee6966f62bfccbffc5108a8d8d75c"
+  },
+  "observations": {
+    "allTop": {
+      "box": [
+        0,
+        0,
+        900,
+        87
+      ],
+      "pixelsExact": 75776,
+      "pixels": 78300,
+      "meanAbsoluteChannelError": 2.288604
+    },
+    "tabStrip": {
+      "box": [
+        0,
+        0,
+        900,
+        41
+      ],
+      "pixelsExact": 36126,
+      "pixels": 36900,
+      "meanAbsoluteChannelError": 0.208609
+    },
+    "addressBar": {
+      "box": [
+        121,
+        46,
+        851,
+        80
+      ],
+      "pixelsExact": 24101,
+      "pixels": 24820,
+      "meanAbsoluteChannelError": 0.440236
+    },
+    "tabStripControlButton": {
+      "box": [
+        278,
+        0,
+        306,
+        41
+      ],
+      "pixelsExact": 1035,
+      "pixels": 1148,
+      "meanAbsoluteChannelError": 0.043844
+    },
+    "tabStripComboButton": {
+      "box": [
+        6,
+        0,
+        34,
+        41
+      ],
+      "pixelsExact": 1078,
+      "pixels": 1148,
+      "meanAbsoluteChannelError": 0.029036
+    },
+    "unresolvedSeparator": {
+      "box": [
+        0,
+        86,
+        900,
+        87
+      ],
+      "pixelsExact": 0,
+      "pixels": 900,
+      "meanAbsoluteChannelError": 178.333333
+    }
+  },
+  "win32": {
+    "win32Pid": 88,
+    "hwnd": 131150,
+    "width": 900,
+    "height": 87,
+    "rgbSha256": "a6571cc4c550c8a745991a4a5461eee758301dcf505c449d5fd76df9bb495298",
+    "win32SecondsToStable": 1.357,
+    "method": "Win32 GetClientRect/GetDC/BitBlt/CreateDIBSection read from another Win64 process"
+  },
+  "limits": "A separate Wine 10 Windows process read the HWND of the original Win64 viewer. Only five native drawing layers were rendered into this diagnostic band. The cursor and two views at y=86 lack verified source colors. This output is not an authorized complete browser chrome frame; no source screenshot entered the renderer and no missing graphic was substituted."
+}
