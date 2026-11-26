@@ -36,7 +36,9 @@ python3 -m experiments.original_desktop_source --port 17326
 
 在独立 Ubuntu 云端会话中，使用同一专用配置目录重新打开原厂应用，应用自行保存的窗口尺寸和首次启动时间一致。原版输入框的光标闪烁也会产生新的绘图。在云端重新核对画面期间，点击可能需要重试。已观测到用户重新点击 Cancel 后，原程序收到按下、松开并返回登录方式菜单。[跨会话设置](docs/measurements/original-cloud-profile.json) · [按钮动作与屏幕实拍](docs/measurements/original-app-pointer-surface.json)
 
-从原版程序选择账户登录时，它会在云机上打开独立的系统浏览器，并在同一台云机的回环地址接收 OAuth 回调。已观察到原版程序和浏览器的两个真实窗口。当前客户端还需要接入这第二个窗口，才能完成账户登录。[系统浏览器和回调的实测](docs/measurements/chatgpt-system-browser-signin.json)
+在安装了 Chromium 的隔离 Ubuntu 云桌面，点击原版 ChatGPT 的登录按钮会由系统打开一扇独立的浏览器窗口。Mutter 记录到键盘焦点从 ChatGPT 切到 Chromium，在浏览器中按 Ctrl+W 后又回到原来的 ChatGPT 窗口。云端负责打开链接和接收应用回调。实测覆盖窗口交接，在线账户登录仍待完成。[原窗口与焦点的实测](docs/measurements/system-browser/actual-wayland-physical-focus.json) · [回调监听的实测](docs/measurements/chatgpt-system-browser-signin.json)
+
+要单独验证系统浏览器内容区，可以在云端运行 `python3 -m cloud_render.browser_viewport_service --port 17328`，在 Windows 客户端运行 `Start.cmd --browser-viewport --instabox --port 17328`。在这一入口，原版 Chromium 打开固定的离线页面。Windows 执行它提供的 Skia 指令，点击「Details」由云端原控件处理。已经在 1000×813 内容区测到原控件展开、同一个 Windows 窗口更新。独立实验也重绘了浏览器自己的标签栏和地址栏。在线登录页以及浏览器在默认桌面中的完整合成仍待接入。[配对说明](docs/interactive-original-desktop.md) · [原版标签栏在 Win64 的绘图](docs/measurements/original-chromium-top/win32-chrome.png)
 
 ## 单独打开云端 ChatGPT
 
