@@ -40,5 +40,9 @@
     "visibleText": "orbit",
     "windowImage": "input.png"
   },
-  "remainingIssue": "After typing, the Cancel button could stay unresponsive while the viewer was waiting for the current application drawing to be verified."
+  "remainingIssue": "After typing, the Cancel button could stay unresponsive while the viewer was waiting for the current application drawing to be verified.",
+  "cancelAttempts": 2,
+  "cancelCloudClickAcknowledged": false,
+  "sourceExit": 1,
+  "sourceTemporaryDirectoryRemoved": true
 }
