@@ -58,7 +58,7 @@ def _root_spans(events):
     return {tid: _index(rows) for tid, rows in activations.items()}
 
 
-def _scoped_pictures(events, tree_id):
+def _scoped_pictures(events, tree_id, *, completed_paint=False):
     commits = defaultdict(list)
     by_sequence = defaultdict(list)
     updates = defaultdict(list)
@@ -79,6 +79,7 @@ def _scoped_pictures(events, tree_id):
         else:
             updates[e['tid']].append((start, stop, args['layerId']))
     paint_spans = {}
+    paint_ends = {}
     for tid in commits.keys() & updates.keys():
         commit_spans = _index(commits[tid])
         rows = []
@@ -88,6 +89,7 @@ def _scoped_pictures(events, tree_id):
                 continue
             if layer_id in layers:
                 raise ValueError('duplicate layer in one native commit')
+            paint_ends[id(layers)] = max(stop, paint_ends.get(id(layers), stop))
             bucket = layers[layer_id] = []
             rows.append((start, stop, bucket))
         paint_spans[tid] = _index(rows)
@@ -96,16 +98,21 @@ def _scoped_pictures(events, tree_id):
             bucket = _cover(paint_spans[e['tid']], e['ts'], e['ts'])
             if bucket is not None:
                 bucket.append(e['args']['snapshot'])
+    if completed_paint:
+        # The main-thread Commit scope can outlive compositor activation on
+        # Chromium. Every nested UpdateLayer must have finished before it.
+        return {seq: [(start, paint_ends.get(id(layers), end), layers)
+                      for start, end, layers in rows] for seq, rows in by_sequence.items()}
     return by_sequence
 
 
-def activations(owned, tree_id, *, checkpoint=None):
+def activations(owned, tree_id, *, checkpoint=None, layers_of=_drawn_layers, completed_paint=False):
     """Yield one actual active scene per proven presentation, in source order."""
     names = {'Activation', 'PipelineReporter', 'Commit', 'UpdateLayer', 'ActivateLayerTree', PICTURE, TREE}
     events = sorted((e for e in owned if e['name'] in names), key=lambda e: _time(e['ts']))
     if sum(e['name'] == PICTURE and 'snapshot' in e.get('args', {}) for e in events) > 512:
         raise ValueError('too many original drawing publications')
-    commits = _scoped_pictures(events, tree_id)
+    commits = _scoped_pictures(events, tree_id, completed_paint=completed_paint)
     if any(len(v) > 32 for v in commits.values()):
         raise ValueError('ambiguous reused compositor frame sequence')
     pipeline = _root_spans(e for e in events if e['name'] in ('PipelineReporter', 'Activation'))
@@ -155,7 +162,7 @@ def activations(owned, tree_id, *, checkpoint=None):
         tree = trees[j]['args']['snapshot']
         if tree['active_tree']['source_frame_number'] != sequence:
             continue
-        layers = _drawn_layers(tree)
+        layers = layers_of(tree)
         if not 0 < len(layers) <= MAX_LAYERS or len({layer['layer_id'] for layer in layers}) != len(layers):
             continue
         current = {}

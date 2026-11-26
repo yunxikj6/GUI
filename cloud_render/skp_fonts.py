@@ -23,6 +23,10 @@ class FontError(ValueError):
 # DejaVu is from Ubuntu Noble and Debian Trixie, Liberation from Debian Trixie.
 # Their redistribution notices accompany the renderer in thin_client/vendor/.
 _FACES = {
+    ('Noto Sans', 700): ('noto/NotoSans-Bold.ttf', {
+        'e83493c945848ecd4a9ad0f6d19164541a0d3e23a9c952304a00a46e00272ac5'}),
+    ('Noto Sans', 400): ('noto/NotoSans-Regular.ttf', {
+        '89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d'}),
     ('DejaVu Sans', 400): ('dejavu/DejaVuSans.ttf', {
         'ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280',
         '57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e'}),

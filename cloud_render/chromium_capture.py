@@ -198,14 +198,14 @@ async def _read_trace(cdp, handle):
     return json.loads(raw)["traceEvents"]
 
 
-async def _snapshot(cdp):
+async def _snapshot(cdp, *, categories=CATEGORIES):
     complete = asyncio.get_running_loop().create_future()
     def on_complete(event):
         if not complete.done():
             complete.set_result(event)
     cdp.once("Tracing.tracingComplete", on_complete)
     try:
-        await cdp.send("Tracing.start", {"categories": CATEGORIES, "transferMode": "ReturnAsStream",
+        await cdp.send("Tracing.start", {"categories": categories, "transferMode": "ReturnAsStream",
                                          "streamFormat": "json"})
         try:
             # The ordinary compositor is idle on a stationary page. Request a
