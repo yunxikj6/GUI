@@ -91,12 +91,14 @@ def check_request(req):
     extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'},
               'input': {'id', 'data'}, 'close': set()}
     extras['desktop'] = {'id', 'data'}
-    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper'}, 'poll': {'reset', 'batch'}}
+    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper', 'searchInput'}, 'poll': {'reset', 'batch'}}
     require(op in extras and set(req) - optional.get(op, set()) == {'op', 'session'} | extras[op],
             'invalid-request')
     require(isinstance(req['session'], str) and re.fullmatch('[0-9a-f]{32}', req['session']), 'invalid-session')
     if op == 'start':
         require('protocol' not in req or (req['protocol'] == 'gnome' and 'codec' not in req), 'invalid-protocol')
+        if 'searchInput' in req:
+            require(req.get('protocol') == 'gnome' and req['searchInput'] is True, 'invalid-capabilities')
         if 'wallpaper' in req:
             require(req.get('protocol') == 'gnome' and req['wallpaper'] is True, 'invalid-capabilities')
         if 'width' in req or 'height' in req:
@@ -111,12 +113,18 @@ def check_request(req):
         require(type(req['after']) is int and 0 <= req['after'] < 2 ** 53, 'invalid-cursor')
     if op == 'desktop':
         require(type(req['id']) is int and 1 <= req['id'] <= 0xffffffff and
-                isinstance(req['data'], str) and 0 < len(req['data']) <= 28, 'invalid-desktop-input')
+                isinstance(req['data'], str) and 0 < len(req['data']) <= 4 * ((23 + MAX_TEXT + 2) // 3), 'invalid-desktop-input')
         raw = base64.b64decode(req['data'], validate=True)
-        require(17 <= len(raw) <= 21 and HEADER.unpack_from(raw) == (b'GVGL', 1, 2, 0, len(raw) - HEADER.size)
+        require(17 <= len(raw) <= 23 + MAX_TEXT and HEADER.unpack_from(raw) == (b'GVGL', 1, 2, 0, len(raw) - HEADER.size)
                 and struct.unpack_from('!I', raw, HEADER.size)[0] == req['id'], 'invalid-desktop-input')
         command = raw[16:]
-        if command[:1] in (b'M', b'L', b'R') and len(command) == 5:
+        if command[:1] == b'T':
+            require(len(command) >= 8, 'invalid-desktop-input')
+            revision, length = struct.unpack_from('!IH', command, 1)
+            require(revision and 1 <= length <= MAX_TEXT and len(command) == 7 + length, 'invalid-desktop-input')
+            value = command[7:].decode('utf-8')
+            require(all(ord(c) >= 32 and not 127 <= ord(c) < 160 for c in value), 'invalid-desktop-input')
+        elif command[:1] in (b'M', b'L', b'R') and len(command) == 5:
             x, y = struct.unpack_from('!HH', command, 1)
             require(x < 1920 and y < 1080, 'invalid-desktop-input')
         else:
@@ -167,6 +175,9 @@ class Relay:
         self.acked = self.published = self.offered = 0
         self.desktop = start.get('protocol') == 'gnome'
         self.confirmed_input = 0
+        self.confirmed_applied = True
+        self.pending_is_text = False
+        self.features = 0
         self.input_id = 0
         self.input_digest = None
         self.input_flushed = False
@@ -179,7 +190,7 @@ class Relay:
         self.controls = set()
         self.previous = b''
 
-    async def artwork_supported(self):
+    async def desktop_features(self):
         reader, writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.start['port']), 5)
         try:
             writer.write(('GNOME-CAPS/1 ' + self.start['pair'] + '\n').encode('ascii'))
@@ -187,8 +198,8 @@ class Relay:
             try:
                 magic, flags = struct.unpack('!4sI', await asyncio.wait_for(reader.readexactly(8), 5))
             except asyncio.IncompleteReadError:
-                return False  # An original v1 service closes unknown authenticated setup requests.
-            return magic == b'GCFG' and bool(flags & 1)
+                return 0  # An original v1 service closes unknown authenticated setup requests.
+            return flags if magic == b'GCFG' else 0
         finally:
             writer.close()
             with suppress(OSError):
@@ -196,7 +207,8 @@ class Relay:
 
     async def receive(self):
         try:
-            artwork = self.start.get('wallpaper') is True and await self.artwork_supported()
+            requested = int(self.start.get('wallpaper') is True) | (2 if self.start.get('searchInput') is True else 0)
+            self.features = requested & await self.desktop_features() if requested else 0
             reader, self.writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.start['port']), 5)
             desktop = self.desktop
             # GNOME emits many small draw blocks between inputs. Buffer them
@@ -209,9 +221,9 @@ class Relay:
                 byte_limit = 2 * (MAX_PAYLOAD + HEADER.size)
             prefix = 'GNOME-AUTH/1 ' if desktop else 'CLRP-AUTH/1 '
             dimensions = b''
-            if desktop and (artwork or desktop_size(self.start) != GNOME_SIZES[0]):
+            if desktop and (self.features or desktop_size(self.start) != GNOME_SIZES[0]):
                 prefix = 'GNOME-AUTH/2 '
-                dimensions = struct.pack('!HHI', *desktop_size(self.start), int(artwork))
+                dimensions = struct.pack('!HHI', *desktop_size(self.start), self.features)
             self.writer.write((prefix + self.start['pair'] + '\n').encode('ascii') + dimensions)
             await self.writer.drain()
             while True:
@@ -220,9 +232,10 @@ class Relay:
                 if desktop:
                     require(magic == b'GVGL' and version == 1 and flags == 0 and
                             ((kind == 1 and 72 < size <= 72 + 1024 * 1024 + 4096)
+                             or (kind == 7 and self.features & 2 and size == 5)
                              or (kind in (3, 4, 5, 6) and size == {3: 5, 4: 4, 5: 44, 6: 1}[kind])),
                             'upstream-protocol')
-                    require(self.published or kind in (1, 4, 6), 'upstream-protocol')
+                    require(self.published or kind in (1, 4, 6, 7), 'upstream-protocol')
                 else:
                     require(magic == b'CLRP' and version == 1 and flags == 0 and
                             ((kind == 1 and 10 <= size <= MAX_PAYLOAD) or (kind == 3 and size == 5)),
@@ -234,9 +247,10 @@ class Relay:
                     ack = await asyncio.wait_for(reader.readexactly(size), 10)
                     number, applied = struct.unpack('!IB', ack)
                     async with self.changed:
-                        require(applied == 1 and number == self.confirmed_input + 1
+                        require((applied == 1 or (applied == 0 and self.pending_is_text)) and number == self.confirmed_input + 1
                                 and number == self.input_id, 'upstream-protocol')
                         self.confirmed_input = number
+                        self.confirmed_applied = bool(applied)
                         self.changed.notify_all()
                 async with self.changed:
                     await self.changed.wait_for(lambda: len(self.messages) < count_limit
@@ -372,6 +386,7 @@ class Relay:
             require(self.published and not self.closed, 'upstream-closed')
             # Mark consumed before writing to the transport. An interrupted write
             # has an unknown application outcome and must never be attempted twice.
+            self.pending_is_text = self.desktop and raw[16:17] == b'T'
             self.input_id, self.input_digest, self.input_flushed = index, digest, False
             try:
                 self.writer.write(raw)
@@ -403,15 +418,20 @@ class Relay:
                 require(req.get('codec') == self.start.get('codec') and
                         req.get('protocol') == self.start.get('protocol') and
                         desktop_size(req) == desktop_size(self.start) and
-                        req.get('wallpaper') == self.start.get('wallpaper'), 'session-conflict')
+                        req.get('wallpaper') == self.start.get('wallpaper') and
+                        req.get('searchInput') == self.start.get('searchInput'), 'session-conflict')
                 await asyncio.wait_for(self.ready.wait(), 35)
                 require(self.published, 'upstream-unavailable')
                 if self.desktop:
                     result['batch'] = True
+                    if self.features & 2:
+                        result['searchInput'] = True
             elif op == 'poll':
                 result = await self.poll(req['after'], req.get('reset', False), req.get('batch', False))
             elif op in ('click', 'input', 'desktop'):
                 require((op == 'desktop') == (self.start.get('protocol') == 'gnome'), 'wrong-input-protocol')
+                if op == 'desktop' and raw[16:17] == b'T':
+                    require(self.features & 2, 'wrong-input-protocol')
                 if op == 'desktop' and raw[16:17] in (b'L', b'M', b'R'):
                     x, y = struct.unpack_from('!HH', raw, 17)
                     width, height = desktop_size(self.start)
@@ -426,7 +446,9 @@ class Relay:
                         with suppress(asyncio.TimeoutError):
                             await asyncio.wait_for(self.changed.wait_for(
                                 lambda: self.confirmed_input >= index or self.closed), 4)
-                        result['confirmed'] = self.confirmed_input >= index
+                        result['confirmed'] = self.confirmed_input == index
+                        if result['confirmed'] and not self.confirmed_applied:
+                            result['applied'] = False
             else:
                 close = True
             reply = {'ok': True, **result}

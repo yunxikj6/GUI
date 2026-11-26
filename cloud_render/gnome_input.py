@@ -7,6 +7,34 @@ SIZE_NAMES = {f'{w}x{h}': (w, h) for w, h in SUPPORTED_SIZES}
 WIDTH, HEIGHT = DEFAULT_SIZE
 
 
+TEXT_HEAD = struct.Struct('!BIH')
+MAX_TEXT = 4096
+
+
+def command_size(data):
+    if data[:1] != b'T':
+        return input_size(bytes(data[:1]))
+    if len(data) < TEXT_HEAD.size:
+        return None
+    _, revision, length = TEXT_HEAD.unpack_from(data)
+    if not revision or not 1 <= length <= MAX_TEXT:
+        raise ValueError('GNOME 文字提交头无效。')
+    return TEXT_HEAD.size + length
+
+
+def encode_text(revision, text):
+    if (type(revision) is not int or not 0 < revision <= 0xffffffff or type(text) is not str
+            or not 0 < len(text) <= MAX_TEXT or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in text)):
+        raise ValueError('GNOME 搜索文本或焦点编号无效。')
+    try:
+        data = text.encode('utf-8')
+    except UnicodeEncodeError:
+        raise ValueError('GNOME 搜索文本编码无效。') from None
+    if len(data) > MAX_TEXT:
+        raise ValueError('GNOME 搜索文本过长。')
+    return TEXT_HEAD.pack(ord('T'), revision, len(data)) + data
+
+
 _COORDS = struct.Struct('!HH')
 KEYS = ('Tab', 'Enter', 'Escape', 'Left', 'Right', 'Up', 'Down', 'Backspace',
         'Delete', 'Home', 'End', 'PageUp', 'PageDown', 'Shift+Tab', 'Space')
@@ -47,9 +75,17 @@ def encode_key(key):
 
 def decode_input(command, *, size=DEFAULT_SIZE):
     """Validate exactly one command, returning (opcode, positional arguments)."""
-    if type(command) is not bytes or len(command) != input_size(command[:1]):
+    if type(command) is not bytes or len(command) != command_size(command):
         raise ValueError('GNOME 输入长度无效。')
     op = command[:1]
+    if op == b'T':
+        _, revision, _ = TEXT_HEAD.unpack_from(command)
+        try:
+            text = command[TEXT_HEAD.size:].decode('utf-8')
+        except UnicodeDecodeError:
+            raise ValueError('GNOME 搜索文本编码无效。') from None
+        encode_text(revision, text)
+        return op, (revision, text)
     if op == b'S':
         return op, ()
     if op == b'K':

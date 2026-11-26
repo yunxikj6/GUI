@@ -4,7 +4,7 @@ GNOME Shell 46、Mutter、Ubuntu Dock、Yaru 与 Noble 壁纸运行在云机。�
 
 ## 云端环境与启动
 
-在云端的 Ubuntu 24.04 amd64 普通用户环境安装发行版组件。需要 Python 3、`ubuntu-session`、`gnome-shell`、`gnome-shell-extension-ubuntu-dock`、`yaru-theme-gnome-shell`、`yaru-theme-icon`、`ubuntu-wallpapers-noble`、`xvfb`、`x11-utils`、`xdotool`、`dbus-daemon`、`libglib2.0-bin`、`libgl1-mesa-dri` 和提供 `virgl_test_server` 的 `virgl-server`。使用有完整依赖的专用虚拟机或容器，保留系统 GLib 的 `gio-launch-desktop` 程序。源端需要可写的私有临时目录、独立的进程及套接字环境。新启动的源使用独立的 HOME、桌面目录、Xauthority 和两条 D-Bus 总线。
+在云端的 Ubuntu 24.04 amd64 普通用户环境安装发行版组件。需要 Python 3、`ubuntu-session`、`gnome-shell`、`gnome-shell-extension-ubuntu-dock`、`yaru-theme-gnome-shell`、`yaru-theme-icon`、`ubuntu-wallpapers-noble`、`fonts-noto-cjk`、`xvfb`、`x11-utils`、`xdotool`、`dbus-daemon`、`libglib2.0-bin`、`libgl1-mesa-dri` 和提供 `virgl_test_server` 的 `virgl-server`。使用有完整依赖的专用虚拟机或容器，保留系统 GLib 的 `gio-launch-desktop` 程序。源端需要可写的私有临时目录、独立的进程及套接字环境。新启动的源使用独立的 HOME、桌面目录、Xauthority 和两条 D-Bus 总线。
 
 用户通过配对中继打开云桌面。在仓库根目录运行以下命令启动云机回环服务。交互式终端会显示配对码。在服务管理器内运行时，用其私密环境配置设置 `CLOUDWORKSPACE_GNOME_TOKEN`。
 
@@ -40,3 +40,11 @@ python3 -m unittest discover -s tests -p 'test_gnome_*.py'
 Windows 客户端会在内存中核对随包附带的 Noble 默认壁纸。只有已核对的本机资源才会参与会话协商。云端遇到与该资源字节完全一致的纹理上传时，可发回资源摘要和原始绘图参数。本机据此恢复 Ubuntu 的完整纹理，继续执行原版 GNOME 绘图。旧服务端、缺少该资源的客户端和其他壁纸继续使用原来的绘图指令。
 
 `thin_client/vendor/ubuntu-noble/wallpaper.rgb.xz` 是 Canonical 的 `warty-final-ubuntu.png` 转存为无损 RGB 后的压缩文件。发行版标注版权为 2016–2022 Canonical Ltd，许可为 CC BY-SA 4.0。原包声明及许可全文见 [COPYRIGHT](../thin_client/vendor/ubuntu-noble/COPYRIGHT)。
+
+### GNOME 概览搜索的输入法
+
+打开概览，点击原版 GNOME 搜索框。客户端和云端都支持文字输入时，Windows 输入法在本机处理候选词。提交的文字进入当前这一次获得焦点的 GNOME 搜索框。云端的 GNOME Shell 通过 Clutter 输入法更新自己的控件、搜索结果和画面。中文字体由云机的 `fonts-noto-cjk` 包提供。
+
+云端源码须包含 `cloud_render/gnome_search/`。会话在专用临时 HOME 启用自带的 GNOME Shell 46 输入扩展，校验私有 Unix 套接字对端的 Shell 进程，并监听原版搜索框的焦点。离开概览、锁屏、切换控件或重连都会使先前的候选词提交失效。单次提交接受最多 4096 个 UTF-8 字节的单行文字。私有中转重试复用同一个操作序号。与旧版连接时，原有指针和导航键仍然可用。
+
+实测时，原控件依次显示 `abc`、`abc你好` 和退格后的 `abc你`。独立渲染器输出的 91 帧都与对应的云端原帧哈希相同。[本地重绘画面](gnome-search-zh.png) · [验收记录](measurements/gnome-search-input.json)

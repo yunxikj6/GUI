@@ -5,28 +5,34 @@ from contextlib import suppress
 import hashlib
 import io
 import re
+import secrets
 import socket
 import threading
 
 from cloud_render import gnome_wire as wire
 from cloud_render.instabox_relay import BATCH_BYTES, BATCH_COUNT, BATCH_INLINE
-from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer
+from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer, encode_text
 from .instabox_transport import InstaBoxControl, RequestOutcomeUnknown, TransportError
 
 
-DOWNSTREAM = {wire.BLOCK, wire.ACK, wire.READY, wire.END, wire.UNAVAILABLE}
+_FOCUS_REJECTED = object()
+
+DOWNSTREAM = {wire.BLOCK, wire.ACK, wire.READY, wire.END, wire.UNAVAILABLE, wire.FOCUS}
 
 
 class _Provider(InstaBoxControl):
-    def __init__(self, box, port, pairing, size, wallpaper=False):
+    def __init__(self, box, port, pairing, size, wallpaper=False, search_input=False):
         super().__init__(box)
         self.cursor = 0
         self.pending = deque()
         try:
             dimensions = {} if size == DEFAULT_SIZE else dict(width=size[0], height=size[1])
+            if search_input:
+                dimensions['searchInput'] = True
             if wallpaper:
                 dimensions['wallpaper'] = True
             started = self._call('start', port=port, pair=pairing, protocol='gnome', **dimensions)
+            self.search_input = started.get('searchInput') is True and search_input
             self.batch = started.get('batch') is True
         except BaseException:
             self.close()
@@ -81,6 +87,10 @@ class _Provider(InstaBoxControl):
             raise TransportError('云桌面中转回执不匹配。')
         if 'confirmed' in ack and type(ack['confirmed']) is not bool:
             raise TransportError('原桌面操作确认无效。')
+        if ack.get('applied', True) is not True:
+            if not self.search_input or ack.get('applied') is not False or not ack.get('confirmed'):
+                raise TransportError('云端输入确认无效。')
+            return _FOCUS_REJECTED
         return ack.get('confirmed', False)
 
     def close(self):
@@ -93,16 +103,18 @@ class _Provider(InstaBoxControl):
 
 
 class _Forward:
-    def __init__(self, port, pairing, size, wallpaper=False):
+    def __init__(self, port, pairing, size, wallpaper=False, search_input=False):
         flags = 0
-        if wallpaper:
+        requested = (wire.WALLPAPER if wallpaper else 0) | (wire.SEARCH_INPUT if search_input else 0)
+        if requested:
             with socket.create_connection(('127.0.0.1', port), timeout=5) as query, query.makefile('rb') as reply:
                 query.sendall(wire.QUERY + pairing.encode('ascii') + b'\n')
                 capabilities = reply.read(wire.FEATURES.size)
                 if len(capabilities) == wire.FEATURES.size:
                     magic, offered = wire.FEATURES.unpack(capabilities)
                     if magic == wire.FEATURE_MAGIC:
-                        flags = offered & wire.WALLPAPER
+                        flags = offered & requested
+        self.search_input = bool(flags & wire.SEARCH_INPUT)
         self.peer = socket.create_connection(('127.0.0.1', port), timeout=8)
         try:
             extended = bool(flags) or size != DEFAULT_SIZE
@@ -139,6 +151,11 @@ class DesktopStream:
         self.input_lock = threading.Lock()
         self.ready = self.ended = self.closed = False
         self.problem = None
+        self.focus_namespace = secrets.randbits(128) + 1
+        self.focus_revision = 0
+        self.focus_active = False
+        self.last_applied = True
+        self.early_results = {}
         self.sent = self.confirmed = self.ordered_ack = 0
         self.thread = threading.Thread(target=self._receive, name='GNOME drawing stream', daemon=True)
         self.thread.start()
@@ -172,12 +189,24 @@ class DesktopStream:
                             if self.ready or wire.DIMENSIONS.unpack(body) != self.size:
                                 raise TransportError('云桌面尺寸或就绪状态不符。')
                             self.ready = True
+                        elif kind == wire.FOCUS:
+                            rev, active = wire.FOCUS_STATE.unpack(body)
+                            if (not getattr(self.peer, 'search_input', False) or
+                                    rev != self.focus_revision + 1 or active not in (0, 1)):
+                                raise TransportError('原桌面搜索焦点无效。')
+                            self.focus_revision, self.focus_active = rev, bool(active)
                         elif kind == wire.ACK:
                             seq, applied = wire.INPUT_ACK.unpack(body)
-                            if seq != self.ordered_ack + 1 or seq > self.sent or applied != 1:
+                            if (seq != self.ordered_ack + 1 or seq > self.sent or applied not in (0, 1) or
+                                    (not applied and not getattr(self.peer, 'search_input', False))):
                                 raise TransportError('原桌面未确认此次操作。')
+                            expected = self.early_results.pop(seq, None)
+                            if expected is not None and bool(applied) != expected:
+                                raise TransportError('原桌面两次输入回执不一致。')
                             self.ordered_ack = seq
-                            self.confirmed = max(self.confirmed, seq)
+                            if seq >= self.confirmed:
+                                self.confirmed = seq
+                                self.last_applied = bool(applied)
                         elif kind == wire.UNAVAILABLE:
                             if not 1 <= body[0] <= len(wire.UNAVAILABLE_APPS):
                                 raise TransportError('云端图面提示无效。')
@@ -227,6 +256,12 @@ class DesktopStream:
                 self.changed.wait_for(lambda: self.ready or self.closed or self.ended or self.problem, 45)
                 if not self.ready or self.closed or self.ended or self.problem:
                     raise TransportError('云桌面尚未就绪或已断开。')
+                # The fast provider reply can arrive before the drawing-ordered
+                # receipt. Bound the decisions retained for the second check.
+                if not self.changed.wait_for(lambda: len(self.early_results) < 64 or self.closed or self.ended or self.problem, 25):
+                    raise TransportError('等待原桌面输入回执超时。')
+                if self.closed or self.ended or self.problem:
+                    raise TransportError('云桌面输入连接已断开。')
                 number = self.sent + 1
                 if number > 0xffffffff:
                     raise TransportError('输入序号已用尽。请重新连接。')
@@ -240,17 +275,34 @@ class DesktopStream:
                     # ACK still determines its outcome, without another write.
                     applied = False
                 with self.changed:
-                    if applied is True:
+                    if applied is True or applied is _FOCUS_REJECTED:
+                        decision = applied is True
+                        if self.ordered_ack == number and self.last_applied != decision:
+                            raise TransportError('原桌面两次输入回执不一致。')
+                        if self.ordered_ack < number:
+                            self.early_results[number] = decision
                         self.confirmed = number
+                        self.last_applied = decision
                         self.changed.notify_all()
                     self.changed.wait_for(lambda: self.confirmed == number or self.closed or self.ended or self.problem, 25)
                     if self.confirmed != number:
                         raise TransportError('原桌面没有确认操作。')
+                    return self.last_applied
             except (OSError, ValueError):
                 with suppress(OSError):
                     self.close()
                 raise TransportError('无法确认操作是否已执行。请重新连接后检查桌面。') from None
-            return True
+
+    def text_focus(self):
+        with self.changed:
+            if self.focus_active and self.ready and not (self.closed or self.ended or self.problem):
+                return (self.focus_namespace << 32) | self.focus_revision
+            return None
+
+    def commit_text(self, revision, text):
+        if type(revision) is not int or self.text_focus() != revision:
+            return False
+        return self._input(encode_text(revision & 0xffffffff, text))
 
     def send_super(self):
         return self._input(b'S')
@@ -298,11 +350,11 @@ def _credentials(port, pairing):
         raise ValueError('云桌面端口或配对码无效。')
 
 
-def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False):
+def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False):
     _credentials(port, pairing)
-    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper), size=size)
+    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper, search_input), size=size)
 
 
-def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False):
+def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False, search_input=False):
     _credentials(port, pairing)
-    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper), size=size)
+    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper, search_input), size=size)

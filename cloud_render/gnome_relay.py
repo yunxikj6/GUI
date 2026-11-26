@@ -21,11 +21,13 @@ TOKEN = re.compile(r'[A-Za-z0-9_-]{43}\Z')
 
 
 @asynccontextmanager
-async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=False):
+async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=False, search_input=False):
     width, height = checked_size(size)
-    size_args = [] if size == DEFAULT_SIZE else ['--size', f'{width}x{height}']
+    options = [] if size == DEFAULT_SIZE else ['--size', f'{width}x{height}']
     if wallpaper:
-        size_args.append('--wallpaper')
+        options.append('--wallpaper')
+    if search_input:
+        options.append('--search-input')
     read_fd, write_fd = os.pipe()
     events = asyncio.StreamReader(limit=2048)
     transport = proc = None
@@ -36,7 +38,7 @@ async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=Fal
             try:
                 proc = await asyncio.create_subprocess_exec(
                     sys.executable, '-m', 'cloud_render.gnome_source', '--event-fd', str(write_fd),
-                    '--session-mode', session_mode, *size_args,
+                    '--session-mode', session_mode, *options,
                     stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL, pass_fds=(write_fd,), start_new_session=True,
                     cwd=Path(__file__).resolve().parents[1],
@@ -68,7 +70,11 @@ async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=Fal
 
 
 class _SourceLink:
-    def __init__(self, source, events, reader, writer, size):
+    def __init__(self, source, events, reader, writer, size, search_input=False):
+        self.search_input = search_input
+        self.focus_revision = 0
+        self.salt = secrets.token_bytes(32)
+        self.last_applied = True
         self.size = size
         self.source = source
         self.events = events
@@ -136,7 +142,17 @@ class _SourceLink:
             elif kind == 'input' and self.pending and not self.pending.done():
                 if type(result.get('sequence')) is not int or result['sequence'] != self.sequence:
                     raise wire.DesktopError('源端输入回执次序不符。')
-                self.pending.set_result(True)
+                applied = result.get('applied', True)
+                if type(applied) is not bool or (not applied and not self.search_input):
+                    raise wire.DesktopError('原厂输入法操作结果无效。')
+                self.pending.set_result(applied)
+            elif kind == 'focus' and self.search_input:
+                revision, active = result.get('revision'), result.get('active')
+                if (type(revision) is not int or revision != self.focus_revision + 1 or
+                        revision > 0xffffffff or type(active) is not bool):
+                    raise wire.DesktopError('原厂输入焦点序号无效。')
+                self.focus_revision = revision
+                await self.send(wire.packet(wire.FOCUS, wire.FOCUS_STATE.pack(revision, active)))
             elif kind == 'unavailable' and result.get('application') in wire.UNAVAILABLE_APPS:
                 app = result['application']
                 now = asyncio.get_running_loop().time()
@@ -154,9 +170,12 @@ class _SourceLink:
             body = msg[1]
             seq, = wire.SEQUENCE.unpack_from(body)
             command = body[wire.SEQUENCE.size:]
-            decode_input(command, size=self.size)
-            if seq == self.sequence and seq and command == self.last_command:
-                await self.send(wire.packet(wire.ACK, wire.INPUT_ACK.pack(seq, 1)))
+            kind, _ = decode_input(command, size=self.size)
+            if kind == b'T' and not self.search_input:
+                raise wire.DesktopError('当前会话未协商原厂文字输入。')
+            fingerprint = hmac.digest(self.salt, command, 'sha256')
+            if seq == self.sequence and seq and hmac.compare_digest(fingerprint, self.last_command):
+                await self.send(wire.packet(wire.ACK, wire.INPUT_ACK.pack(seq, self.last_applied)))
                 continue
             if seq != self.sequence + 1:
                 raise wire.DesktopError('桌面输入重复或次序不符。')
@@ -170,10 +189,12 @@ class _SourceLink:
             self.pending = loop.create_future()
             self.source.stdin.write(command)
             await asyncio.wait_for(self.source.stdin.drain(), 5)
-            await asyncio.wait_for(self.pending, 10)
+            self.last_applied = await asyncio.wait_for(self.pending, 10)
+            if not self.last_applied and kind != b'T':
+                raise wire.DesktopError('原桌面导航操作未经确认。')
             self.pending = None
-            self.last_command = command
-            await self.send(wire.packet(wire.ACK, wire.INPUT_ACK.pack(seq, 1)))
+            self.last_command = fingerprint
+            await self.send(wire.packet(wire.ACK, wire.INPUT_ACK.pack(seq, self.last_applied)))
 
     async def run(self):
         draw = asyncio.create_task(self.drawing())
@@ -215,7 +236,7 @@ class DesktopService:
                 return
             login = await asyncio.wait_for(reader.readexactly(len(self.expected)), 5)
             if hmac.compare_digest(login, self.expected_query):
-                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, wire.WALLPAPER))
+                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, wire.WALLPAPER | wire.SEARCH_INPUT))
                 await writer.drain()
                 return
             options = {}
@@ -224,6 +245,8 @@ class DesktopService:
             elif hmac.compare_digest(login, self.expected_size):
                 raw = await asyncio.wait_for(reader.readexactly(wire.SESSION.size), 5)
                 width, height, offered = wire.SESSION.unpack(raw)
+                if offered & wire.SEARCH_INPUT:
+                    options['search_input'] = True
                 if offered & wire.WALLPAPER:
                     options['wallpaper'] = True
                 size = checked_size((width, height))
@@ -236,7 +259,7 @@ class DesktopService:
                 options['size'] = size
             factory = self.source_factory(**options)
             async with factory as (source, observations):
-                await _SourceLink(source, observations, reader, writer, size).run()
+                await _SourceLink(source, observations, reader, writer, size, options.get('search_input', False)).run()
         except (OSError, EOFError, ValueError, TimeoutError):
             pass
         finally:

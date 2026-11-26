@@ -12,8 +12,10 @@ QUERY = b'GNOME-CAPS/1 '
 FEATURES = struct.Struct('!4sI')
 FEATURE_MAGIC = b'GCFG'
 WALLPAPER = 1
+SEARCH_INPUT = 2
+FOCUS_STATE = struct.Struct('!IB')
 HEADER = struct.Struct('!4sBBHI')
-BLOCK, INPUT, ACK, READY, END, UNAVAILABLE = range(1, 7)
+BLOCK, INPUT, ACK, READY, END, UNAVAILABLE, FOCUS = range(1, 8)
 UNAVAILABLE_APPS = ('chatgpt', 'claude', 'wayland')
 BLOCK_HEAD = struct.Struct('!II32s32s')
 INPUT_ACK = struct.Struct('!IB')
@@ -43,9 +45,9 @@ def payload_size(header, allowed):
     if kind == BLOCK:
         valid = BLOCK_HEAD.size < size <= MAX_PACKET
     elif kind == INPUT:
-        valid = 5 <= size <= 9
+        valid = 5 <= size <= 4 + 7 + 4096
     else:
-        valid = size == {ACK: INPUT_ACK.size, READY: DIMENSIONS.size, END: FINAL.size, UNAVAILABLE: 1}[kind]
+        valid = size == {ACK: INPUT_ACK.size, READY: DIMENSIONS.size, END: FINAL.size, UNAVAILABLE: 1, FOCUS: FOCUS_STATE.size}[kind]
     if not valid:
         raise DesktopError('无效的桌面消息长度。')
     return kind, size

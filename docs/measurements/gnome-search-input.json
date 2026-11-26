@@ -1,0 +1,36 @@
+{
+  "environment": "Dedicated Ubuntu 24.04 GNOME Shell 46 source, authenticated loopback stream and independent Mesa software renderer on the same Linux test host. Public fixture entered through DesktopStream.commit_text.",
+  "surface": [
+    800,
+    520
+  ],
+  "originalControl": "GNOME Shell overview St.Entry with focused Clutter.Text via Main.inputMethod.commit",
+  "sourceAndReplayFramesEqual": 91,
+  "fontPackage": "Ubuntu fonts-noto-cjk",
+  "testedSourceFontSha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a",
+  "observedFieldValues": [
+    "abc",
+    "abc你好",
+    "abc你"
+  ],
+  "pendingWindowMsWithoutCommit": 2600,
+  "staleFocusRefused": true,
+  "actions": {
+    "English": {
+      "frame": 44,
+      "sha256": "67d22ba0c20abc22c16f28a07312bb9ab88f30d27dc6ce14fa74c326467374cd",
+      "sourceAckMs": 33.6
+    },
+    "Chinese": {
+      "frame": 46,
+      "sha256": "a402566ecd3e58e74101ece3fc9dc1a69a0d3c52198f882b11338663ebb6f40a",
+      "sourceAckMs": 24.6
+    },
+    "Backspace": {
+      "frame": 48,
+      "sha256": "8dd6f50c187966f2ea8744164c6948d688efd92bca48f528a7bf9887569ad123",
+      "sourceAckMs": 65.5
+    }
+  },
+  "image": "../gnome-search-zh.png"
+}

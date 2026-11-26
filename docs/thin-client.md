@@ -12,7 +12,7 @@
 sudo apt-get update
 sudo apt-get install gnome-shell ubuntu-session ubuntu-settings gnome-shell-extension-ubuntu-dock \
   yaru-theme-gnome-shell yaru-theme-gtk yaru-theme-icon ubuntu-wallpapers ubuntu-wallpapers-noble \
-  xvfb xauth xdotool x11-utils dbus-daemon virgl-server libgl1-mesa-dri python3
+  xvfb xauth xdotool x11-utils dbus-daemon virgl-server libgl1-mesa-dri fonts-noto-cjk python3
 python3 -m cloud_render.gnome_relay --port 17325
 ```
 

@@ -20,7 +20,8 @@ import threading
 import time
 
 from .gnome_commands import StreamError, _connect, copy_commands
-from .gnome_input import DEFAULT_SIZE, SIZE_NAMES, decode_input, input_size
+from .gnome_search_input import SearchBridge, UUID
+from .gnome_input import DEFAULT_SIZE, SIZE_NAMES, decode_input, command_size
 
 
 class SourceError(RuntimeError):
@@ -302,10 +303,11 @@ def _apply(env, xid, command, size=DEFAULT_SIZE):
 
 
 class _Source:
-    def __init__(self, stack, directory, event_fd, control_fd, mode, size=DEFAULT_SIZE, wallpaper=False):
+    def __init__(self, stack, directory, event_fd, control_fd, mode, size=DEFAULT_SIZE, wallpaper=False, search=False):
         self.wallpaper = wallpaper
         self.size = size
         self.width, self.height = size
+        self.search = SearchBridge(directory, stack) if search else None
         self.mode = mode
         self.stack = stack
         self.directory = directory
@@ -372,7 +374,11 @@ class _Source:
             inputs.append(self.shell_log)
         if self.gate:
             inputs.extend([self.gate.server, self.gate.activation])
+        if self.search and self.search.peer:
+            inputs.append(self.search.peer)
         readable, _, _ = select.select(inputs, [], [], timeout)
+        if self.search and self.search.peer in readable:
+            self.search.receive(self.emit)
         if self.shell_log is not None and self.shell_log in readable:
             chunk = os.read(self.shell_log.fileno(), 4096)
             if not chunk:
@@ -475,6 +481,11 @@ class _Source:
                           'org.gnome.Shell.Extensions.GetExtensionInfo', 'ubuntu-dock@ubuntu.com')
             if "'state': <1.0>" not in result.stdout or "'enabled': <true>" not in result.stdout:
                 raise SourceError('Ubuntu Dock 没有在发行版会话中启用。')
+        if self.search:
+            _run(env, 'gdbus', 'call', '--session', '--dest', 'org.gnome.Shell',
+                 '--object-path', '/org/gnome/Shell', '--method', 'org.gnome.Shell.Extensions.EnableExtension', UUID)
+            self.wait(lambda: self.search.connect(shell.pid), '原厂搜索输入通道')
+            self.wait(lambda: self.search.revision, '原厂搜索焦点状态')
         self.wait(lambda: self.scene_changed, '启动清屏后的原桌面画面')
         _run(env, 'xdotool', 'windowfocus', '--sync', xid)
         _focused(env, xid, self.size)
@@ -487,23 +498,30 @@ class _Source:
         while True:
             self.poll(.25)
             while self.pending:
-                length = input_size(bytes(self.pending[:1]))
-                if len(self.pending) < length:
+                length = command_size(self.pending)
+                if length is None or len(self.pending) < length:
                     break
                 command = bytes(self.pending[:length])
-                decode_input(command, size=self.size)
+                kind, args = decode_input(command, size=self.size)
                 del self.pending[:length]
                 _focused(self.env, xid, self.size)
                 self.read_frames()
                 before = self.frames
-                _apply(self.env, xid, command, self.size)
+                if kind == b'T':
+                    if not self.search:
+                        raise SourceError('此会话未协商搜索输入。')
+                    applied = self.search.commit(*args, self.poll)
+                else:
+                    _apply(self.env, xid, command, self.size)
+                    applied = True
                 _focused(self.env, xid, self.size)
                 self.ack += 1
-                self.emit('input', sequence=self.ack, framesBefore=before)
+                self.emit('input', sequence=self.ack, framesBefore=before, applied=applied)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--search-input', action='store_true')
     parser.add_argument('--size', choices=SIZE_NAMES, default='800x520')
     parser.add_argument('--event-fd', type=int, required=True, help='接收就绪、绘制与输入回执的专用写入文件描述符')
     parser.add_argument('--session-mode', choices=('ubuntu', 'gnome'), default='ubuntu',
@@ -524,7 +542,7 @@ def main():
             signal.signal(signal.SIGTERM, stop)
             with tempfile.TemporaryDirectory(prefix='gnome-', dir='/tmp') as root, ExitStack() as stack:
                 _Source(stack, Path(root), args.event_fd, sys.stdin.fileno(), args.session_mode,
-                        SIZE_NAMES[args.size], args.wallpaper).serve()
+                        SIZE_NAMES[args.size], args.wallpaper, args.search_input).serve()
     except (Disconnected, KeyboardInterrupt, BrokenPipeError):
         return 0
     except (OSError, SourceError, StreamError, ValueError, subprocess.SubprocessError) as exc:

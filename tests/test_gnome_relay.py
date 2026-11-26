@@ -79,9 +79,16 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         self.retired = asyncio.Event()
 
         @asynccontextmanager
-        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False):
+        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False):
             self.artwork.append(wallpaper)
             source = Source(size)
+            if search_input:
+                source.events.feed_data(b'{"event":"focus","revision":1,"active":true}\n')
+                def apply(data):
+                    source.applied.append(data)
+                    seq = len(source.applied)
+                    source.events.feed_data(json.dumps(dict(event='input', sequence=seq, applied=seq == 1)).encode() + b'\n')
+                source.write = apply
             self.sources.append(source)
             try:
                 yield source, source.events
@@ -199,8 +206,9 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         server = await asyncio.start_server(legacy, '127.0.0.1', 0)
         port = server.sockets[0].getsockname()[1]
         def local():
-            with transport.connect(LocalProvider(), port, self.token, wallpaper=True) as peer:
+            with transport.connect(LocalProvider(), port, self.token, wallpaper=True, search_input=True) as peer:
                 self.assertEqual(read_exact(peer, 17), b'original graphics')
+                self.assertIsNone(peer.text_focus())
         try:
             await asyncio.wait_for(asyncio.to_thread(local), 12)
         finally:
@@ -208,6 +216,48 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
             await server.wait_closed()
         self.assertEqual(logins, [wire.QUERY + self.token.encode('ascii') + b'\n',
                                   wire.AUTH + self.token.encode('ascii') + b'\n'])
+
+    async def test_search_commit_lost_reply_stale_target_and_new_session(self):
+        def local_file(owner, index):
+            return (Path('/tmp') / ('clrp-' + owner.session) / f'msg-{index}.bin').open('rb')
+
+        def exercise(private, previous):
+            with patch.object(InstaBoxControl, '_open_file', local_file):
+                provider = LocalProvider()
+                stream = (transport.connect(provider, self.port, self.token, search_input=True) if private else
+                          transport.connect_forwarded(self.port, self.token, search_input=True))
+                with stream:
+                    self.assertEqual(read_exact(stream, len(Source.content)), Source.content)
+                    revision = stream.text_focus()
+                    self.assertTrue(revision)
+                    if previous is not None:
+                        self.assertFalse(stream.commit_text(previous, '旧会话'))
+                    self.assertTrue(stream.commit_text(revision, '搜索😀'))
+                    self.assertFalse(stream.commit_text(revision, '已失焦'))
+                    if private:
+                        self.assertEqual(provider.calls, [1, 1, 2, 2])
+                    return revision
+
+        last = None
+        for private in (True, False):
+            self.retired.clear()
+            last = await asyncio.wait_for(asyncio.to_thread(exercise, private, last), 15)
+            await asyncio.wait_for(self.retired.wait(), 3)
+            self.assertEqual([gnome_input.decode_input(data)[1] for data in self.sources[-1].applied],
+                             [(1, '搜索😀'), (1, '已失焦')])
+
+    def test_unicode_input_length_and_framing(self):
+        for text in ('中文', '👩‍💻', 'e\u0301', '人' * 1365 + 'a'):
+            raw = gnome_input.encode_text(1, text)
+            self.assertEqual(gnome_input.decode_input(raw), (b'T', (1, text)))
+            self.assertEqual(gnome_input.command_size(raw[:3]), None)
+            self.assertEqual(gnome_input.command_size(raw[:7]), len(raw))
+        for text in ('', 'a\n', '\u0085', '\udc00', '人' * 1366):
+            with self.assertRaises(ValueError):
+                gnome_input.encode_text(1, text)
+        for malformed in (b'T', b'T' + bytes(6), b'T' + struct.pack('!IH', 1, 1) + b'\x80'):
+            with self.assertRaises(ValueError):
+                gnome_input.decode_input(malformed)
 
     async def test_bad_size_or_pair_never_starts_a_source(self):
         for token, size in [(self.token, (1919, 1080)), ('x' * 43, (1280, 900))]:
