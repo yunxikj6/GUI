@@ -1,0 +1,151 @@
+{
+  "windowsZip": {
+    "sha256": "a2cdbc2fe86ad6ea554d0ca5e5c10a7e2fb76473b9ce68efc31bf6b09154c174",
+    "bytes": 58289354,
+    "membersVerifiedAgainstArchive": 95,
+    "entry": "cmd.exe /d /c Start.cmd --browser-viewport --port 17328",
+    "scope": "Unmodified published Win64 client ZIP, its Node, CanvasKit and CPython under Wine 10. Separate Windows process read the foreground HWND with GDI. No cloud screenshots, drawing files or development checkout were mounted into the client. The client used an authenticated local forward to the separately isolated cloud role.",
+    "hwnd": 131150,
+    "processId": 112,
+    "normalExit": 0
+  },
+  "cloudZip": {
+    "sha256": "17f757786722e6d182a0ca10279692ca31cfaaea1ae056fa37b19499926d60d4",
+    "bytes": 199879,
+    "sourceCommit": "f960e3586a26e00f63b43500c31a2e99bc53780b",
+    "membersVerifiedAgainstGit": 59,
+    "entry": "python -m cloud_render.browser_viewport_service --port 17328",
+    "scope": "Unmodified published cloud source CLI, private loopback and XDG-launched system browser. Observer parsed exact-copy CLRP packets; independent X11 readback used only for comparison.",
+    "exit": 0
+  },
+  "frames": [
+    {
+      "sequence": 1,
+      "clrpBytes": 1440564,
+      "sha256": "7430f4e063ec2536711a0fedecf587e278b3025bac3b9223ff7da43033db78c2",
+      "visible": {
+        "xid": "0x20000b",
+        "verifiedExecutablePid": 25,
+        "nativeWindow": [
+          20,
+          20,
+          1000,
+          900
+        ],
+        "viewport": [
+          1000,
+          813
+        ],
+        "viewportOffset": [
+          0,
+          87
+        ],
+        "rgbSha256": "baee7188d6b047f608c2d49219679c306c03fd3ba42a867282036d89d6b54104"
+      },
+      "state": "before",
+      "win32Screenshot": "win32-before.png",
+      "win32PngSha256": "cf907da85ac343f48846f298bfb9d07823423a02201565c911f9cd2220289782",
+      "cloudScreenshot": "cloud-before.png",
+      "cloudPngSha256": "432c522cb4b8a56b633bf4dc91008e7355050398a29caedcebbca26dee962881",
+      "win32VersusIndependentCloudX11Pixels": {
+        "identical": 806745,
+        "total": 813000,
+        "meanAbsoluteRgbChannelError": 0.048492,
+        "differenceBounds": [
+          200,
+          238,
+          729,
+          512
+        ]
+      },
+      "win32VersusIndependentCanvasKitPixels": {
+        "identical": 813000,
+        "total": 813000,
+        "meanAbsoluteRgbChannelError": 0.0,
+        "differenceBounds": null
+      }
+    },
+    {
+      "sequence": 2,
+      "clrpBytes": 1958314,
+      "sha256": "19601fa8147e8aed5ac807f9bf6324b0219a251ddaef6575253be5caedb6e3e8",
+      "visible": {
+        "xid": "0x20000b",
+        "verifiedExecutablePid": 25,
+        "nativeWindow": [
+          20,
+          20,
+          1000,
+          900
+        ],
+        "viewport": [
+          1000,
+          813
+        ],
+        "viewportOffset": [
+          0,
+          87
+        ],
+        "rgbSha256": "bd919cc8a2e6a17acedf656fa105b301af6eb5ccae0ebca0bdb3ffd0bd147ac9"
+      },
+      "state": "after",
+      "win32Screenshot": "win32-after.png",
+      "win32PngSha256": "9f85fb7f7881791e502c042bcc53ba6ba3ebb43b9bf334bc395593c6868c698f",
+      "cloudScreenshot": "cloud-after.png",
+      "cloudPngSha256": "cd5b36052a59cd87dab90d2ea91c203855e5b8732b6292f18955d39fe39cbdf0",
+      "win32VersusIndependentCloudX11Pixels": {
+        "identical": 801410,
+        "total": 813000,
+        "meanAbsoluteRgbChannelError": 0.078422,
+        "differenceBounds": [
+          200,
+          238,
+          748,
+          620
+        ]
+      },
+      "win32VersusIndependentCanvasKitPixels": {
+        "identical": 813000,
+        "total": 813000,
+        "meanAbsoluteRgbChannelError": 0.0,
+        "differenceBounds": null
+      }
+    }
+  ],
+  "input": {
+    "nativeWindowsAction": {
+      "action": "click",
+      "client": [
+        237,
+        495
+      ],
+      "targetLabel": "Details",
+      "hwnd": 131150,
+      "method": "Win32 SendInput from independent process with foreground check"
+    },
+    "serverObserved": [
+      {
+        "type": "Click",
+        "sequence": 1,
+        "position": [
+          237.0,
+          495.0
+        ]
+      }
+    ],
+    "serverAck": [
+      {
+        "sequence": 1,
+        "applied": true
+      }
+    ],
+    "changedPixelsOnSameHwnd": 9259,
+    "sourceButtonState": "Details expanded, showing Hide details in the source X11 and local Win32 captures"
+  },
+  "cleanup": {
+    "portReclaimed": true,
+    "temporaryBrowserProfileReclaimed": true,
+    "privateForwardAndTestPairingDirectoryReclaimed": true
+  },
+  "limits": "Measures the explicitly selected Chromium offline viewport. Its private XDG handler opens a real system-browser window. This independent pair was measured at 1000 × 813 content pixels in a 1000 × 900 source window. On the narrower 900 × 633 case, an earlier real click reached the source but the source could not attest the expanded drawing. The test used a local private forward. It did not exercise InstaBox WAN, physical Windows 11, live account sign-in or authenticated conversation."
+}
