@@ -32,6 +32,8 @@ python3 -m experiments.original_desktop_source --port 17326
 
 应用内容变化时，两端可协商复用同一窗口中已经验证的绘图数据。每次重组都校验原图完整 SHA-256。在两态真实云录制的五轮回放中，协议数据量中位数从 2,396,121 字节降到 812,591 字节，重建的两幅原图和全部 38,001,652 字节 GPU 指令均相同。[绘图复用与操作耗时记录](docs/measurements/original-application-delta.json)
 
+从原版程序选择账户登录时，它会在云机上打开独立的系统浏览器，并在同一台云机的回环地址接收 OAuth 回调。已观察到原版程序和浏览器的两个真实窗口。当前客户端还需要接入这第二个窗口，才能完成账户登录。[系统浏览器和回调的实测](docs/measurements/chatgpt-system-browser-signin.json)
+
 ## 单独打开云端 ChatGPT
 
 单独连接云端的 ChatGPT 绘图服务时，在 Windows 运行 `Start.cmd --cloud-app`。服务从原版 ChatGPT for Linux 提取 Skia 指令。本机的 Microsoft Edge 使用随包 CanvasKit 绘制原始界面，云端应用负责编辑状态、输入处理和账号。两条服务使用各自的配对码。[云端应用的安装与启动](docs/thin-client.md)
