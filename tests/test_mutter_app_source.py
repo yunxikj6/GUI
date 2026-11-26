@@ -148,6 +148,39 @@ class LiveMutterSourceTest(unittest.TestCase):
                 sleep.assert_called_once()
                 self.assertEqual(inspector.manual_scene('rgb', 50), (None, None))
 
+    def test_only_a_new_physical_commit_rearms_a_sample_that_observed_a_different_surface(self):
+        import json
+        from unittest.mock import patch
+
+        from experiments.mutter_app.capture import publish
+        from experiments.mutter_app.live import Inspector, initialize
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pair = root / 'pair'
+            initialize(pair)
+            inspector = Inspector(root, pair, interactive=True)
+            (root / 'scenes.json').write_text('{}')
+            request = root / 'requested-scene.json'
+            receipt = root / 'unmatched-scene.json'
+            with patch('experiments.mutter_app.live.time.monotonic', return_value=1.0):
+                inspector.manual_scene('caret', 100)
+                first = json.loads(request.read_text())
+                inspector.manual_scene('caret', 110)
+                self.assertEqual(json.loads(request.read_text()), first)
+                publish(receipt, {'businessRgbSha256': 'other', 'witnessByte': 100})
+                inspector.manual_scene('caret', 120)
+                self.assertEqual(json.loads(request.read_text()), first)
+                publish(receipt, first)
+                inspector.manual_scene('caret', 100)
+                self.assertEqual(json.loads(request.read_text()), first)
+                inspector.manual_scene('caret', 130)
+                self.assertEqual(
+                    json.loads(request.read_text()), {'businessRgbSha256': 'caret', 'witnessByte': 130}
+                )
+                inspector.manual_scene('caret', 140)
+                self.assertEqual(json.loads(request.read_text())['witnessByte'], 130)
+
     def test_private_channels_use_new_session_and_reject_reuse(self):
         import json
         import stat
@@ -278,7 +311,8 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / 'requested-scene.json').write_text('{"businessRgbSha256":"scene"}')
+            request = {'businessRgbSha256': 'scene', 'witnessByte': 13}
+            (root / 'requested-scene.json').write_text(json.dumps(request))
             (root / 'owner.log').touch()
             page = Mock()
             page.url = APP_PAGE
@@ -303,7 +337,9 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
                 ),
                 patch(
                     'experiments.mutter_app.capture._reference_digest',
-                    new=AsyncMock(side_effect=[None, 'scene', None, 'scene', 'scene']),
+                    new=AsyncMock(
+                        side_effect=[None, 'scene', None, 'scene', 'another phase', 'scene', 'scene']
+                    ),
                 ) as reference,
                 patch(
                     'experiments.mutter_app.capture.capture_frame',
@@ -315,11 +351,12 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
             ):
                 await observe_interactive(page, root, ())
             self.assertEqual(seen, ['scene'])
-            self.assertEqual(reference.await_count, 5)
-            self.assertEqual(capture.await_count, 2)
+            self.assertEqual(reference.await_count, 7)
+            self.assertEqual(capture.await_count, 3)
+            self.assertEqual(json.loads((root / 'unmatched-scene.json').read_text()), request)
             self.assertEqual(
                 json.loads((root / 'capture-counts.json').read_text()),
-                {'references': 5, 'traces': 2, 'referenceTimeouts': 2},
+                {'references': 7, 'traces': 3, 'referenceTimeouts': 2},
             )
 
     async def test_idle_original_surface_never_requests_an_application_screenshot(self):

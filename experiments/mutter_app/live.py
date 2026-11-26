@@ -218,12 +218,18 @@ class Inspector:
         approvals = json.loads(scenes.read_text()) if scenes.is_file() else {}
         if source_digest not in approvals:
             now = time.monotonic()
-            if self.requested != source_digest or now - self.request_time > 2:
-                self.requested, self.request_time = source_digest, now
-                publish(
-                    self.out / 'requested-scene.json',
-                    {'businessRgbSha256': source_digest, 'witnessByte': journal_byte},
-                )
+            request = {'businessRgbSha256': source_digest, 'witnessByte': journal_byte}
+            send = (
+                self.requested is None
+                or self.requested['businessRgbSha256'] != source_digest
+                or now - self.request_time > 2
+            )
+            if not send and journal_byte > self.requested['witnessByte']:
+                missed = self.out / 'unmatched-scene.json'
+                send = missed.is_file() and json.loads(missed.read_text()) == self.requested
+            if send:
+                self.requested, self.request_time = request, now
+                publish(self.out / 'requested-scene.json', request)
             if not scenes.exists():
                 wait_for(scenes.is_file, 'original application did not supply its first drawing', 75)
             pending = self.out / 'pending-scene.json'

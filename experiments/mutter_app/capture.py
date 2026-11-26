@@ -256,6 +256,7 @@ async def observe_interactive(page, out, native_layers):
             digest = await _reference_digest(page)
             references += 1
             missed_reference = digest is None
+            changed_during_request = digest is not None and digest != request['businessRgbSha256']
             if digest is not None and not cache.find(digest):
                 publish(out / 'pending-scene.json', {'businessRgbSha256': digest, 'witnessByteStart': start})
                 attempts += 1
@@ -273,6 +274,8 @@ async def observe_interactive(page, out, native_layers):
                 end_digest = await _reference_digest(page)
                 references += 1
                 missed_reference = end_digest is None
+                if end_digest is not None and digest != end_digest:
+                    changed_during_request = True
                 if (
                     digest == end_digest
                     and _exclusive_page(page)
@@ -285,6 +288,11 @@ async def observe_interactive(page, out, native_layers):
                     cache.add(digest, raw, start)
                 else:
                     retry = time.monotonic() < retry_until
+            if changed_during_request:
+                # A field caret or hover transition can change the original
+                # surface between its real request and either reference. Allow
+                # the next actual occurrence to request its own recording.
+                publish(out / 'unmatched-scene.json', request)
             if missed_reference:
                 publish(out / 'pending-scene.json', {})
                 timeouts += 1
