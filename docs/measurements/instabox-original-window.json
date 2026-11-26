@@ -1,0 +1,57 @@
+{
+  "provider": "InstaBox",
+  "account": false,
+  "authenticationSubmitted": false,
+  "source": "ee367f7",
+  "originalELF": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "sourceWindowSelectionSha256": "cb4312978f3a247ca0d85314b8fd32651167adf3f63c36675b3e067f69d0afc9",
+  "exports": {
+    "binding.json": {
+      "bytes": 544,
+      "sha256": "0255f3c9fcbe2d484cd2620d04541f63542f9a6c26531a9bc906d88d6c8ab578"
+    },
+    "stats.json": {
+      "bytes": 97,
+      "sha256": "54c94ba9cbd1a47317cd53059bca41eb082c276f5741c0bf5303860694895178"
+    },
+    "desktop.virglx": {
+      "bytes": 12001495,
+      "sha256": "9274424814c2da0f65d32b92cc0d1a3def83cf8797d23c4955c1ebca2f527f85"
+    }
+  },
+  "passed": true,
+  "stages": [
+    "before",
+    "after"
+  ],
+  "sourcePrivateAndOffline": true,
+  "onlyClassifiedStreamExported": true,
+  "stats": {
+    "originalBytes": 160766284,
+    "removedApplicationBytes": 152582560,
+    "drawings": 2,
+    "pending": 86
+  },
+  "seconds": 40.063,
+  "display": {
+    "scanouts": 180,
+    "held": 78,
+    "states": {
+      "before": {
+        "scanout": 163,
+        "sha256": "2239dd7ab9bf2ac97866c8dd594a9af36373320ecfc194bea4b80e97b609934e",
+        "commit": 83
+      },
+      "after": {
+        "scanout": 171,
+        "sha256": "07e5390b01496ebfc02e150af106f5c6559fd17541438bac6bdc2cda84aff8a6",
+        "commit": 91
+      }
+    },
+    "drawings": 2,
+    "reuses": 7,
+    "unpaired": 86,
+    "windowPaints": 84
+  },
+  "viewerTransport": "Archived rendering commands from the real source, replayed on a Win64 client under Wine. These two HWND images were not the result of a live click from Windows."
+}
