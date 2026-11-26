@@ -114,8 +114,8 @@
     "The supported desktop app captures use SkPicture v110, supported Viz passes and verified fonts. Windows 11 display, focus and Microsoft IME remain unverified."
   ],
   "clientBinaries": {
-    "x64": "e5ea41e56e529bbdfa85aa17e8aaf73c39aa5a28ac2713a1acc139b395d0cc8a",
-    "arm64": "845d6a41cf2856ef311b662d58554ade88c32221874491a548b930fd7230227b"
+    "x64": "59a3afc2289659c6581e9b5f51798fc2326208d6dce10ac2ccc6f00d7c4e085b",
+    "arm64": "f46e39279028db24fd06420dd127b127eceab2334771ca80f85436ab3b99e001"
   },
   "gnomeResearch": {
     "scope": "Separate exploratory test in an isolated Ubuntu 24.04 guest. Not part of the delivered client.",
@@ -187,8 +187,8 @@
   },
   "standalonePackage": {
     "download": "../../releases/thin-windows/cloud-workspace.zip",
-    "bytes": 24134554,
-    "sha256": "56df10db4a1ba0df334167c4f4c549882d3f57549a34c92dd5c5884a233b4d8a",
+    "bytes": 24136487,
+    "sha256": "2479fb0c19e16c49672be9200eb1aef05764631d58abdc96df2651b76f51925c",
     "entries": 82,
     "archiveValidation": "Verified every SHA256SUMS entry, both native launchers and the complete private Windows runtime. This ZIP includes the GNOME command viewer and the explicit ChatGPT app mode.",
     "runtime": "Official Windows x64 CPython 3.13.17 embeddable and MSYS2 VirGL. The ChatGPT app mode additionally uses installed Microsoft Edge and bundled CanvasKit.",
@@ -541,10 +541,10 @@
   "gnomeDesktopMeasurements": "gnome-private-command-stream.json",
   "originalDesktopPackage": {
     "download": "../../releases/original-win64/cloud-workspace.zip",
-    "bytes": 58283230,
-    "sha256": "5fe9e1a405c24a10a0c6afcada83fe15145e7ed3ed4fdc5bab5afa220b674858",
-    "entries": 93,
-    "source": "Original GNOME Shell plus source-identified ChatGPT rendering commands, Win64 CanvasKit and VirGL; signed-out window tests."
+    "bytes": 58289354,
+    "sha256": "a2cdbc2fe86ad6ea554d0ca5e5c10a7e2fb76473b9ce68efc31bf6b09154c174",
+    "entries": 95,
+    "source": "Original GNOME Shell and ChatGPT signing-in UI, local Win64 CanvasKit and VirGL. The separate paired Chromium route presents its offline content viewport."
   },
   "cloudSourcePackage": {
     "download": "../../releases/ubuntu-source/cloud-workspace-server.zip",
