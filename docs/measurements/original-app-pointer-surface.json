@@ -1,0 +1,224 @@
+{
+  "scope": "A network-isolated Ubuntu Noble source ran its pinned signed-out ChatGPT desktop binary under GNOME. The interactive desktop client was a Win64 process under Wine. Source timings refer to the original Linux process. All forms used inert test text and were never submitted.",
+  "sourceBinarySha256": "b36d94aff6ec46074f9d4ac5f898d1cc449396b661663487fcf2d11e41c502a7",
+  "applicationViewport": [
+    1090,
+    760
+  ],
+  "desktopViewport": [
+    1280,
+    900
+  ],
+  "sourceTiming": {
+    "measure": "Elapsed source monotonic time from acknowledgement of the fifth replacement letter to publication of a corroborated original drawing containing the whole word. Both drawings were independently replayed in CanvasKit and compared to the original field.",
+    "before": {
+      "sourceCommit": "e33fa69617f39658faeed7df9487096a97678a01",
+      "milliseconds": 2325,
+      "fieldMeanAbsoluteChannelError": 0.765,
+      "originalDrawingSha256": "2363816576d3b5e0dba7a6ebca93937a4053de4cb88dc66cea8253002e8ecd09",
+      "timingLogSha256": "094080852f65be9dcb00bfeccb998d72b677fc50d570e443d60414cb3af8461c"
+    },
+    "after": {
+      "sourceCommit": "0c48a75db1690d49b852665092ac33781a74dac0",
+      "milliseconds": 514,
+      "fieldMeanAbsoluteChannelError": 0.95,
+      "originalDrawingSha256": "c8f11049aa80740347f6ab680a011fecb8824a0bf925b2f452b2aa55e7a7c6fe",
+      "timingLogSha256": "a4b6a3acfc0e319d6ce037afb5848db0dc20d50de60cc11c90aeb6505eb8ea29"
+    },
+    "samplesPerVersion": 1,
+    "wholeBufferIntegrityChecks": {
+      "width": 1090,
+      "height": 760,
+      "samplesPerVersion": 90,
+      "beforeMedianCpuMilliseconds": 7.96,
+      "afterMedianCpuMilliseconds": 5.75,
+      "sameShmAndBusinessDigests": true
+    },
+    "earlierIndependentBusyRun": {
+      "ackToPublishedDrawingMilliseconds": 18056,
+      "scope": "Observed on a loaded source in a different Win64 trial. The isolated timing pair does not establish a latency guarantee."
+    }
+  },
+  "cancelHeld": {
+    "physicalConnection": {
+      "pid": 281,
+      "waylandClient": 1,
+      "waylandPointer": 28,
+      "waylandSurface": 33,
+      "originOnDesktop": [
+        127,
+        67
+      ],
+      "pointerOnDesktop": [
+        584,
+        533
+      ],
+      "pointerInsideOriginal": [
+        457,
+        466
+      ]
+    },
+    "originalControl": {
+      "tag": "BUTTON",
+      "boundsInOriginal": [
+        375,
+        448.5,
+        166,
+        36
+      ],
+      "focusedEditNode": 5,
+      "observedButtonNode": 6,
+      "samples": 116,
+      "firstAndLastObservedSerial": [
+        171,
+        307
+      ],
+      "distinctGeometryNodeFocusTuples": 1,
+      "trustedEvents": {
+        "pointermove": 1
+      }
+    },
+    "lastVisibleSerialAtRejectedPress": 189,
+    "heldSerial": 190,
+    "firstLegallyPairedSerialOfNewPhase": 191,
+    "heldWitnessByte": 115355,
+    "startOfNewRecordingWitnessByte": 115436,
+    "secondsBetweenFirstAndSecondRequestForSamePhase": 3.159,
+    "secondsFromSecondRequestToApprovedRecording": 0.368,
+    "secondsFromApprovalToFirstPairedCommit": 0.03,
+    "independentComparison": {
+      "changedPixels": 15,
+      "exclusivePixelBoundsInOriginal": [
+        416,
+        411,
+        417,
+        426
+      ],
+      "bitmapArea": 828400,
+      "matchingNativeDamage": [
+        416,
+        411,
+        1,
+        15
+      ],
+      "pictures": [
+        "5a7e0ff17c1e5dc1cea144bf625454726312ec49c3edc2a7329b5717f8c1b81d",
+        "f761a9efb48ac57e403e4fa57d2a90497c5b81791eaa8681e8eee2731b35be23"
+      ]
+    },
+    "finalSourceReport": {
+      "controllerClosed": true,
+      "lastRevision": 125,
+      "classification": {
+        "shell": 1324,
+        "cursor": 2,
+        "unapproved": 113,
+        "approved": 194
+      }
+    },
+    "evidenceSha256": {
+      "identity.json": "a8a7903430dfa4f0bd411323a4552092a2c7cd3ce074122063dfd6c8c20eae74",
+      "owner.log": "cd21eb80592e38362e1a7cd0e89c766541e8edd0a1edb42b9c26a0a573a76229",
+      "source-receipt-timing.ndjson": "0ac0ae2857d997feb4614430f75bf6526406c008200fb38ecce3b8c01c8774ac",
+      "original-node.ndjson": "a5023787367dfa0667ff358c50d60ccc61f4124b135d1a5c3b77679cd541bb63",
+      "scenes.json": "c0fc7cd80bb237914195574b005505071d05e2aa48378c3cb5057e2e42e83c15",
+      "live-source.json": "4e71307ae710bc3c9f765be8e672c000769a897165cde541932deb9316ad4e6f"
+    },
+    "result": "Only a trusted pointer movement reached the original Cancel button. Win32 rejected the attempt while the source lacked an eligible drawing. The source did not activate the button."
+  },
+  "referenceTimeoutRecovery": {
+    "sourceCommit": "5409d2e",
+    "applicationPid": 271,
+    "method": "Two individual screenshot operations were given a 1 ms deadline to cause genuine upstream timeouts. Production uses a 5000 ms reference deadline.",
+    "referenceAttempts": 7,
+    "actualReferenceTimeouts": 2,
+    "originalPictureCaptures": 3,
+    "corroboratedWelcomeSerial": 21,
+    "corroboratedMenuSerial": 39,
+    "controllerClosed": true,
+    "evidenceSha256": {
+      "identity.json": "6d14be218d496060a108213fe30486fd257875dc41500a2db17f3651f0adba71",
+      "timing.ndjson": "0a1a5e5e18459ff54b484cdb759b126fab33b031cfae5aa5fa905e0aa4821fc8",
+      "verified-steps.json": "c2f5444cf7ab1aa230bd4f931da84c8dee4459e4a7e7edd768e1d7727d9c6699",
+      "capture-counts.json": "dfeaed05c10b1b334ad0544e878d759f688a91162a74fe624d163a2a0578792c",
+      "live-source.json": "006c9996ce3f0802514feaf7d74526d6b48f30f34d7733555deaa7ca868fd29f"
+    }
+  },
+  "newPhysicalIntent": {
+    "method": "The first physical attempt was rejected while the drawing was incomplete. The operator reviewed the visible form and issued a separate physical click after both real phases became available. The earlier input was never queued.",
+    "cloudRoleSourceCommit": "17fb1814ac09d2a41ce6a7634f2b0c86f8dec56c",
+    "win64CandidateZipSha256": "a0250024efbcb25121fc2df823ced07f3b088f803281c4a243143abe3e3010ed",
+    "sourcePid": 322,
+    "sourceMoveAcknowledgement": 20,
+    "newClickAcknowledgement": 21,
+    "millisecondsFromHoverToFirstApprovedPhase": 2710,
+    "millisecondsFromHoverToSecondApprovedPhase": 10970,
+    "millisecondsFromUnmatchedReceiptToNewRequestInOneObservedCycle": 6,
+    "originalControl": {
+      "tag": "BUTTON",
+      "node": 6,
+      "enabled": true,
+      "boundsInOriginal": [
+        375,
+        448.5,
+        166,
+        36
+      ],
+      "pointInOriginal": [
+        457,
+        466
+      ],
+      "sourcePointer": 28,
+      "sourceWaylandButtonDownSerial": 7,
+      "sourceWaylandButtonUpSerial": 8,
+      "onDesktop": [
+        584,
+        533
+      ],
+      "trustedEvents": [
+        "pointerdown",
+        "pointerup",
+        "click"
+      ]
+    },
+    "menuSurfaceSerial": 347,
+    "menuDrawingSha256": "2f996be8fd87d39f70ac454f85e29396c67cdbba1fdbadab6130a4e69bdfcfc4",
+    "sourceFinal": {
+      "controllerClosed": true,
+      "lastRevision": 108,
+      "classification": {
+        "shell": 1294,
+        "cursor": 2,
+        "unapproved": 145,
+        "approved": 202
+      }
+    },
+    "windowsFinal": {
+      "originalDesktop": true,
+      "steps": 28,
+      "displayOffset": [
+        90,
+        79
+      ],
+      "closedByUser": true
+    },
+    "sourceEvidenceSha256": {
+      "owner.log": "733802fe4c5c135ffbed2405d2d2c6bb0a90ecfabd1543660763f769e2df4e23",
+      "identity.json": "d98a6f86d12f6174077d7a77860678d3d2e9d93322eda09dcef57cb382436b1a",
+      "original-node.ndjson": "da9540ece4865b832752bc02c8c86a560999540c0815b96b92f4a5ab5a4d1781",
+      "unmatched-times.ndjson": "0a38addb7c05bac8547cab616777dc13b60dfacfa206fde6c38a4b2b2664b389",
+      "source-receipt-timing.ndjson": "a0c60ae14cbd56ef990fbabd142e6cc32200c5f6f7ab75c983346e48bdd52d53",
+      "scenes.json": "9aac7a437374c32158b3bff3d8fbf2d90b56611b644de336e7f1b31ef6babc46",
+      "presented-scene.json": "e2857843199b5dd93d9c493d4744c92f8e9718b9e3a89496a876b01a01424221",
+      "live-source.json": "48b6f93356719061bb40fd6d5586e49142c5acaa34759f697d69c0862e8bd9da"
+    },
+    "windowsEvidenceSha256": {
+      "original-app-pointer/input.png": "ec9396d0a3309c879ad73f99d5c2146f8c2b7d86ddd720b7a855327d4334ee26",
+      "original-app-pointer/replace.png": "9f6585e0e3cd732da7146ce89fb06489d127ff851ece5e4b4fffb832e494f3d8",
+      "original-app-pointer/reconfirmed-form.png": "cc73657d10a6fbcc646529ecbe8aee1081726b05c27a3615431f0d1854f621c2",
+      "original-app-pointer/cancelled-on-new-intent.png": "7c04417ea38513ffa7f70ad61b6d6d15bd266a54b79a1747bfd6eb039a16690d",
+      "original-app-pointer/new-physical-intention.json": "c383b6a426ef403439c2099dcf1a8103a7a53033056775613822cffdad01d2eb",
+      "original-app-pointer/observed.json": "a3bea7968ed47ed6c0eb6d6865c01464874bb8275f30c4606a042afa491ab757"
+    }
+  }
+}
