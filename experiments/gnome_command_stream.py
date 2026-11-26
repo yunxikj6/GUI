@@ -4,6 +4,7 @@ from contextlib import closing
 import os
 from pathlib import Path
 import socket
+import stat
 import sys
 
 # Also support running the experiment by file path from outside the repository.
@@ -24,12 +25,17 @@ def record(args):
         raise StreamError('the listening socket needs an owner-private parent directory')
     if sys.stdout.isatty():
         raise StreamError('redirect the command stream to a private file or a pipe')
+    options = {}
+    if getattr(args, 'live', False):
+        if not stat.S_ISFIFO(os.fstat(sys.stdout.fileno()).st_mode):
+            raise StreamError('live recording requires a pipe to the bounded command transport')
+        options['max_bytes'] = None
     with closing(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)) as listener:
         listener.bind(os.fspath(args.listen))
         try:
             listener.listen(1)
             with listener.accept()[0] as app, _connect(args.gpu) as gpu, app.makefile('rb') as incoming:
-                copy_commands(incoming, gpu, recording=sys.stdout.buffer, respond=app.sendall)
+                copy_commands(incoming, gpu, recording=sys.stdout.buffer, respond=app.sendall, **options)
         finally:
             args.listen.unlink(missing_ok=True)
 
@@ -58,6 +64,7 @@ def main():
     capture = roles.add_parser('record', help='receive GNOME commands and write a command stream to stdout')
     capture.add_argument('--listen', type=Path, required=True)
     capture.add_argument('--gpu', type=Path, required=True)
+    capture.add_argument('--live', action='store_true', help='continue streaming to a pipe until disconnect')
     capture.set_defaults(action=record)
     client = roles.add_parser('replay', help='read commands on stdin and output locally rendered BGRX surfaces')
     client.add_argument('--gpu', type=Path, required=True)

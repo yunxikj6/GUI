@@ -73,7 +73,7 @@ cd /work/source || exit 1
 : > /work/result/broker-started
 unset GALLIUM_DRIVER VTEST_SOCKET_NAME CW_MUTTER_WITNESS
 export WAYLAND_DISPLAY=gnome-vgpu
-case "$CW_LIVE" in interactive) set -- --interactive;; proof) set -- --live;; *) set --;; esac
+case "$CW_LIVE" in interactive) set -- --interactive --pair /work/pair;; proof) set -- --live;; *) set --;; esac
 exec "$CW_PYTHON" -m experiments.mutter_app.capture /work/result "$@" > /work/result/broker.log 2>&1
 EOF
     chmod 700 "$out/bin/"{chatgpt,wayland-original}
@@ -114,15 +114,17 @@ gpu=$!
 wait_for 8 test -S "$XDG_RUNTIME_DIR/gpu"
 manual=()
 if [[ $CW_LIVE = interactive ]]; then manual=(--interactive); fi
+mode=()
 raw="$out/commands.virgl"
 if [[ $CW_LIVE != 0 ]]; then
+    mode=(--live)
     raw="$XDG_RUNTIME_DIR/source-stream"
     mkfifo -m 600 "$raw"
     "$CW_PYTHON" -m experiments.mutter_app.live stream /work/pair --source "$out" "${manual[@]}" < "$raw" 2>"$out/transport.log" &
     transport=$!
 fi
 "$CW_PYTHON" -m experiments.gnome_command_stream record --listen "$XDG_RUNTIME_DIR/source" \
-    --gpu "$XDG_RUNTIME_DIR/gpu" > "$raw" 2>"$out/relay.log" &
+    --gpu "$XDG_RUNTIME_DIR/gpu" "${mode[@]}" > "$raw" 2>"$out/relay.log" &
 relay=$!
 wait_for 8 test -S "$XDG_RUNTIME_DIR/source"
 env CW_MUTTER_WITNESS="$out/owner.log" GALLIUM_DRIVER=virpipe VTEST_SOCKET_NAME="$XDG_RUNTIME_DIR/source" \
@@ -131,11 +133,19 @@ env CW_MUTTER_WITNESS="$out/owner.log" GALLIUM_DRIVER=virpipe VTEST_SOCKET_NAME=
 shell=$!
 wait_for 20 test -S "$XDG_RUNTIME_DIR/gnome-vgpu"
 visible() {
-    local id
-    for id in $(xdotool search --onlyvisible --name '^gnome-shell$' 2>/dev/null); do
-        if xwininfo -id "$id" | grep -q 'Width: 1280'; then echo "$id" >"$out/nested-window"; return 0; fi
-    done
-    return 1
+    local id properties window found=
+    while read -r id; do
+        properties=$(xprop -id "$id" _NET_WM_PID _NET_WM_NAME 2>/dev/null) || continue
+        grep -Fxq "_NET_WM_PID(CARDINAL) = $shell" <<<"$properties" || continue
+        grep -Fxq '_NET_WM_NAME(UTF8_STRING) = "gnome-shell"' <<<"$properties" || continue
+        window=$(xwininfo -id "$id" 2>/dev/null) || continue
+        [[ $(awk '/^ *Width:/ { w=$2 } /^ *Height:/ { h=$2 }
+                  /^ *Map State:/ { state=$3 } END { print w,h,state }' <<<"$window") == '1280 900 IsViewable' ]] || continue
+        [[ -z $found ]] || return 1
+        found=$id
+    done < <(xwininfo -root -children | sed -nE 's/^[[:space:]]*(0x[[:xdigit:]]+) .*/\1/p')
+    [[ -n $found ]] || return 1
+    echo "$found" >"$out/nested-window"
 }
 wait_for 25 visible
 xid=$(cat "$out/nested-window")

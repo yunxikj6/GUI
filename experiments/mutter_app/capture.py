@@ -1,4 +1,4 @@
-"""Collect two stable signed-out original application states on the dedicated cloud source."""
+"""Observe the original application in a dedicated cloud-side Ubuntu session."""
 
 import argparse
 import asyncio
@@ -8,16 +8,19 @@ import os
 import re
 import subprocess
 import time
+from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageGrab
 
 from cloud_render.chatgpt_process import APP_PAGE, open_chatgpt
-from cloud_render.chromium_capture import _exclusive_page, _read_trace, capture_frame
+from cloud_render.chromium_capture import CaptureError, _exclusive_page, _read_trace, capture_frame
 from cloud_render.wire import Frame, encode_message
 
 from .controls import ORIGINAL_SHA256, caption_layers, require
+
+SUPPORTED_GEOMETRY = (1090, 760, 1, 1026, 36, 'light')
 
 
 def business_digest(image):
@@ -113,9 +116,10 @@ async def titlebar(top, page, pid, out, *, interactive=False):
     )
     try:
         if interactive:
-            # Opening the stock app changes its blank first window to the
-            # signed-out view. Observe the native browser compositor activation.
-            await page.get_by_text('Sign in another way', exact=True).wait_for(timeout=30000)
+            # The stock app chooses its own window geometry while mapping its first surface.
+            async with asyncio.timeout(30):
+                while await geometry(page) != SUPPORTED_GEOMETRY:
+                    await asyncio.sleep(0.08)
             await asyncio.sleep(1.2)
         else:
             (out / '.hover.tmp').write_bytes(photo)
@@ -170,41 +174,85 @@ def publish(path, value):
     temp.replace(path)
 
 
+class DrawingCache:
+    """Index a bounded source-only set of verified vendor recordings by their visual identity."""
+
+    def __init__(self, out, *, capacity=16, byte_limit=48 << 20):
+        self.out = out
+        self.path = out / 'drawings'
+        self.path.mkdir(mode=0o700)
+        self.records = OrderedDict()
+        self.capacity = capacity
+        self.byte_limit = byte_limit
+        self.size = 0
+        self.sequence = 0
+
+    def find(self, digest):
+        if digest not in self.records:
+            return False
+        self.records.move_to_end(digest)
+        return True
+
+    def add(self, digest, raw, start):
+        require(0 < len(raw) <= self.byte_limit, 'original drawing exceeds the source cache budget')
+        require(not self.find(digest), 'drawing already indexed')
+        picture = hashlib.sha256(raw).hexdigest()
+        asset = self.path / (picture + '.clrp')
+        temp = self.path / '.capture'
+        temp.write_bytes(raw)
+        temp.replace(asset)
+        self.size += len(raw)
+        self.sequence += 1
+        self.records[digest] = {
+            'pictureSha256': picture,
+            'witnessByteStart': start,
+            'bytes': len(raw),
+        }
+        evicted = []
+        while len(self.records) > self.capacity or self.size > self.byte_limit:
+            _, old = self.records.popitem(last=False)
+            self.size -= old['bytes']
+            evicted.append(old['pictureSha256'])
+        publish(self.out / 'scenes.json', self.records)
+        retained = {r['pictureSha256'] for r in self.records.values()}
+        for key in evicted:
+            if key not in retained:
+                (self.path / (key + '.clrp')).unlink(missing_ok=True)
+
+
 async def observe_interactive(page, out, native_layers):
-    """Repaint verified, signed-out states as the user's original window changes."""
-    source = out / 'drawings'
-    source.mkdir(mode=0o700)
-    observed = {}
-    sequence = 0
+    """Observe the changing original surface without recognizing pages, fields or labels."""
+    cache = DrawingCache(out)
     while not (out / 'controller-closed').exists() and not page.is_closed():
         if not _exclusive_page(page) or page.url != APP_PAGE:
             return
-        known = None
-        for label, marker in [('after', 'Amazon Bedrock'), ('before', 'Sign in another way')]:
-            if await page.get_by_text(marker, exact=True).is_visible():
-                known = label
-                break
-        if known and await geometry(page) == (1090, 760, 1, 1026, 36, 'light'):
+        if await geometry(page) == SUPPORTED_GEOMETRY:
             start = (out / 'owner.log').stat().st_size
             digest = business_digest(Image.open(BytesIO(await page.screenshot())))
-            if digest not in observed:
+            if not cache.find(digest):
                 publish(out / 'pending-scene.json', {'businessRgbSha256': digest})
-                frame = await capture_frame(page, sequence + 1)
+                try:
+                    frame = await capture_frame(page, cache.sequence + 1)
+                except CaptureError:
+                    # Animation, unsupported effects and geometry changes cannot
+                    # authorize a drawing. The source may advance to a supported commit.
+                    await asyncio.sleep(0.4)
+                    continue
                 end_digest = business_digest(Image.open(BytesIO(await page.screenshot())))
-                if digest == end_digest and await geometry(page) == (1090, 760, 1, 1026, 36, 'light'):
+                if (
+                    digest == end_digest
+                    and _exclusive_page(page)
+                    and page.url == APP_PAGE
+                    and await geometry(page) == SUPPORTED_GEOMETRY
+                ):
                     raw = encode_message(
                         Frame(frame.sequence, frame.width, frame.height, frame.layers + native_layers)
                     )
-                    picture = hashlib.sha256(raw).hexdigest()
-                    require(len(observed) < 32, 'signed-out scene limit reached; start a new session')
-                    (source / (picture + '.clrp')).write_bytes(raw)
-                    sequence += 1
-                    observed[digest] = {'phase': known, 'pictureSha256': picture, 'witnessByteStart': start}
-                    publish(out / 'scenes.json', observed)
-        await asyncio.sleep(0.4)
+                    cache.add(digest, raw, start)
+        await asyncio.sleep(0.25)
 
 
-async def collect(out, *, live=False, interactive=False):
+async def collect(out, *, live=False, interactive=False, pair=None):
     require(
         out.is_dir() and out.stat().st_uid == os.getuid() and not out.stat().st_mode & 0o077,
         'source output must be private',
@@ -242,16 +290,23 @@ async def collect(out, *, live=False, interactive=False):
         layers = await titlebar(browser, page, pid, out, interactive=interactive)
         if interactive:
             try:
-                await observe_interactive(page, out, layers)
+                if pair is None:
+                    await observe_interactive(page, out, layers)
+                else:
+                    from .editor import active_editor
+
+                    async with active_editor(page, out, pair):
+                        await observe_interactive(page, out, layers)
             finally:
-                await browser.detach()
+                if page.context.browser.is_connected():
+                    await browser.detach()
             return
         states = {}
         for sequence, (name, label) in enumerate(
             (('before', 'Sign in another way'), ('after', 'Amazon Bedrock')), 1
         ):
             target = page.get_by_text(label, exact=True)
-            await target.wait_for(timeout=0 if interactive else (180000 if live else 15000))
+            await target.wait_for(timeout=180000 if live else 15000)
             await asyncio.sleep(0.8)
             require(await geometry(page) == (1090, 760, 1, 1026, 36, 'light'), 'application changed geometry')
             start_log = (out / 'owner.log').stat().st_size
@@ -275,10 +330,7 @@ async def collect(out, *, live=False, interactive=False):
                 await target.click()
         await browser.detach()
         (out / 'capture.json').write_text(json.dumps({'identity': identity, 'states': states}, indent=2))
-        if interactive:
-            while not (out / 'controller-closed').exists() and not page.is_closed():
-                await asyncio.sleep(0.15)
-        elif live:
+        if live:
             # Keep the original native window open while the client renders the
             # last menu commit. The dedicated session owner terminates the source.
             await asyncio.sleep(120)
@@ -290,11 +342,12 @@ def main():
     parser.add_argument('--drive', action='store_true')
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--interactive', action='store_true')
+    parser.add_argument('--pair', type=Path)
     args = parser.parse_args()
     if args.drive:
         drive(args.output)
     else:
-        asyncio.run(collect(args.output, live=args.live, interactive=args.interactive))
+        asyncio.run(collect(args.output, live=args.live, interactive=args.interactive, pair=args.pair))
 
 
 if __name__ == '__main__':

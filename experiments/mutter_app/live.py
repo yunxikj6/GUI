@@ -37,6 +37,7 @@ def initialize(channel):
     channel.mkdir(mode=0o700)
     for name in ('graphics.fifo', 'input.fifo'):
         os.mkfifo(channel / name, 0o600)
+    (channel / 'focus.events').touch(mode=0o600, exist_ok=False)
     publish(channel / 'session.json', {'session': secrets.token_hex(32), 'exe': ORIGINAL_SHA256})
 
 
@@ -79,6 +80,8 @@ class Journal:
     def __init__(self, path):
         self.path = path
         self.file = None
+        self.position = 0
+        self.fragment = b''
         self.origins = {}
         self.peers = {}
         self.commits = set()
@@ -93,50 +96,59 @@ class Journal:
             if not self.path.is_file():
                 return
             self.file = self.path.open('rb')
-        for raw in self.file:
-            require(self.file.tell() <= 16 << 20, 'live witness exceeds source limit')
-            fields = raw.decode('ascii').split()
-            name = fields.pop(0)
-            if name == 'XDG_SURFACE':
-                client, pid, xdg, surface = map(int, fields)
-                self.roles[client, xdg] = (pid, surface)
-            elif name == 'TOPLEVEL':
-                client, xdg, top = map(int, fields)
-                self.tops[client, top] = xdg
-            elif name == 'APP_ID':
-                client, top, label = fields
-                self.ids[int(client), int(top)] = label
-            elif name == 'CURSOR':
-                self.cursors.add(tuple(map(int, fields)))
-            elif name == 'PEER':
-                *peer, serial = map(int, fields)
-                require(serial not in self.peers, 'duplicate original attach')
-                self.peers[serial] = tuple(peer)
-            elif name == 'COMMIT':
-                self.commits.add(tuple(map(int, fields)))
-            elif name == 'ORIGIN':
-                offset, kind, *desc = fields
-                require(int(offset) not in self.origins, 'duplicate source offset')
-                self.origins[int(offset)] = (kind, list(map(int, desc)), None)
-            elif name == 'ACCESS':
-                require(self.access is None, 'overlapping native GL observation')
-                self.access = {'serial': int(fields[3]), 'writes': []}
-            elif name in ('WIRE', 'SHM', 'COGL_REGION', 'COGL_CREATE', 'GL', 'END'):
-                access = self.access
-                require(access is not None and access['serial'] == int(fields[0]), 'unexpected native access')
-                if name == 'SHM':
-                    access['shm'] = (int(fields[1]), int(fields[2]), fields[3])
-                elif name in ('COGL_REGION', 'COGL_CREATE'):
-                    access['cogl'] = fields[1]
-                elif name == 'GL':
-                    access['gl'] = (int(fields[1]), int(fields[2]))
-                elif name == 'WIRE':
-                    access['writes'].append((int(fields[1]), list(map(int, fields[2:]))))
-                else:
-                    for offset, desc in access.pop('writes'):
-                        require(offset not in self.origins, 'duplicate native transfer')
-                        self.origins[offset] = ('SHM', desc, dict(access, witnessByte=self.file.tell()))
-                    self.access = None
+        while chunk := self.file.read(64 << 10):
+            lines = (self.fragment + chunk).split(b'\n')
+            self.fragment = lines.pop()
+            require(len(self.fragment) < 512, 'invalid partial source witness')
+            for line in lines:
+                require(0 < len(line) < 512, 'invalid source witness record')
+                self.position += len(line) + 1
+                require(self.position <= 16 << 20, 'live witness exceeds source limit')
+                self.record(line)
+
+    def record(self, raw):
+        fields = raw.decode('ascii').split()
+        name = fields.pop(0)
+        if name == 'XDG_SURFACE':
+            client, pid, xdg, surface = map(int, fields)
+            self.roles[client, xdg] = (pid, surface)
+        elif name == 'TOPLEVEL':
+            client, xdg, top = map(int, fields)
+            self.tops[client, top] = xdg
+        elif name == 'APP_ID':
+            client, top, label = fields
+            self.ids[int(client), int(top)] = label
+        elif name == 'CURSOR':
+            self.cursors.add(tuple(map(int, fields)))
+        elif name == 'PEER':
+            *peer, serial = map(int, fields)
+            require(serial not in self.peers, 'duplicate original attach')
+            self.peers[serial] = tuple(peer)
+        elif name == 'COMMIT':
+            self.commits.add(tuple(map(int, fields)))
+        elif name == 'ORIGIN':
+            offset, kind, *desc = fields
+            require(int(offset) not in self.origins, 'duplicate source offset')
+            self.origins[int(offset)] = (kind, list(map(int, desc)), None)
+        elif name == 'ACCESS':
+            require(self.access is None, 'overlapping native GL observation')
+            self.access = {'serial': int(fields[3]), 'writes': []}
+        elif name in ('WIRE', 'SHM', 'COGL_REGION', 'COGL_CREATE', 'GL', 'END'):
+            access = self.access
+            require(access is not None and access['serial'] == int(fields[0]), 'unexpected native access')
+            if name == 'SHM':
+                access['shm'] = (int(fields[1]), int(fields[2]), fields[3])
+            elif name in ('COGL_REGION', 'COGL_CREATE'):
+                access['cogl'] = fields[1]
+            elif name == 'GL':
+                access['gl'] = (int(fields[1]), int(fields[2]))
+            elif name == 'WIRE':
+                access['writes'].append((int(fields[1]), list(map(int, fields[2:]))))
+            else:
+                for offset, desc in access.pop('writes'):
+                    require(offset not in self.origins, 'duplicate native transfer')
+                    self.origins[offset] = ('SHM', desc, dict(access, witnessByte=self.position))
+                self.access = None
 
     def at(self, offset):
         self.update()
@@ -154,7 +166,11 @@ class Inspector:
         self.image = Image.new('RGBA', (1090, 760))
         self.pictures = {}
         self.phase = None
-        self.counts = {'shell': 0, 'cursor': 0, 'unapproved': 0, 'before': 0, 'after': 0}
+        self.revision = 0
+        self.last_picture = None
+        self.cached_asset = None
+        self.counts = {'shell': 0, 'cursor': 0, 'unapproved': 0}
+        self.counts.update({'approved': 0} if interactive else {'before': 0, 'after': 0})
 
     def state(self, name):
         record = wait_for(
@@ -166,6 +182,10 @@ class Inspector:
             self.phase = (name, state)
 
     def asset(self, digest, limit):
+        if self.interactive:
+            raw = self.cached_asset
+            require(raw is not None and len(raw) <= limit, 'invalid active original drawing')
+            return raw
         path = self.pictures[digest]
         require(path.stat().st_size <= limit, 'live picture too large')
         return path.read_bytes()
@@ -192,8 +212,24 @@ class Inspector:
         if state is None or journal_byte < state['witnessByteStart']:
             return None, None
         digest = bytes.fromhex(state['pictureSha256'])
-        self.pictures[digest] = self.out / 'drawings' / (digest.hex() + '.clrp')
-        return state['phase'], digest
+        if digest != self.last_picture:
+            try:
+                asset = self.out / 'drawings' / (digest.hex() + '.clrp')
+                with asset.open('rb') as stream:
+                    require(
+                        os.fstat(stream.fileno()).st_size == state['bytes'] <= 32 * 1024**2 + 12,
+                        'invalid source drawing size',
+                    )
+                    self.cached_asset = stream.read(state['bytes'])
+            except FileNotFoundError:
+                # It may have been evicted after reading the atomically published index.
+                return None, None
+            require(
+                len(self.cached_asset) == state['bytes']
+                and hashlib.sha256(self.cached_asset).digest() == digest,
+                'invalid original recording in source cache',
+            )
+        return 'approved', digest
 
     def inspect(self, offset, ordinal, desc, creation, pixels):
         origin = wait_for(lambda: self.journal.at(offset), 'Mutter did not classify the exact outgoing PUT')
@@ -297,10 +333,15 @@ class Inspector:
                     name, digest = phase, bytes.fromhex(state['pictureSha256'])
         self.counts[name or 'unapproved'] += 1
         if digest is not None:
-            publish(
-                self.out / ('forwarded-' + name + '.json'),
-                {'offset': offset, 'ordinal': ordinal, 'serial': serial},
-            )
+            receipt = {'offset': offset, 'ordinal': ordinal, 'serial': serial}
+            if self.interactive:
+                if digest != self.last_picture:
+                    self.revision += 1
+                    self.last_picture = digest
+                receipt.update(revision=self.revision, pictureSha256=digest.hex())
+                publish(self.out / 'presented-scene.json', receipt)
+            else:
+                publish(self.out / ('forwarded-' + name + '.json'), receipt)
         return WitnessedPut(self.binding, serial, digest)
 
 
@@ -308,8 +349,16 @@ def stream(out, channel, *, interactive=False):
     reader = LiveInput(sys.stdin.buffer)
     inspector = Inspector(out, channel, interactive=interactive)
     require(stat.S_ISFIFO((channel / 'graphics.fifo').lstat().st_mode), 'private graphics FIFO required')
-    with (channel / 'graphics.fifo').open('wb') as sink:
-        result = stream_witnessed(reader, sink, inspect_put=inspector.inspect, fetch_picture=inspector.asset)
+    try:
+        with (channel / 'graphics.fifo').open('wb') as sink:
+            result = stream_witnessed(
+                reader, sink, inspect_put=inspector.inspect, fetch_picture=inspector.asset
+            )
+    except BrokenPipeError:
+        if not interactive:
+            raise
+        wait_for((out / 'controller-closed').is_file, 'graphics connection lost while input was open', 2)
+        result = {'controllerClosed': True, 'lastRevision': inspector.revision}
     publish(out / 'live-source.json', dict(result, classification=inspector.counts))
 
 
@@ -328,8 +377,28 @@ def receive_click(out, channel, *, interactive=False):
     xid = (out / 'nested-window').read_text().strip()
     with (channel / 'input.fifo').open('rb') as src:
         sequence = 0
-        while event := src.read(5):
-            command, x, y = pointer_command(event, xid)
+        while op := src.read(1):
+            if op in (b'L', b'M'):
+                event = op + src.read(4)
+                command, x, y = pointer_command(event, xid)
+            else:
+                require(interactive, 'proof mode expects just a pointer click')
+                from cloud_render.gnome_input import command_size, decode_input
+
+                header = op + (src.read(6) if op == b'T' else b'')
+                size = command_size(header)
+                require(size is not None, 'incomplete editor command')
+                event = header + src.read(size - len(header))
+                opcode, args = decode_input(event, size=(1280, 900))
+                if opcode in (b'T', b'A'):
+                    from .editor import deliver
+
+                    applied = deliver(out, event)
+                    sequence += 1
+                    publish(channel / 'last-input.json', {'sequence': sequence, 'applied': applied})
+                    continue
+                require(opcode == b'K', 'unsupported application navigation')
+                command = ['xdotool', 'key', '--clearmodifiers', args[0]]
             require(
                 interactive or event[:1] == b'L' and (out / 'forwarded-before.json').is_file(),
                 'expected a single pointer click on the presented original page',
