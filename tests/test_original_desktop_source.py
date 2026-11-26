@@ -246,3 +246,32 @@ class OriginalDesktopSourceTests(unittest.TestCase):
         _, err = proc.communicate(timeout=5)
         self.assertEqual(proc.returncode, 1)
         self.assertIn(b"CLOUDWORKSPACE_GNOME_TOKEN", err)
+
+
+@unittest.skipUnless(hasattr(os, 'pidfd_open'), 'Linux process descriptor')
+class OriginalQuitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_quit_requires_the_original_process_and_private_focused_window(self):
+        from unittest.mock import AsyncMock, Mock, patch
+        from experiments.mutter_app import capture
+        from experiments.mutter_app.controls import WitnessError
+
+        page = Mock()
+        page.evaluate = AsyncMock(return_value=True)
+        page.context.browser.is_connected.return_value = False
+        protocol = Mock()
+        pid = os.getpid()
+        protocol.send = AsyncMock(return_value={'processInfo': [{'type': 'browser', 'id': pid}]})
+        with patch.object(capture.os.path, 'samefile', return_value=True), \
+             patch.object(capture.subprocess, 'check_output', return_value=b'99') as focused, \
+             patch.object(capture.subprocess, 'run') as key:
+            with self.assertRaisesRegex(WitnessError, 'focused quit target'):
+                await capture.quit_original(page, protocol, pid, '0x42')
+            key.assert_not_called()
+            focused.return_value = b'66'
+            with patch.object(capture.select, 'select', return_value=([1], [], [])):
+                await capture.quit_original(page, protocol, pid, '0x42')
+            key.assert_called_once_with(['xdotool', 'key', '--clearmodifiers', 'ctrl+q'], check=True, timeout=3)
+            protocol.send.return_value = {'processInfo': [{'type': 'browser', 'id': pid + 1}]}
+            with self.assertRaisesRegex(WitnessError, 'process changed'):
+                await capture.quit_original(page, protocol, pid, '0x42')
+            self.assertEqual(key.call_count, 1)

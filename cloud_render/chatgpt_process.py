@@ -104,8 +104,10 @@ async def open_chatgpt(profile: Path, *, executable: Path = Path('/usr/bin/chatg
                 no_viewport=True, ignore_default_args=True, env=_cloud_environment(home),
                 args=['--remote-debugging-pipe', '--user-data-dir=' + str(user_data)], timeout=30000,
             )
+            browser = context.browser
             try:
                 page = await asyncio.wait_for(_original_window(context), timeout=30)
                 yield page
             finally:
-                await context.close()
+                if browser is None or browser.is_connected():
+                    await context.close()

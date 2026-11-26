@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import select
 import subprocess
 import time
 from collections import OrderedDict
@@ -304,6 +305,32 @@ async def observe_interactive(page, out, native_layers):
         )
 
 
+async def quit_original(page, browser_protocol, pid, xid):
+    # The desktop has stopped accepting input. Verify the live browser again
+    # before sending the original app's Quit accelerator on its private display.
+    fd = os.pidfd_open(pid)
+    try:
+        processes = (await browser_protocol.send('SystemInfo.getProcessInfo'))['processInfo']
+        owners = [p['id'] for p in processes if p['type'] == 'browser']
+        require(owners == [pid] and os.path.samefile(f'/proc/{pid}/exe', '/usr/lib/chatgpt/ChatGPT'),
+                'the original application process changed before shutdown')
+        if not await page.evaluate('document.hasFocus()'):
+            await page.bring_to_front()
+            await page.wait_for_function('document.hasFocus()', timeout=2000)
+        window = await asyncio.to_thread(subprocess.check_output, ['xdotool', 'getwindowfocus'], timeout=2)
+        require(int(window.strip()) == int(xid, 0) and await page.evaluate('document.hasFocus()'),
+                'the verified application is not the focused quit target')
+        await asyncio.to_thread(subprocess.run, ['xdotool', 'key', '--clearmodifiers', 'ctrl+q'],
+                                check=True, timeout=3)
+        require((await asyncio.to_thread(select.select, [fd], [], [], 6))[0],
+                'the original application did not exit after its Quit command')
+        async with asyncio.timeout(4):
+            while page.context.browser.is_connected():
+                await asyncio.sleep(.02)
+    finally:
+        os.close(fd)
+
+
 async def collect(out, *, live=False, interactive=False, pair=None):
     require(
         out.is_dir() and out.stat().st_uid == os.getuid() and not out.stat().st_mode & 0o077,
@@ -350,6 +377,9 @@ async def collect(out, *, live=False, interactive=False, pair=None):
                     async with active_editor(page, out, pair):
                         await observe_interactive(page, out, layers)
             finally:
+                if (os.environ.get('CW_APP_PROFILE') and (out / 'controller-closed').is_file()
+                        and page.context.browser.is_connected()):
+                    await quit_original(page, browser, pid, xid)
                 if page.context.browser.is_connected():
                     await browser.detach()
             return
