@@ -12,7 +12,7 @@ import zlib
 
 from cloud_render import frame_delta, gnome_commands as mesa, gnome_wallpaper as artwork
 from cloud_render.gnome_input import decode_input
-from cloud_render.gnome_wire import FOCUS_STATE, SEARCH_INPUT, SELECT_ALL, FOCUS_DELETE, APP_WALLPAPER, APP_PICTURE_DELTA
+from cloud_render.gnome_wire import FOCUS_STATE, SEARCH_INPUT, SELECT_ALL, FOCUS_DELETE, APP_WALLPAPER, APP_PICTURE_DELTA, APP_WALLPAPER_X99
 from cloud_render.gnome_relay import DesktopService, TOKEN
 from experiments.application_surface import SurfaceError
 from experiments.live_application_surface import BIND, DRAW, DRAW_DELTA, DRAW_PREFIX_BYTES, HOLD, REUSE, binding_record
@@ -83,11 +83,12 @@ def _compact_drawing(body, previous):
 
 class _Graphics:
     """Forward only whole, session-bound records from the source's private FIFO."""
-    def __init__(self, channel, reader, config, eof, *, app_wallpaper=False, picture_delta=False):
+    def __init__(self, channel, reader, config, eof, *, app_wallpaper=False, picture_delta=False, app_wallpaper_x99=False):
         self.channel, self.reader, self.eof = channel, reader, eof
         self.buffer = memoryview(source_hello(config))
         self.task = None
         self.app_wallpaper = app_wallpaper
+        self.app_wallpaper_x99 = app_wallpaper_x99
         self.picture_delta = picture_delta
         self.previous_picture = b''
         self.bound_handle = None
@@ -125,7 +126,7 @@ class _Graphics:
                 raise SurfaceError('invalid original texture length')
             pixels = await self.reader.readexactly(count)
             if self.app_wallpaper and self.artwork_references < artwork.MAX_REFERENCES:
-                reference = artwork.reference_for_upload(descriptor, pixels)
+                reference = artwork.reference_for_upload(descriptor, pixels, x99=self.app_wallpaper_x99)
                 if reference is not None:
                     self.artwork_references += 1
                     return reference
@@ -278,8 +279,8 @@ class _Peer:
 
 
 @asynccontextmanager
-async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
-    if size != SIZE or wallpaper or (focus_delete and not search_input):
+async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False, app_wallpaper_x99=False):
+    if size != SIZE or wallpaper or (focus_delete and not search_input) or (app_wallpaper_x99 and not app_wallpaper):
         raise SurfaceError('unsupported application desktop configuration')
     _private(channel, stat.S_ISDIR)
     for name in ('graphics.fifo','input.fifo'):
@@ -299,7 +300,8 @@ async def interactive_fifos(channel, *, size=SIZE, wallpaper=False, search_input
         def eof():
             finished.set()
             events.feed_eof()
-        graphics = _Graphics(channel, reader, config, eof, app_wallpaper=app_wallpaper, picture_delta=picture_delta)
+        graphics = _Graphics(channel, reader, config, eof, app_wallpaper=app_wallpaper, picture_delta=picture_delta,
+                             app_wallpaper_x99=app_wallpaper_x99)
         pointer = _Pointer(channel, events, editing=search_input, focus_delete=focus_delete)
         opening = asyncio.create_task(pointer.open())
         def opened(task):
@@ -346,7 +348,7 @@ async def serve(channel, port, token):
             if asyncio.get_running_loop().time() >= deadline:
                 raise SurfaceError('application source did not initialize')
             await asyncio.sleep(.05)
-        return supported_editor_features(channel) | APP_WALLPAPER | APP_PICTURE_DELTA
+        return supported_editor_features(channel) | APP_WALLPAPER | APP_PICTURE_DELTA | APP_WALLPAPER_X99
 
     service = DesktopService(token, source, features=capabilities)
     closing = False

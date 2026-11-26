@@ -64,17 +64,24 @@ class OriginalDesktopArtwork(unittest.IsolatedAsyncioTestCase):
                 await bridge._packet()
 
     def test_local_reconstruction_consumes_the_original_number_of_logical_bytes(self):
+        self.check_reconstruction(self.ref, self.pixels, x99=False)
+        pixels = bytearray(self.pixels)
+        pixels[3::4] = bytes([99]) * art.PIXELS
+        reference = art.reference_for_upload(self.desc, pixels, x99=True)
+        self.check_reconstruction(reference, pixels, x99=True)
+
+    def check_reconstruction(self, reference, physical_pixels, *, x99):
         unref = mesa._HEADER.pack(1,mesa.UNREF) + mesa._WORD.pack(7)
-        prefix = self.create + self.ref + unref + self.create
+        prefix = self.create + reference + unref + self.create
         bound = Binding(b's'*32,bytes.fromhex(ORIGINAL_SHA256),47,b'p'*32,8,7,2)
-        offset = len(prefix)-len(self.ref)+len(self.head)+len(self.pixels)
+        offset = len(prefix)-len(reference)+len(self.head)+len(self.pixels)
         stream = LiveSurfaceStream(io.BytesIO(prefix+binding_record(offset,bound)), session=b's'*32,
-                                   authorize=lambda b:b==bound,rasterize=lambda f:None,wallpaper=self.pixels)
+                                   authorize=lambda b:b==bound,rasterize=lambda f:None,wallpaper=self.pixels,wallpaper_x99=x99)
         actual = hashlib.sha256()
         while block := stream.read(65536):
             actual.update(block)
         expected = hashlib.sha256(self.create+self.head)
-        expected.update(self.pixels)
+        expected.update(physical_pixels)
         expected.update(unref+self.create)
         self.assertEqual(actual.digest(),expected.digest())
         self.assertEqual((stream.offset,stream.binding,stream.artwork_references),(offset,bound,1))

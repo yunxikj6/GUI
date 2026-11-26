@@ -88,6 +88,9 @@ class _PointerDesktop:
     def has_picture_delta(self):
         return getattr(self.transport, 'has_picture_delta', lambda: False)()
 
+    def has_application_wallpaper_x99(self):
+        return getattr(self.transport, 'has_application_wallpaper_x99', lambda: False)()
+
     def has_application_wallpaper(self):
         return self.transport.has_application_wallpaper()
 
@@ -139,6 +142,7 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
     state = _WindowInput()
     cache = None
     session_wallpaper = None
+    wallpaper_x99 = False
     picture_delta = False
 
     def native_window(title, width, height, submit):
@@ -153,7 +157,7 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
 
         with OriginalPicturePainter(node=node) as painter:
             source = LiveSurfaceStream(connection, session=nonce, authorize=authorized, rasterize=painter,
-                                       wallpaper=session_wallpaper, picture_delta=picture_delta)
+                                       wallpaper=session_wallpaper, picture_delta=picture_delta, wallpaper_x99=wallpaper_x99)
             if live:
                 state.reader = source
 
@@ -172,10 +176,11 @@ def present_original_desktop(connect, open_window, *, node='node', runtime_dir=N
                         state.reader = None
 
     def render(connection, present):
-        nonlocal cache, session_wallpaper, picture_delta
+        nonlocal cache, session_wallpaper, picture_delta, wallpaper_x99
         picture_delta = connection.has_picture_delta()
         if artwork is not None and connection.has_application_wallpaper():
             session_wallpaper = artwork
+            wallpaper_x99 = connection.has_application_wallpaper_x99()
         # Cache the source records, before the local engine expands SkPictures into textures.
         cache = SceneCache(connection)
         draw(cache, present, live=True)
@@ -224,11 +229,11 @@ def main(argv=None):
             box = InstaBox(key, args.machine)
             box.ensure_running()
             return connect(box,args.port,token, size=SIZE, search_input=True, focus_delete=True,
-                           app_wallpaper=artwork is not None, picture_delta=True)
+                           app_wallpaper=artwork is not None, picture_delta=True, app_wallpaper_x99=artwork is not None)
     else:
         def start():
             return connect_forwarded(args.port,token, size=SIZE, search_input=True, focus_delete=True,
-                           app_wallpaper=artwork is not None, picture_delta=True)
+                           app_wallpaper=artwork is not None, picture_delta=True, app_wallpaper_x99=artwork is not None)
 
     bundled = Path(__file__).resolve().parents[1]/'thin_client/vendor/node/windows-x64/node.exe'
     node = args.node or (bundled if bundled.is_file() else 'node')

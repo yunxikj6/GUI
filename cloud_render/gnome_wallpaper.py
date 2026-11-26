@@ -6,6 +6,7 @@ from pathlib import Path
 WIDTH, HEIGHT = 3840, 2160
 PIXELS = WIDTH * HEIGHT
 RGBX_SHA256 = bytes.fromhex('16ff86e9d3bb20925bb14030ead8ea83631eaa97efb010c1f643f24759c16019')
+RGBX_99_SHA256 = bytes.fromhex('b4da4262ad652769b76d6d97c46514ea7e611362f436be6f965edf90c9330ca1')
 RGB_XZ_SHA256 = bytes.fromhex('93aa46251c15eed89240c8815e76c351575083a4f6717b2288d78177a395078a')
 XZ_BYTES = 5787728
 PUT = 5
@@ -51,18 +52,28 @@ def put_reference(payload):
     return reference_for_upload(payload[:TRANSFER.size], memoryview(payload)[TRANSFER.size:])
 
 
-def reference_for_upload(desc, pixels):
+def reference_for_upload(desc, pixels, *, x99=False):
     if len(desc) != TRANSFER.size or len(pixels) != PIXELS * 4 or not _complete_upload(desc):
         return None
-    if hashlib.sha256(pixels).digest() != RGBX_SHA256:
+    digest = hashlib.sha256(pixels).digest()
+    if digest != RGBX_SHA256 and not (x99 and digest == RGBX_99_SHA256):
         return None
-    return HEADER.pack((TRANSFER.size + 32) // 4, REFERENCE) + desc + RGBX_SHA256
+    return HEADER.pack((TRANSFER.size + 32) // 4, REFERENCE) + desc + digest
 
 
-def expand_reference(body, asset):
-    if len(body) != TRANSFER.size + 32 or body[TRANSFER.size:] != RGBX_SHA256:
+def expand_reference(body, asset, *, x99=False):
+    digest = body[TRANSFER.size:]
+    if len(digest) != 32 or (digest != RGBX_SHA256 and not (x99 and digest == RGBX_99_SHA256)):
         raise ValueError('unknown desktop resource reference')
     size = TRANSFER.unpack_from(body)[-1]
     if asset is None or size != len(asset) or not _complete_upload(body):
         raise ValueError('referenced original asset is unavailable')
+    if digest == RGBX_99_SHA256:
+        # Two independently measured cloud uploads have the same RGB samples
+        # as the bundled artwork, with each fourth byte set to decimal 99.
+        native = bytearray(asset)
+        native[3::4] = bytes([99]) * PIXELS
+        if hashlib.sha256(native).digest() != digest:
+            raise ValueError('reconstructed Ubuntu texture differs from its source')
+        asset = native
     return HEADER.pack(TRANSFER.size // 4 + (size + 3) // 4, PUT) + body[:TRANSFER.size], asset

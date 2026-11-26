@@ -30,6 +30,26 @@ class OriginalArtwork(unittest.TestCase):
         changed[16] = 1  # This is now a partial update at x=1.
         self.assertIsNone(art.put_reference(changed))
 
+    def test_instabox_texture_requires_its_own_capability_and_exact_digest(self):
+        physical = bytearray(self.asset)
+        physical[3::4] = bytes([99]) * art.PIXELS
+        self.assertEqual(hashlib.sha256(physical).digest(), art.RGBX_99_SHA256)
+        self.assertIsNone(art.reference_for_upload(self.desc, physical))
+        reference = art.reference_for_upload(self.desc, physical, x99=True)
+        self.assertEqual(len(reference), 84)
+        self.assertEqual(reference[-32:], art.RGBX_99_SHA256)
+        with self.assertRaises(ValueError):
+            art.expand_reference(reference[8:], self.asset)
+        header, restored = art.expand_reference(reference[8:], self.asset, x99=True)
+        self.assertEqual(header[8:], self.desc)
+        self.assertEqual(restored, physical)
+        # A correct colour channel layout or constant padding alone is insufficient.
+        physical[0] ^= 1
+        self.assertIsNone(art.reference_for_upload(self.desc, physical, x99=True))
+        physical[0] ^= 1
+        physical[-1] ^= 1
+        self.assertIsNone(art.reference_for_upload(self.desc, physical, x99=True))
+
     def test_rejects_unknown_references_and_corrupt_or_missing_assets(self):
         def forbidden(encoded, artwork):
             with self.assertRaises(gpu.VirglError):

@@ -89,7 +89,7 @@ class LiveSurfaceStream:
     checks each source-attested process/surface lifetime against the application
     this session requested. The adapter accepts no network URLs, paths or commands.
     """
-    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None, picture_delta=False):
+    def __init__(self, source, *, session, authorize, rasterize, wallpaper=None, picture_delta=False, wallpaper_x99=False):
         self.source = source
         self.session = session
         self.authorize = authorize
@@ -102,6 +102,7 @@ class LiveSurfaceStream:
         self._buffer = memoryview(b'')
         self.picture_delta = picture_delta
         self.wallpaper = wallpaper
+        self.wallpaper_x99 = wallpaper_x99
         self.artwork_references = 0
         self._resource_tail = None
         self._failed = False
@@ -211,7 +212,7 @@ class LiveSurfaceStream:
         if self.artwork_references == 0 and (type(self.wallpaper) is not bytes or
                 len(self.wallpaper) != artwork.PIXELS * 4 or hashlib.sha256(self.wallpaper).digest() != artwork.RGBX_SHA256):
             raise SurfaceError('local original desktop artwork differs from its source')
-        head, asset = artwork.expand_reference(body, self.wallpaper)
+        head, asset = artwork.expand_reference(body, self.wallpaper, x99=self.wallpaper_x99)
         # A later Wayland binding names an offset in the original source stream.
         # The local GPU sees the exact PUT while the session cache keeps the small reference.
         self.offset += len(head) + len(asset)
