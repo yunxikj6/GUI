@@ -227,7 +227,8 @@ _GNOME_FEATURES = wire.WALLPAPER | wire.SEARCH_INPUT | wire.SELECT_ALL | wire.FO
 
 
 def _valid_features(flags):
-    return (type(flags) is int and flags >= 0 and not flags & ~(_GNOME_FEATURES | wire.APP_WALLPAPER | wire.APP_PICTURE_DELTA) and
+    return (type(flags) is int and flags >= 0 and not flags & ~(_GNOME_FEATURES | wire.APP_WALLPAPER | wire.APP_WALLPAPER_X99 | wire.APP_PICTURE_DELTA) and
+            (not flags & wire.APP_WALLPAPER_X99 or bool(flags & wire.APP_WALLPAPER)) and
             (not flags & (wire.SELECT_ALL | wire.FOCUS_DELETE) or bool(flags & wire.SEARCH_INPUT)))
 
 
@@ -283,6 +284,8 @@ class DesktopService:
                     options['picture_delta'] = True
                 if offered & wire.APP_WALLPAPER:
                     options['app_wallpaper'] = True
+                    if offered & wire.APP_WALLPAPER_X99:
+                        options['app_wallpaper_x99'] = True
                 if offered & wire.WALLPAPER:
                     options['wallpaper'] = True
                 size = checked_size((width, height))

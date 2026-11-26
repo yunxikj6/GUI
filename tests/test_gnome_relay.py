@@ -77,13 +77,15 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         self.sources = []
         self.artwork = []
         self.application_artwork = []
+        self.application_artwork_x99 = []
         self.picture_deltas = []
         self.retired = asyncio.Event()
 
         @asynccontextmanager
-        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False):
+        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False, search_input=False, focus_delete=False, app_wallpaper=False, picture_delta=False, app_wallpaper_x99=False):
             self.artwork.append(wallpaper)
             self.application_artwork.append(app_wallpaper)
+            self.application_artwork_x99.append(app_wallpaper_x99)
             self.picture_deltas.append(picture_delta)
             source = Source(size)
             if search_input:
@@ -213,6 +215,47 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(self.retired.wait(),3)
                 self.assertEqual(self.application_artwork[-1],expected)
                 self.assertFalse(self.artwork[-1])
+
+    async def test_x99_artwork_only_when_both_peers_support_both_wallpaper_bits(self):
+        artwork, variant = wire.APP_WALLPAPER, wire.APP_WALLPAPER_X99
+        cases = ((0, True, True, (False, False)),
+                 (artwork, True, True, (True, False)),
+                 (artwork | variant, True, False, (True, False)),
+                 (artwork | variant, False, True, (False, False)),
+                 (artwork | variant, True, True, (True, True)))
+
+        def connect(private, original, x99):
+            options = dict(app_wallpaper=original, app_wallpaper_x99=x99)
+            stream = (transport.connect(LocalProvider(), self.port, self.token, **options) if private
+                      else transport.connect_forwarded(self.port, self.token, **options))
+            with stream:
+                return stream.has_application_wallpaper(), stream.has_application_wallpaper_x99()
+
+        for private in (False, True):
+            for offered, original, x99, expected in cases:
+                with self.subTest(private=private, offered=offered, original=original, x99=x99):
+                    self.service.features = offered
+                    self.retired.clear()
+                    result = await asyncio.wait_for(asyncio.to_thread(connect, private, original, x99), 15)
+                    await asyncio.wait_for(self.retired.wait(), 3)
+                    self.assertEqual(result, expected)
+                    self.assertEqual((self.application_artwork[-1], self.application_artwork_x99[-1]), expected)
+
+    async def test_private_protocol_refuses_an_x99_bit_without_the_original_asset(self):
+        with self.assertRaises(ValueError):
+            DesktopService(self.token, features=wire.APP_WALLPAPER_X99)
+        with self.assertRaises(instabox_relay.RelayError):
+            instabox_relay.check_request(dict(op='start', session='0'*32, protocol='gnome',
+                                              pair=self.token, port=self.port, appWallpaperX99=True))
+        self.service.features = wire.APP_WALLPAPER | wire.APP_WALLPAPER_X99
+        reader, writer = await asyncio.open_connection('127.0.0.1', self.port)
+        writer.write(wire.AUTH_SIZE + self.token.encode('ascii') + b'\n' +
+                     wire.SESSION.pack(*gnome_input.DEFAULT_SIZE, wire.APP_WALLPAPER_X99))
+        await writer.drain()
+        self.assertEqual(await asyncio.wait_for(reader.read(), 2), b'')
+        writer.close()
+        await writer.wait_closed()
+        self.assertEqual(self.sources, [])
 
     async def test_picture_delta_requires_both_peers_independently_of_wallpaper(self):
         def local_file(owner, index):

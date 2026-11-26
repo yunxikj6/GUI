@@ -14,6 +14,8 @@ FEATURE_MAGIC = b'GCFG'
 WALLPAPER = 1
 # This bit applies inside a witnessed application stream, including its logical PUT offsets.
 APP_WALLPAPER = 16
+# The original Ubuntu RGB texture with a constant 0x63 fourth channel. Requires APP_WALLPAPER.
+APP_WALLPAPER_X99 = 128
 # An independently negotiated delta uses only the previous witnessed application picture.
 APP_PICTURE_DELTA = 32
 SEARCH_INPUT = 2
