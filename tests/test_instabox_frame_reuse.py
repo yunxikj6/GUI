@@ -67,6 +67,9 @@ class ReuseRecovery(unittest.TestCase):
                     with front.makefile('rb') as pipe:
                         self.assertEqual(read_message(pipe), frames[0])
                         self.assertEqual(read_message(pipe), None if corrupt_reset else frames[1])
+                        if not corrupt_reset:
+                            # Let the final poll retire frame two before closing the local connection.
+                            self.assertIsNone(read_message(pipe))
                 finally:
                     front.close()
                     owner.close()
