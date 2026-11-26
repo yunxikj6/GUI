@@ -24,6 +24,7 @@ PACKAGES = (
     "yaru-theme-icon",
     "yaru-theme-gtk",
     "fonts-ubuntu",
+    "fonts-noto-cjk",
     "fonts-dejavu-core",
     "adwaita-icon-theme",
     "gnome-themes-extra-data",
