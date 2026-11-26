@@ -23,6 +23,8 @@ class NativeEntry(unittest.TestCase):
                 contextlib.redirect_stderr(io.StringIO()) as err:
             for options in (['--machine', 'example'], ['--no-browser'], ['--port', '8000'],
                             ['--connect-port', '65536'], ['--connect-port', '0', '--native'],
+                            ['--desktop-size', '1920x1080', '--native'], ['--desktop-size', '800x520', '--cloud-app'],
+                            ['--desktop-size', '1024x768'], ['--desktop-size', '1280x900', '--connect-port', '1'],
                             ['--desktop-port', '0'], ['--cloud-app', '--workbench'],
                             ['--desktop-port', '9', '--connect-port', '8'], ['--cloud-app', '--desktop-port', '9']):
                 with self.subTest(options=options), patch.object(sys, 'argv', ['launcher.py', *options]), self.assertRaises(SystemExit) as exit:
@@ -34,6 +36,7 @@ class NativeEntry(unittest.TestCase):
         cases = (
             ([], {}, False, ['--instabox', '--port', '17325']),
             ([], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, False, ['--instabox', '--port', '17325']),
+            (['--desktop-size', '1920x1080'], {}, False, ['--instabox', '--port', '17325', '--size', '1920x1080']),
             (['--desktop-port', '4100', '--machine', 'm_abc'], {}, False, ['--instabox', '--port', '4100', '--machine', 'm_abc']),
             (['--machine', 'm_abc'], {}, False, ['--instabox', '--port', '17325', '--machine', 'm_abc']),
             (['--instabox'], {'CLOUDWORKSPACE_RENDER_PORT': '4040'}, False, ['--instabox', '--port', '17325']),

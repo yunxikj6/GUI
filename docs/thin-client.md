@@ -22,7 +22,7 @@ python3 -m cloud_render.gnome_relay --port 17325
 Start.cmd --machine m_YOUR_MACHINE --desktop-port 17325
 ```
 
-窗口支持指针移动、左右点击以及 Tab、Shift+Tab、Enter、方向键等导航键。可按 Ctrl+Esc 切换 GNOME 活动概览。当前桌面源尺寸为 800×520，调整本机窗口大小时，显示与点击坐标会一起缩放。
+窗口支持指针移动、左右点击以及 Tab、Shift+Tab、Enter、方向键等导航键。可按 Ctrl+Esc 切换 GNOME 活动概览。默认桌面尺寸是 800×520。启动新会话时可指定 1280×900 或 1920×1080，例如运行 `Start.cmd --desktop-size 1920x1080`。Ubuntu 将按所选尺寸排布原版桌面。会话期间调整 Windows 窗口大小会同步缩放显示和点击坐标。较大尺寸需要云机也运行支持尺寸协商的版本。
 
 ## 单独打开原版 ChatGPT
 

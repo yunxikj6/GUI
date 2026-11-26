@@ -14,14 +14,18 @@ import signal
 import sys
 
 from . import gnome_wire as wire
-from .gnome_input import decode_input
+from .gnome_input import DEFAULT_SIZE, checked_size, decode_input
 
 
 TOKEN = re.compile(r'[A-Za-z0-9_-]{43}\Z')
 
 
 @asynccontextmanager
-async def open_source(session_mode='ubuntu'):
+async def open_source(session_mode='ubuntu', *, size=DEFAULT_SIZE, wallpaper=False):
+    width, height = checked_size(size)
+    size_args = [] if size == DEFAULT_SIZE else ['--size', f'{width}x{height}']
+    if wallpaper:
+        size_args.append('--wallpaper')
     read_fd, write_fd = os.pipe()
     events = asyncio.StreamReader(limit=2048)
     transport = proc = None
@@ -32,7 +36,7 @@ async def open_source(session_mode='ubuntu'):
             try:
                 proc = await asyncio.create_subprocess_exec(
                     sys.executable, '-m', 'cloud_render.gnome_source', '--event-fd', str(write_fd),
-                    '--session-mode', session_mode,
+                    '--session-mode', session_mode, *size_args,
                     stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL, pass_fds=(write_fd,), start_new_session=True,
                     cwd=Path(__file__).resolve().parents[1],
@@ -64,7 +68,8 @@ async def open_source(session_mode='ubuntu'):
 
 
 class _SourceLink:
-    def __init__(self, source, events, reader, writer):
+    def __init__(self, source, events, reader, writer, size):
+        self.size = size
         self.source = source
         self.events = events
         self.reader = reader
@@ -124,9 +129,9 @@ class _SourceLink:
                     raise wire.DesktopError('源端帧确认无效。')
                 frames += 1
             elif kind == 'ready' and not self.ready.is_set():
-                if (result.get('width'), result.get('height')) != (800, 520):
+                if (result.get('width'), result.get('height')) != self.size:
                     raise wire.DesktopError('源端桌面尺寸不受支持。')
-                await self.send(wire.packet(wire.READY, wire.DIMENSIONS.pack(800, 520)))
+                await self.send(wire.packet(wire.READY, wire.DIMENSIONS.pack(*self.size)))
                 self.ready.set()
             elif kind == 'input' and self.pending and not self.pending.done():
                 if type(result.get('sequence')) is not int or result['sequence'] != self.sequence:
@@ -149,7 +154,7 @@ class _SourceLink:
             body = msg[1]
             seq, = wire.SEQUENCE.unpack_from(body)
             command = body[wire.SEQUENCE.size:]
-            decode_input(command)
+            decode_input(command, size=self.size)
             if seq == self.sequence and seq and command == self.last_command:
                 await self.send(wire.packet(wire.ACK, wire.INPUT_ACK.pack(seq, 1)))
                 continue
@@ -195,6 +200,8 @@ class DesktopService:
         if not TOKEN.fullmatch(token):
             raise ValueError('无效的云桌面配对码。')
         self.expected = wire.AUTH + token.encode('ascii') + b'\n'
+        self.expected_size = wire.AUTH_SIZE + token.encode('ascii') + b'\n'
+        self.expected_query = wire.QUERY + token.encode('ascii') + b'\n'
         self.source_factory = source_factory
         self.busy = False
         self.active = set()
@@ -207,11 +214,29 @@ class DesktopService:
             if len(self.active) > 16:
                 return
             login = await asyncio.wait_for(reader.readexactly(len(self.expected)), 5)
-            if not hmac.compare_digest(login, self.expected) or self.busy:
+            if hmac.compare_digest(login, self.expected_query):
+                writer.write(wire.FEATURES.pack(wire.FEATURE_MAGIC, wire.WALLPAPER))
+                await writer.drain()
+                return
+            options = {}
+            if hmac.compare_digest(login, self.expected):
+                size = DEFAULT_SIZE
+            elif hmac.compare_digest(login, self.expected_size):
+                raw = await asyncio.wait_for(reader.readexactly(wire.SESSION.size), 5)
+                width, height, offered = wire.SESSION.unpack(raw)
+                if offered & wire.WALLPAPER:
+                    options['wallpaper'] = True
+                size = checked_size((width, height))
+            else:
+                return
+            if self.busy:
                 return
             self.busy = owned = True
-            async with self.source_factory() as (source, observations):
-                await _SourceLink(source, observations, reader, writer).run()
+            if size != DEFAULT_SIZE:
+                options['size'] = size
+            factory = self.source_factory(**options)
+            async with factory as (source, observations):
+                await _SourceLink(source, observations, reader, writer, size).run()
         except (OSError, EOFError, ValueError, TimeoutError):
             pass
         finally:

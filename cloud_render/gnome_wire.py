@@ -1,4 +1,4 @@
-"""Private stream of original Mesa requests for one 800×520 GNOME source and one renderer."""
+"""Private stream of original Mesa requests for one GNOME source and one renderer."""
 import asyncio
 import hashlib
 import struct
@@ -7,12 +7,20 @@ import zlib
 
 MAGIC = b'GVGL'
 AUTH = b'GNOME-AUTH/1 '
+AUTH_SIZE = b'GNOME-AUTH/2 '
+QUERY = b'GNOME-CAPS/1 '
+FEATURES = struct.Struct('!4sI')
+FEATURE_MAGIC = b'GCFG'
+WALLPAPER = 1
 HEADER = struct.Struct('!4sBBHI')
 BLOCK, INPUT, ACK, READY, END, UNAVAILABLE = range(1, 7)
 UNAVAILABLE_APPS = ('chatgpt', 'claude', 'wayland')
 BLOCK_HEAD = struct.Struct('!II32s32s')
 INPUT_ACK = struct.Struct('!IB')
 DIMENSIONS = struct.Struct('!HH')
+# Authenticated v2 setup. Flags advertise optional commands the viewer can decode.
+# A server may always send the original commands and ignore unknown offers.
+SESSION = struct.Struct('!HHI')
 FINAL = struct.Struct('!IQ32s')
 SEQUENCE = struct.Struct('!I')
 MAX_RAW = 1024 * 1024

@@ -1,4 +1,5 @@
 import io
+import json
 import os
 from pathlib import Path
 import select
@@ -139,6 +140,25 @@ class GnomeSourceTests(unittest.TestCase):
                     stack.enter_context(closing(original.accept()[0]))
                 with self.assertRaises(gnome_source.SourceError):
                     gate.seal()
+
+    @unittest.skipUnless(Path('/proc/net/unix').exists(), 'Linux UNIX domain sockets required')
+    def test_background_display_probes_do_not_claim_the_user_launched_a_window(self):
+        with tempfile.TemporaryDirectory() as temp, ExitStack() as stack:
+            root = Path(temp)
+            control, keep_open = os.pipe()
+            read, events = os.pipe()
+            for fd in (control, keep_open, read, events):
+                stack.callback(os.close, fd)
+            source = gnome_source._Source(stack, root, events, control, 'ubuntu')
+            source.gate = gnome_source._ClientGate(root, stack)
+            with socket.socket(socket.AF_UNIX) as helper:
+                helper.connect(str(source.gate.denied))
+                source.poll(.1)
+                self.assertEqual(helper.recv(1), b'')
+            self.assertFalse(select.select([read], [], [], 0)[0])
+            gnome_app_request.activate(root, 'wayland')
+            source.poll(.1)
+            self.assertEqual(json.loads(os.read(read, 128)), {'event': 'unavailable', 'application': 'wayland'})
 
     def test_original_desktop_metadata_routes_all_exec_and_dbus_activations(self):
         with tempfile.TemporaryDirectory(prefix='gnome-', dir='/tmp') as temp, ExitStack() as stack:

@@ -20,7 +20,7 @@ import threading
 import time
 
 from .gnome_commands import StreamError, _connect, copy_commands
-from .gnome_input import HEIGHT, WIDTH, decode_input, input_size
+from .gnome_input import DEFAULT_SIZE, SIZE_NAMES, decode_input, input_size
 
 
 class SourceError(RuntimeError):
@@ -200,15 +200,17 @@ class _ClientGate:
             return 'wayland'
 
 
-def _record(directory, notify, gate_fd):
+def _record(directory, notify, gate_fd, size=DEFAULT_SIZE, wallpaper=False):
     """Own the blocking vtest I/O in a child so a stalled sink can be cancelled."""
+    surface_width, surface_height = size
     frame = 0
 
     def scanned(desc, pixels):
         nonlocal frame
         _, level, stride, _, x, y, _, width, height, depth, size = desc
         if ((level, x, y, width, height, depth, size) ==
-                (0, 0, 0, WIDTH, HEIGHT, 1, WIDTH * HEIGHT * 4) and stride in (0, WIDTH * 4)):
+                (0, 0, 0, surface_width, surface_height, 1, surface_width * surface_height * 4)
+                and stride in (0, surface_width * 4)):
             frame += 1
             os.write(notify, _FRAME.pack(frame, hashlib.sha256(pixels).digest()))
 
@@ -224,7 +226,7 @@ def _record(directory, notify, gate_fd):
             publisher.start()
             try:
                 copy_commands(source, gpu, recording=output, respond=client.sendall,
-                              scanout=scanned, max_bytes=None)
+                              scanout=scanned, max_bytes=None, wallpaper=wallpaper)
             finally:
                 output.finish()
             publisher.join()
@@ -270,9 +272,10 @@ def _authority(path):
             f.write(data)
 
 
-def _window(env):
+def _window(env, size=DEFAULT_SIZE):
+    width, height = size
     result = _run(env, 'xwininfo', '-root', '-tree', verify=False)
-    matches = re.findall(r'^\s*(0x[0-9a-f]+) "gnome-shell": [^\n]*?\b800x520[+-]',
+    matches = re.findall(rf'^\s*(0x[0-9a-f]+) "gnome-shell": [^\n]*?\b{width}x{height}[+-]',
                          result.stdout, flags=re.MULTILINE)
     if len(matches) == 1:
         xid = matches[0]
@@ -281,13 +284,13 @@ def _window(env):
     return None
 
 
-def _focused(env, xid):
-    if _window(env) != xid or _run(env, 'xdotool', 'getwindowfocus').stdout.strip() != str(int(xid, 16)):
+def _focused(env, xid, size=DEFAULT_SIZE):
+    if _window(env, size) != xid or _run(env, 'xdotool', 'getwindowfocus').stdout.strip() != str(int(xid, 16)):
         raise SourceError('原 GNOME 窗口已失去焦点。')
 
 
-def _apply(env, xid, command):
-    kind, args = decode_input(command)
+def _apply(env, xid, command, size=DEFAULT_SIZE):
+    kind, args = decode_input(command, size=size)
     if kind in (b'S', b'K'):
         _run(env, 'xdotool', 'key', 'Super_L' if kind == b'S' else args[0])
     else:
@@ -299,7 +302,10 @@ def _apply(env, xid, command):
 
 
 class _Source:
-    def __init__(self, stack, directory, event_fd, control_fd, mode):
+    def __init__(self, stack, directory, event_fd, control_fd, mode, size=DEFAULT_SIZE, wallpaper=False):
+        self.wallpaper = wallpaper
+        self.size = size
+        self.width, self.height = size
         self.mode = mode
         self.stack = stack
         self.directory = directory
@@ -325,7 +331,7 @@ class _Source:
                         XDG_RUNTIME_DIR=str(directory), XAUTHORITY=str(directory / 'authority'),
                         DBUS_SYSTEM_BUS_ADDRESS='unix:path=' + str(directory / 'system'),
                         GSETTINGS_BACKEND='memory', LIBGL_ALWAYS_SOFTWARE='1', LP_NUM_THREADS='2',
-                        GALLIUM_DRIVER='llvmpipe', MUTTER_DEBUG_DUMMY_MODE_SPECS=f'{WIDTH}x{HEIGHT}')
+                        GALLIUM_DRIVER='llvmpipe', MUTTER_DEBUG_DUMMY_MODE_SPECS=f'{self.width}x{self.height}')
 
     def emit(self, event, **fields):
         # These short records are atomic on a pipe and include no window contents.
@@ -383,7 +389,9 @@ class _Source:
                 self.emit('unavailable', application=app.decode('ascii'))
         if self.gate and self.gate.server in readable:
             application = self.gate.refused()
-            if application:
+            # System helpers also probe WAYLAND_DISPLAY while Shell starts.
+            # The private .desktop activation socket identifies user launches.
+            if application in ('chatgpt', 'claude'):
                 self.emit('unavailable', application=application)
         if self.frame_pipe in readable:
             self.read_frames()
@@ -430,7 +438,7 @@ class _Source:
             read, write = os.pipe()
             pipes.callback(os.close, read)
             with os.fdopen(write, 'wb'):
-                self.start(['Xvfb', '-displayfd', str(write), '-screen', '0', '900x640x24', '-nolisten',
+                self.start(['Xvfb', '-displayfd', str(write), '-screen', '0', f'{self.width + 100}x{self.height + 120}x24', '-nolisten',
                             'tcp', '-auth', self.env['XAUTHORITY'], '+extension', 'GLX'], pass_fds=(write,))
             self.wait(lambda: select.select([read], [], [], 0)[0], '私有 X 显示器')
             display = os.read(read, 32).strip()
@@ -447,7 +455,8 @@ class _Source:
         with os.fdopen(gate_write, 'wb', buffering=0) as release:
             with os.fdopen(gate_read, 'rb'):
                 self.start([sys.executable, '-m', 'cloud_render.gnome_source', '--record', str(runtime),
-                            '--event-fd', str(self.notify), '--gate-fd', str(gate_read)],
+                            '--event-fd', str(self.notify), '--gate-fd', str(gate_read),
+                            '--size', f'{self.width}x{self.height}', *(['--wallpaper'] if self.wallpaper else [])],
                            pass_fds=(self.notify, gate_read), stdout=sys.stdout.buffer,
                            cwd=Path(__file__).resolve().parents[1])
             self.wait(lambda: (runtime / 'source').is_socket(), '原厂绘图源')
@@ -458,7 +467,7 @@ class _Source:
             self.shell_log = self.stack.enter_context(shell.stderr)
             self.wait(self.gate.seal, '独占的 Wayland 显示入口')
             release.write(struct.pack('!I', shell.pid))
-        xid = self.wait(lambda: self.shell_started and self.frames and _window(env),
+        xid = self.wait(lambda: self.shell_started and self.frames and _window(env, self.size),
                         '原 GNOME 窗口')
         if self.mode == 'ubuntu':
             result = _run(env, 'gdbus', 'call', '--session', '--dest', 'org.gnome.Shell',
@@ -468,9 +477,9 @@ class _Source:
                 raise SourceError('Ubuntu Dock 没有在发行版会话中启用。')
         self.wait(lambda: self.scene_changed, '启动清屏后的原桌面画面')
         _run(env, 'xdotool', 'windowfocus', '--sync', xid)
-        _focused(env, xid)
+        _focused(env, xid, self.size)
         self.ready = True
-        self.emit('ready', width=WIDTH, height=HEIGHT, frames=self.frames)
+        self.emit('ready', width=self.width, height=self.height, frames=self.frames)
         return xid
 
     def serve(self):
@@ -482,22 +491,24 @@ class _Source:
                 if len(self.pending) < length:
                     break
                 command = bytes(self.pending[:length])
-                decode_input(command)
+                decode_input(command, size=self.size)
                 del self.pending[:length]
-                _focused(self.env, xid)
+                _focused(self.env, xid, self.size)
                 self.read_frames()
                 before = self.frames
-                _apply(self.env, xid, command)
-                _focused(self.env, xid)
+                _apply(self.env, xid, command, self.size)
+                _focused(self.env, xid, self.size)
                 self.ack += 1
                 self.emit('input', sequence=self.ack, framesBefore=before)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--size', choices=SIZE_NAMES, default='800x520')
     parser.add_argument('--event-fd', type=int, required=True, help='接收就绪、绘制与输入回执的专用写入文件描述符')
     parser.add_argument('--session-mode', choices=('ubuntu', 'gnome'), default='ubuntu',
                         help='默认使用 Ubuntu 发行版会话；gnome 用于诊断基础桌面。')
+    parser.add_argument('--wallpaper', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--record', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--gate-fd', type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -506,13 +517,14 @@ def main():
     try:
         os.fstat(args.event_fd)
         if args.record:
-            _record(args.record, args.event_fd, args.gate_fd)
+            _record(args.record, args.event_fd, args.gate_fd, SIZE_NAMES[args.size], args.wallpaper)
         else:
             def stop(signum, frame):
                 raise Disconnected
             signal.signal(signal.SIGTERM, stop)
             with tempfile.TemporaryDirectory(prefix='gnome-', dir='/tmp') as root, ExitStack() as stack:
-                _Source(stack, Path(root), args.event_fd, sys.stdin.fileno(), args.session_mode).serve()
+                _Source(stack, Path(root), args.event_fd, sys.stdin.fileno(), args.session_mode,
+                        SIZE_NAMES[args.size], args.wallpaper).serve()
     except (Disconnected, KeyboardInterrupt, BrokenPipeError):
         return 0
     except (OSError, SourceError, StreamError, ValueError, subprocess.SubprocessError) as exc:

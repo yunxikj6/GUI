@@ -21,6 +21,7 @@ const help = `Cloud Linux Workspace
 默认打开完整云端 GNOME 桌面
 
   --instabox        使用 InstaBox 私有连接
+  --desktop-size SIZE  新会话尺寸，可选 800x520、1280x900、1920x1080
   --desktop-port N  指定云端 GNOME 服务端口，默认 17325
   --cloud-app       打开单独的云端 ChatGPT 程序，默认云端端口 17324
   --machine ID      选用指定的 InstaBox 实例
@@ -35,10 +36,10 @@ const help = `Cloud Linux Workspace
   --help            显示本说明`
 
 type options struct {
-	distro, app                                  string
-	renderPort, desktopPort, machine             string
-	direct, cloudApp                             bool
-	native, check, setup, showHelp, offerInstall bool
+	distro, app                                   string
+	renderPort, desktopPort, desktopSize, machine string
+	direct, cloudApp                              bool
+	native, check, setup, showHelp, offerInstall  bool
 }
 type failure struct {
 	code, message string
@@ -54,6 +55,12 @@ func parse(args []string) (options, *failure) {
 		switch args[i] {
 		case "--cloud-app":
 			opt.cloudApp = true
+		case "--desktop-size":
+			i++
+			if i >= len(args) || opt.desktopSize != "" || (args[i] != "800x520" && args[i] != "1280x900" && args[i] != "1920x1080") {
+				return opt, fail("arguments", "--desktop-size 需要 800x520、1280x900 或 1920x1080。")
+			}
+			opt.desktopSize = args[i]
 		case "--desktop-port":
 			i++
 			if i >= len(args) || opt.desktopPort != "" || !validRenderPort(args[i]) {
@@ -109,10 +116,10 @@ func parse(args []string) (options, *failure) {
 	if opt.app != "" && opt.distro != "" {
 		return opt, fail("arguments", "--open-app 使用 Windows 应用，不能与 --distro 同时使用。")
 	}
-	if opt.desktopPort != "" && (opt.cloudApp || opt.renderPort != "") {
+	if (opt.desktopPort != "" || opt.desktopSize != "") && (opt.cloudApp || opt.renderPort != "") {
 		return opt, fail("arguments", "请分别选择云端桌面或单应用连接。")
 	}
-	if (opt.cloudApp || opt.desktopPort != "" || opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
+	if (opt.cloudApp || opt.desktopSize != "" || opt.desktopPort != "" || opt.renderPort != "" || opt.direct || opt.machine != "") && (opt.localDesktop() || opt.app != "") {
 		return opt, fail("arguments", "云端绘图与本地兼容模式不能同时使用。")
 	}
 	return opt, nil
@@ -322,6 +329,9 @@ func launchRenderer(opt options, exe string, env []string, run runner) *failure 
 	if desktop {
 		mode = desktopRendererRun
 		tokenKey = "CLOUDWORKSPACE_GNOME_TOKEN"
+		if opt.desktopSize != "" {
+			args = append(args, "--desktop-size", opt.desktopSize)
+		}
 		if opt.desktopPort != "" {
 			args = append(args, "--desktop-port", opt.desktopPort)
 		}

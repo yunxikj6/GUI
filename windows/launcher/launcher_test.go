@@ -202,7 +202,7 @@ func TestDiagnostics(t *testing.T) {
 }
 
 func TestRenderEntry(t *testing.T) {
-	for _, flags := range [][]string{{"--connect-port"}, {"--connect-port", ""}, {"--connect-port", "0"}, {"--desktop-port", "65536"}, {"--desktop-port", "1e1"}, {"--connect-port", "０１"}, {"--cloud-app", "--desktop-port", "7"}, {"--desktop-port", "8", "--connect-port", "9"}, {"--cloud-app", "--native"}, {"--connect-port", "9", "--distro", "Ubuntu"}, {"--connect-port", "20", "--open-app", "Claude"}, {"--machine", "example"}, {"--instabox", "--setup-native"}} {
+	for _, flags := range [][]string{{"--desktop-size"}, {"--desktop-size", "1280x720"}, {"--desktop-size", "1920x1080", "--cloud-app"}, {"--desktop-size", "1280x900", "--native"}, {"--connect-port"}, {"--connect-port", ""}, {"--connect-port", "0"}, {"--desktop-port", "65536"}, {"--desktop-port", "1e1"}, {"--connect-port", "０１"}, {"--cloud-app", "--desktop-port", "7"}, {"--desktop-port", "8", "--connect-port", "9"}, {"--cloud-app", "--native"}, {"--connect-port", "9", "--distro", "Ubuntu"}, {"--connect-port", "20", "--open-app", "Claude"}, {"--machine", "example"}, {"--instabox", "--setup-native"}} {
 		if _, err := parse(flags); err == nil {
 			t.Errorf("accepted %q", flags)
 		}
@@ -221,6 +221,7 @@ func TestRenderEntry(t *testing.T) {
 		{nil, []string{"--instabox"}, desktopRendererRun, ""},
 		{nil, []string{"--instabox"}, desktopRendererRun, "5900"},
 		{[]string{"--instabox", "--machine", "m_abc"}, []string{"--instabox", "--machine", "m_abc"}, desktopRendererRun, ""},
+		{[]string{"--desktop-size", "1920x1080", "--desktop-port", "9"}, []string{"--instabox", "--desktop-size", "1920x1080", "--desktop-port", "9"}, desktopRendererRun, ""},
 		{[]string{"--desktop-port", "9"}, []string{"--instabox", "--desktop-port", "9"}, desktopRendererRun, ""},
 		{[]string{"--cloud-app"}, []string{"--instabox", "--cloud-app"}, instaboxRendererRun, ""},
 		{[]string{"--cloud-app"}, []string{"--cloud-app"}, rendererRun, "5900"},

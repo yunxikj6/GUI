@@ -114,8 +114,8 @@
     "The supported desktop app captures use SkPicture v110, supported Viz passes and verified fonts. Windows 11 display, focus and Microsoft IME remain unverified."
   ],
   "clientBinaries": {
-    "x64": "b5357cb6cafa9b340feff5b7b8ef217205c5a13dd8a6622f7d5952f0249db680",
-    "arm64": "efeffd779be3e95c28e5463c1a1e9cb86583d00fa3d74d2e5f49cc01144c4af3"
+    "x64": "e5ea41e56e529bbdfa85aa17e8aaf73c39aa5a28ac2713a1acc139b395d0cc8a",
+    "arm64": "845d6a41cf2856ef311b662d58554ade88c32221874491a548b930fd7230227b"
   },
   "gnomeResearch": {
     "scope": "Separate exploratory test in an isolated Ubuntu 24.04 guest. Not part of the delivered client.",
@@ -187,9 +187,9 @@
   },
   "standalonePackage": {
     "download": "../../releases/thin-windows/cloud-workspace.zip",
-    "bytes": 18305545,
-    "sha256": "b22835a9d9b7919872acc7bf776046d0b03dc1a80b73e62d2046257af001ba65",
-    "entries": 78,
+    "bytes": 24121481,
+    "sha256": "c54fb9f2621ee232b3b018f6c0bda364e39161e4d0ae345a7a5bdc0faab4542c",
+    "entries": 80,
     "archiveValidation": "Verified every SHA256SUMS entry, both native launchers and the complete private Windows runtime. This ZIP includes the GNOME command viewer and the explicit ChatGPT app mode.",
     "runtime": "Official Windows x64 CPython 3.13.17 embeddable and MSYS2 VirGL. The ChatGPT app mode additionally uses installed Microsoft Edge and bundled CanvasKit.",
     "rendererValidation": {

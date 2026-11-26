@@ -29,7 +29,9 @@ class ThinDownloadTest(unittest.TestCase):
                 names = set(archive.namelist())
                 for required in ('windows/runtime/python.exe', 'windows/runtime/python313.zip', 'windows/runtime/LICENSE.txt',
                                  'thin_client/gnome_desktop.py', 'thin_client/gnome_window.py', 'thin_client/gnome_transport.py',
-                                 'thin_client/vendor/virgl/windows-x64/libvirglrenderer-1.dll'):
+                                 'thin_client/vendor/virgl/windows-x64/libvirglrenderer-1.dll',
+                                 'cloud_render/gnome_wallpaper.py', 'thin_client/vendor/ubuntu-noble/wallpaper.rgb.xz',
+                                 'thin_client/vendor/ubuntu-noble/COPYRIGHT'):
                     self.assertIn(required, names)
                 self.assertEqual(archive.read('windows/runtime/python313._pth').splitlines(),
                                  [b'python313.zip', b'.', b'..\\..'])

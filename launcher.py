@@ -191,7 +191,7 @@ def main():
     if opt.setup_native and opt.check_native:
         args.error('请分别运行 --setup-native 和 --check-native')
     native_mode = opt.native or opt.distro is not None or opt.check_native or opt.setup_native
-    if (opt.cloud_app or opt.desktop_port is not None or opt.connect_port is not None or opt.instabox) and (native_mode or web_options):
+    if (opt.cloud_app or opt.desktop_size is not None or opt.desktop_port is not None or opt.connect_port is not None or opt.instabox) and (native_mode or web_options):
         args.error('请分别启动云端绘图客户端与兼容模式')
     if native_mode and (web_options or opt.machine is not None):
         args.error('本机 GNOME 桌面与网页服务参数不能同时使用')

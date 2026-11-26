@@ -7,7 +7,7 @@ import hashlib
 import json
 import os
 import socket
-import sys
+import ssl
 import threading
 import time
 import urllib.error
@@ -15,6 +15,8 @@ import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path, PurePosixPath
+
+PROVIDER_ORIGIN = 'https://api.instabox.sh'
 
 
 class BridgeError(Exception):
@@ -29,10 +31,18 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def open_provider_request(request, timeout):
-    if sys.platform == 'win32':
-        from thin_client.winhttp import open_request
-        return open_request(request, timeout)
-    return urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout)
+    # Both JSON and private spool reads stay on the fixed, authenticated HTTPS origin.
+    if (not request.full_url.startswith(PROVIDER_ORIGIN + '/v1/')
+            or any(c in request.full_url for c in '#\\\r\n\0')
+            or request.get_method() not in ('GET', 'POST')):
+        raise ValueError('expected the private InstaBox HTTPS API origin')
+    for name, value in request.header_items():
+        if name.lower() not in ('accept', 'content-type', 'x-api-key', 'idempotency-key'):
+            raise ValueError('unexpected InstaBox request header')
+        if not isinstance(value, str) or not value.isascii() or any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise ValueError('invalid InstaBox request header value')
+    https = urllib.request.HTTPSHandler(context=ssl.create_default_context())
+    return urllib.request.build_opener(NoRedirect(), https).open(request, timeout=timeout)
 
 
 def json_bytes(value):
@@ -68,7 +78,7 @@ print('ready')
 
 
 class InstaBoxAccount:
-    base = 'https://api.instabox.sh'
+    base = PROVIDER_ORIGIN
 
     def __init__(self, key: str):
         if not key.strip():

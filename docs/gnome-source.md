@@ -33,3 +33,10 @@ python3 -m cloud_render.gnome_relay --port 17325
 ```sh
 python3 -m unittest discover -s tests -p 'test_gnome_*.py'
 ```
+
+
+### 本地重绘 Ubuntu 壁纸
+
+Windows 客户端会在内存中核对随包附带的 Noble 默认壁纸。只有已核对的本机资源才会参与会话协商。云端遇到与该资源字节完全一致的纹理上传时，可发回资源摘要和原始绘图参数。本机据此恢复 Ubuntu 的完整纹理，继续执行原版 GNOME 绘图。旧服务端、缺少该资源的客户端和其他壁纸继续使用原来的绘图指令。
+
+`thin_client/vendor/ubuntu-noble/wallpaper.rgb.xz` 是 Canonical 的 `warty-final-ubuntu.png` 转存为无损 RGB 后的压缩文件。发行版标注版权为 2016–2022 Canonical Ltd，许可为 CC BY-SA 4.0。原包声明及许可全文见 [COPYRIGHT](../thin_client/vendor/ubuntu-noble/COPYRIGHT)。

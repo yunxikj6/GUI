@@ -34,6 +34,9 @@ MAX_TEXT = 4096
 # JSON metadata plus one base64-encoded committed-text envelope.
 CONTROL_LIMIT = 6144
 REPLY_LIMIT = 96 * 1024
+BATCH_COUNT = 16
+BATCH_BYTES = 8 * 1024 * 1024
+BATCH_INLINE = 4 * ((INLINE + 2) // 3)
 IDLE = 180
 SOCKET = 'control.sock'
 OWNER = b'CLRP HTTPS relay 1\n'
@@ -74,23 +77,37 @@ def input_bytes(encoded, *, click_only):
     return raw
 
 
+# This isolated helper executes without importing the project package.
+GNOME_SIZES = ((800, 520), (1280, 900), (1920, 1080))
+
+
+def desktop_size(req):
+    return req.get('width', 800), req.get('height', 520)
+
+
 def check_request(req):
     require(isinstance(req, dict) and isinstance(req.get('op'), str), 'invalid-request')
     op = req['op']
     extras = {'start': {'port', 'pair'}, 'poll': {'after'}, 'click': {'id', 'data'},
               'input': {'id', 'data'}, 'close': set()}
     extras['desktop'] = {'id', 'data'}
-    optional = {'start': {'codec', 'protocol'}, 'poll': {'reset'}}
+    optional = {'start': {'codec', 'protocol', 'width', 'height', 'wallpaper'}, 'poll': {'reset', 'batch'}}
     require(op in extras and set(req) - optional.get(op, set()) == {'op', 'session'} | extras[op],
             'invalid-request')
     require(isinstance(req['session'], str) and re.fullmatch('[0-9a-f]{32}', req['session']), 'invalid-session')
     if op == 'start':
         require('protocol' not in req or (req['protocol'] == 'gnome' and 'codec' not in req), 'invalid-protocol')
+        if 'wallpaper' in req:
+            require(req.get('protocol') == 'gnome' and req['wallpaper'] is True, 'invalid-capabilities')
+        if 'width' in req or 'height' in req:
+            require(req.get('protocol') == 'gnome' and type(req.get('width')) is int and
+                    type(req.get('height')) is int and desktop_size(req) in GNOME_SIZES, 'invalid-dimensions')
         require('codec' not in req or req['codec'] == 'cdz1', 'invalid-codec')
         require(type(req['port']) is int and 1 <= req['port'] <= 65535, 'invalid-port')
         require(isinstance(req['pair'], str) and re.fullmatch('[A-Za-z0-9_-]{43}', req['pair']), 'invalid-pair')
     if op == 'poll':
         require('reset' not in req or req['reset'] is True, 'invalid-reset')
+        require('batch' not in req or (req['batch'] is True and 'reset' not in req), 'invalid-batch')
         require(type(req['after']) is int and 0 <= req['after'] < 2 ** 53, 'invalid-cursor')
     if op == 'desktop':
         require(type(req['id']) is int and 1 <= req['id'] <= 0xffffffff and
@@ -101,7 +118,7 @@ def check_request(req):
         command = raw[16:]
         if command[:1] in (b'M', b'L', b'R') and len(command) == 5:
             x, y = struct.unpack_from('!HH', command, 1)
-            require(x < 800 and y < 520, 'invalid-desktop-input')
+            require(x < 1920 and y < 1080, 'invalid-desktop-input')
         else:
             require(command == b'S' or (command[:1] == b'K' and len(command) == 2 and 1 <= command[1] <= 15),
                     'invalid-desktop-input')
@@ -148,6 +165,8 @@ class Relay:
         self.messages = deque()
         self.queued_bytes = 0
         self.acked = self.published = self.offered = 0
+        self.desktop = start.get('protocol') == 'gnome'
+        self.confirmed_input = 0
         self.input_id = 0
         self.input_digest = None
         self.input_flushed = False
@@ -160,12 +179,40 @@ class Relay:
         self.controls = set()
         self.previous = b''
 
+    async def artwork_supported(self):
+        reader, writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.start['port']), 5)
+        try:
+            writer.write(('GNOME-CAPS/1 ' + self.start['pair'] + '\n').encode('ascii'))
+            await writer.drain()
+            try:
+                magic, flags = struct.unpack('!4sI', await asyncio.wait_for(reader.readexactly(8), 5))
+            except asyncio.IncompleteReadError:
+                return False  # An original v1 service closes unknown authenticated setup requests.
+            return magic == b'GCFG' and bool(flags & 1)
+        finally:
+            writer.close()
+            with suppress(OSError):
+                await writer.wait_closed()
+
     async def receive(self):
         try:
+            artwork = self.start.get('wallpaper') is True and await self.artwork_supported()
             reader, self.writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.start['port']), 5)
-            desktop = self.start.get('protocol') == 'gnome'
+            desktop = self.desktop
+            # GNOME emits many small draw blocks between inputs. Buffer them
+            # without waiting for a client round trip per block before seeing
+            # a source ACK, within the old maximum of eight full-size blocks.
+            count_limit = 64 if desktop else 8
+            if desktop:
+                byte_limit = 8 * (1024 * 1024 + 4096 + 72 + HEADER.size)
+            else:
+                byte_limit = 2 * (MAX_PAYLOAD + HEADER.size)
             prefix = 'GNOME-AUTH/1 ' if desktop else 'CLRP-AUTH/1 '
-            self.writer.write((prefix + self.start['pair'] + '\n').encode('ascii'))
+            dimensions = b''
+            if desktop and (artwork or desktop_size(self.start) != GNOME_SIZES[0]):
+                prefix = 'GNOME-AUTH/2 '
+                dimensions = struct.pack('!HHI', *desktop_size(self.start), int(artwork))
+            self.writer.write((prefix + self.start['pair'] + '\n').encode('ascii') + dimensions)
             await self.writer.drain()
             while True:
                 header = await reader.readexactly(HEADER.size)
@@ -182,9 +229,18 @@ class Relay:
                             'upstream-protocol')
                     require(self.published or kind == 1, 'upstream-protocol')
                 total = HEADER.size + size
+                ack = None
+                if desktop and kind == 3:
+                    ack = await asyncio.wait_for(reader.readexactly(size), 10)
+                    number, applied = struct.unpack('!IB', ack)
+                    async with self.changed:
+                        require(applied == 1 and number == self.confirmed_input + 1
+                                and number == self.input_id, 'upstream-protocol')
+                        self.confirmed_input = number
+                        self.changed.notify_all()
                 async with self.changed:
-                    await self.changed.wait_for(lambda: len(self.messages) < 8 and
-                                                self.queued_bytes + total <= 2 * (MAX_PAYLOAD + HEADER.size))
+                    await self.changed.wait_for(lambda: len(self.messages) < count_limit
+                                                and self.queued_bytes + total <= byte_limit)
                 index = self.published + 1
                 receipt = {'kind': 'message', 'id': index, 'size': total}
                 if self.start.get('codec') and kind == 1:
@@ -192,7 +248,7 @@ class Relay:
                     # can supply a standalone retry even if the viewer lost its base.
                     receipt['frame'] = header + await asyncio.wait_for(reader.readexactly(size), 30)
                 elif total <= INLINE:
-                    payload = await asyncio.wait_for(reader.readexactly(size), 30)
+                    payload = ack if ack is not None else await asyncio.wait_for(reader.readexactly(size), 30)
                     raw = header + payload
                     if kind == 3:
                         seq, applied = struct.unpack('!IB', payload)
@@ -255,22 +311,37 @@ class Relay:
             head['standalone'] = reset or not self.previous or packet is frame
         return head['offer']
 
-    async def poll(self, after, reset=False):
+    def offer_batch(self):
+        # Use the same private message files and IDs as individual polls. Bound
+        # both download size and base64 carried in a single exec stdout reply.
+        items = []
+        total = inline = 0
+        for row in self.messages:
+            total += row['size']
+            inline += len(row.get('data', ''))
+            if len(items) >= BATCH_COUNT or total > BATCH_BYTES or inline > BATCH_INLINE:
+                break
+            items.append(row)
+        self.offered = max(self.offered, items[-1]['id'])
+        return {'kind': 'batch', 'messages': items}
+
+    async def poll(self, after, reset=False, batch=False):
         async with self.changed:
+            require(not batch or (self.desktop and not reset), 'invalid-batch')
             require(self.acked <= after <= self.offered, 'invalid-cursor')
             if reset:
                 require(self.start.get('codec') and after == self.acked and self.messages and
                         self.offered == self.messages[0]['id'] and 'frame' in self.messages[0], 'invalid-reset')
-            if after > self.acked:
+            while self.acked < after:
                 head = self.messages[0]
-                require(head['id'] == after, 'invalid-cursor')
+                require(head['id'] == self.acked + 1, 'invalid-cursor')
                 if head.get('offer', head).get('file'):
-                    message_file(self.root, after).unlink()
+                    message_file(self.root, head['id']).unlink()
                 if 'frame' in head:
                     self.previous = head['frame']
                 self.messages.popleft()
                 self.queued_bytes -= head['size']
-                self.acked = after
+                self.acked = head['id']
                 self.changed.notify_all()
             if not self.messages and not self.closed:
                 with suppress(asyncio.TimeoutError):
@@ -278,7 +349,9 @@ class Relay:
             # A concurrent caller can retire this cursor while the poll is asleep.
             require(after == self.acked, 'invalid-cursor')
             if self.messages:
-                self.offered = self.messages[0]['id']
+                if batch:
+                    return self.offer_batch()
+                self.offered = max(self.offered, self.messages[0]['id'])
                 if 'frame' in self.messages[0]:
                     return self.offer_frame(self.messages[0], reset)
                 return self.messages[0]
@@ -294,6 +367,8 @@ class Relay:
                 require(self.input_flushed, 'unconfirmed-input')
                 return {'id': index}
             require(index == self.input_id + 1, 'invalid-input-id')
+            if self.desktop:
+                require(self.confirmed_input == self.input_id, 'unconfirmed-input')
             require(self.published and not self.closed, 'upstream-closed')
             # Mark consumed before writing to the transport. An interrupted write
             # has an unknown application outcome and must never be attempted twice.
@@ -326,14 +401,32 @@ class Relay:
                 require(self.start['port'] == req['port'] and hmac.compare_digest(self.start['pair'], req['pair']),
                         'session-conflict')
                 require(req.get('codec') == self.start.get('codec') and
-                        req.get('protocol') == self.start.get('protocol'), 'session-conflict')
+                        req.get('protocol') == self.start.get('protocol') and
+                        desktop_size(req) == desktop_size(self.start) and
+                        req.get('wallpaper') == self.start.get('wallpaper'), 'session-conflict')
                 await asyncio.wait_for(self.ready.wait(), 35)
                 require(self.published, 'upstream-unavailable')
+                if self.desktop:
+                    result['batch'] = True
             elif op == 'poll':
-                result = await self.poll(req['after'], req.get('reset', False))
+                result = await self.poll(req['after'], req.get('reset', False), req.get('batch', False))
             elif op in ('click', 'input', 'desktop'):
                 require((op == 'desktop') == (self.start.get('protocol') == 'gnome'), 'wrong-input-protocol')
-                result = await self.send_input(req['id'], raw)
+                if op == 'desktop' and raw[16:17] in (b'L', b'M', b'R'):
+                    x, y = struct.unpack_from('!HH', raw, 17)
+                    width, height = desktop_size(self.start)
+                    require(x < width and y < height, 'invalid-desktop-input')
+                index = req['id']
+                result = await self.send_input(index, raw)
+                if self.desktop:
+                    # This result may bypass old drawing on the provider link
+                    # only after the original source accepts the same index.
+                    # Keep the ordinary ordered ACK for replay verification.
+                    async with self.changed:
+                        with suppress(asyncio.TimeoutError):
+                            await asyncio.wait_for(self.changed.wait_for(
+                                lambda: self.confirmed_input >= index or self.closed), 4)
+                        result['confirmed'] = self.confirmed_input >= index
             else:
                 close = True
             reply = {'ok': True, **result}

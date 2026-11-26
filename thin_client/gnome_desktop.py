@@ -1,15 +1,17 @@
 """Present a private cloud GNOME session in a local Win32 window."""
 import argparse
 from collections import deque
+from pathlib import Path
 import re
 import sys
 import threading
 import time
 
+from cloud_render.gnome_input import DEFAULT_SIZE, SIZE_NAMES, checked_size
 from instabox import BridgeError
 
 TITLE = 'Cloud Linux Workspace'
-WIDTH, HEIGHT = 800, 520
+WIDTH, HEIGHT = DEFAULT_SIZE
 APPLICATION_STATUS = {
     'chatgpt': '此桌面的 ChatGPT 绘图通道尚未就绪',
     'claude': '此桌面的 Claude 绘图通道尚未就绪',
@@ -52,8 +54,9 @@ class InputQueue:
             self.condition.notify_all()
 
 
-def present_session(connect, replay, open_window):
+def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE):
     """Keep the Win32 message pump independent of the GPU, source and input ACKs."""
+    width, height = checked_size(size)
     inputs = InputQueue()
     stop = threading.Event()
     finished = threading.Event()
@@ -74,7 +77,7 @@ def present_session(connect, replay, open_window):
         except RuntimeError as exc:
             fail(exc)
 
-    window = open_window(f'{TITLE} · 正在连接云端桌面', WIDTH, HEIGHT, submit)
+    window = open_window(f'{TITLE} · 正在连接云端桌面', width, height, submit)
 
     def send_input(session):
         try:
@@ -94,7 +97,7 @@ def present_session(connect, replay, open_window):
     def present(width, height, pixels):
         if stop.is_set():
             raise InterruptedError('窗口已关闭。')
-        if (width, height) != (WIDTH, HEIGHT):
+        if (width, height) != size:
             raise ValueError('云端桌面的尺寸与当前会话不匹配。')
         if not window.present(pixels):
             raise InterruptedError('本机窗口已关闭。')
@@ -169,6 +172,7 @@ def main(argv=None):
     parser.add_argument('--instabox', action='store_true', help='使用 InstaBox 私有通道')
     parser.add_argument('--port', type=int, default=17325)
     parser.add_argument('--machine')
+    parser.add_argument('--size', choices=SIZE_NAMES, default='800x520')
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error('端口必须在 1 至 65535 之间。')
@@ -192,12 +196,23 @@ def main(argv=None):
         from .gnome_window import open_window
         from .virgl_windows import replay
 
+        artwork = None
+
         def start():
+            nonlocal artwork
+            from cloud_render.gnome_wallpaper import decoded_asset
+            try:
+                artwork = decoded_asset(Path(__file__).with_name('vendor') / 'ubuntu-noble' / 'wallpaper.rgb.xz')
+            except (OSError, ValueError, ImportError):
+                artwork = None
             box = InstaBox(key, args.machine)
             box.ensure_running()
-            return connect(box, args.port, pairing)
+            return connect(box, args.port, pairing, size=SIZE_NAMES[args.size], wallpaper=artwork is not None)
 
-        present_session(start, replay, open_window)
+        def render(session, present):
+            replay(session, present, wallpaper=artwork)
+
+        present_session(start, render, open_window, size=SIZE_NAMES[args.size])
     except BridgeError as exc:
         messages = {
             'network': '无法连接 InstaBox，请检查网络和系统时间。',

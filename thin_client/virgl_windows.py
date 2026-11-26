@@ -55,9 +55,26 @@ def _read(stream, size, *, allow_eof=False):
     return bytes(parts)
 
 
-def _requests(stream):
+def _requests(stream, *, wallpaper=None):
+    from cloud_render import gnome_wallpaper
+    references_left = gnome_wallpaper.MAX_REFERENCES if wallpaper is not None else 0
     while header := _read(stream, HEADER.size, allow_eof=True):
         words, opcode = HEADER.unpack(header)
+        if opcode == gnome_wallpaper.REFERENCE:
+            if not references_left or words != (TRANSFER.size + 32) // 4:
+                raise VirglError('unavailable desktop resource reference')
+            body = _read(stream, words * 4)
+            if references_left == gnome_wallpaper.MAX_REFERENCES:
+                if (type(wallpaper) is not bytes or len(wallpaper) != gnome_wallpaper.PIXELS * 4
+                        or hashlib.sha256(wallpaper).digest() != gnome_wallpaper.RGBX_SHA256):
+                    raise VirglError('local desktop resource failed verification')
+            try:
+                _, texture = gnome_wallpaper.expand_reference(body, wallpaper)
+            except ValueError as exc:
+                raise VirglError('invalid desktop resource reference') from exc
+            references_left -= 1
+            yield PUT, body[:TRANSFER.size] + texture
+            continue
         if opcode == RENDERER:
             if not 1 <= words <= 64:
                 raise VirglError('invalid renderer name length')
@@ -85,7 +102,7 @@ class _Resource:
     @classmethod
     def checked(cls, body):
         args = CREATE_ARGS.unpack(body)
-        handle, target, _, _, width, height, depth, layers, last_level, samples = args
+        handle, target, fmt, _, width, height, depth, layers, last_level, samples = args
         if not handle or target > 11 or not all((width, height, depth)):
             raise VirglError('invalid graphics resource descriptor')
         if target == 0:  # PIPE_BUFFER dimensions and offsets are bytes.
@@ -95,9 +112,16 @@ class _Resource:
         else:
             if not layers or max(width, height, depth, layers) > MAX_DIMENSION or last_level > 13 or samples > 16:
                 raise VirglError('graphics texture exceeds supported dimensions')
-            # Account conservatively for 128-bit texels, mipmaps and samples;
-            # the upstream renderer owns format-specific storage and validation.
-            budget = width * height * depth * layers * 16 * max(1, samples) * (2 if last_level else 1)
+            # VirGL 1.3 virgl_hw.h: B8G8R8X8_UNORM, S8_UINT_Z24_UNORM,
+            # R8G8B8A8_UNORM and R8G8B8X8_UNORM are uncompressed 32-bit texels.
+            # For single-level 2D allocations allow a second full copy, row
+            # pitch alignment and one page minimum. Keep the conservative
+            # estimate for unrecognized, layered, multisampled or mipmapped data.
+            if target == 2 and fmt in (2, 20, 67, 134) and (depth, layers, last_level, samples) == (1, 1, 0, 0):
+                aligned_row = (width * 4 + 255) // 256 * 256
+                budget = max(4096, 2 * aligned_row * height)
+            else:
+                budget = width * height * depth * layers * 16 * max(1, samples) * (2 if last_level else 1)
         if budget > MAX_RESOURCE:
             raise VirglError('graphics resource exceeds memory budget')
         return cls(args, budget)
@@ -120,11 +144,11 @@ class _Resource:
                 and stride in (0, w * 4) and layer_stride in (0, size))
 
 
-def _play(stream, gpu, present):
+def _play(stream, gpu, present, *, wallpaper=None):
     handles = {}
     resident = 0
     started = False
-    for opcode, body in _requests(stream):
+    for opcode, body in _requests(stream, wallpaper=wallpaper):
         if opcode == RENDERER:
             if started or body.rstrip(b'\0') != b'gnome-shell':
                 raise VirglError('expected a single GNOME Shell context')
@@ -354,7 +378,8 @@ class _NativeGpu:
         return data.raw if scanout else None
 
 
-def replay(stream: BinaryIO, on_scanout: Callable[[int, int, bytes], None], *, runtime_dir: Path | str | None = None) -> None:
+def replay(stream: BinaryIO, on_scanout: Callable[[int, int, bytes], None], *, runtime_dir: Path | str | None = None,
+           wallpaper: bytes | None = None) -> None:
     """Incrementally replay one GNOME Shell stream until EOF.
 
     The stream, WGL context and callbacks run on the invoking thread. A blocking
@@ -370,4 +395,4 @@ def replay(stream: BinaryIO, on_scanout: Callable[[int, int, bytes], None], *, r
         cleanup.callback(_RENDERER_LOCK.release)
         directory = runtime_dir if runtime_dir is not None else _MANIFEST.parent / 'vendor' / 'virgl' / 'windows-x64'
         renderer = _NativeGpu(_runtime(directory), cleanup)
-        _play(stream, renderer, on_scanout)
+        _play(stream, renderer, on_scanout, wallpaper=wallpaper)

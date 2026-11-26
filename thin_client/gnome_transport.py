@@ -9,38 +9,68 @@ import socket
 import threading
 
 from cloud_render import gnome_wire as wire
-from cloud_render.gnome_input import encode_key, encode_pointer
-from .instabox_transport import InstaBoxControl, TransportError
+from cloud_render.instabox_relay import BATCH_BYTES, BATCH_COUNT, BATCH_INLINE
+from cloud_render.gnome_input import DEFAULT_SIZE, checked_size, encode_key, encode_pointer
+from .instabox_transport import InstaBoxControl, RequestOutcomeUnknown, TransportError
 
 
 DOWNSTREAM = {wire.BLOCK, wire.ACK, wire.READY, wire.END, wire.UNAVAILABLE}
 
 
 class _Provider(InstaBoxControl):
-    def __init__(self, box, port, pairing):
+    def __init__(self, box, port, pairing, size, wallpaper=False):
         super().__init__(box)
         self.cursor = 0
+        self.pending = deque()
         try:
-            self._call('start', port=port, pair=pairing, protocol='gnome')
+            dimensions = {} if size == DEFAULT_SIZE else dict(width=size[0], height=size[1])
+            if wallpaper:
+                dimensions['wallpaper'] = True
+            started = self._call('start', port=port, pair=pairing, protocol='gnome', **dimensions)
+            self.batch = started.get('batch') is True
         except BaseException:
             self.close()
             raise
 
     def receive(self):
         while not self.stop.is_set():
-            result = self._call('poll', after=self.cursor)
-            kind = result.get('kind')
-            if kind == 'wait':
-                continue
-            if kind == 'closed':
-                return None
-            if kind != 'message' or 'codec' in result:
+            if not self.pending:
+                options = {'batch': True} if self.batch else {}
+                result = self._call('poll', after=self.cursor, **options)
+                kind = result.get('kind')
+                if kind == 'wait':
+                    continue
+                if kind == 'closed':
+                    return None
+                if self.batch:
+                    items = result.get('messages')
+                    if kind != 'batch' or not isinstance(items, list) or not 1 <= len(items) <= BATCH_COUNT:
+                        raise TransportError('云桌面批量绘图回执无效。')
+                    total = inline = 0
+                    for index, item in enumerate(items, self.cursor + 1):
+                        if (not isinstance(item, dict) or type(item.get('id')) is not int
+                                or item['id'] != index or type(item.get('size')) is not int
+                                or not 12 <= item['size'] <= wire.MAX_PACKET + wire.HEADER.size):
+                            raise TransportError('云桌面批量绘图的编号或尺寸无效。')
+                        total += item['size']
+                        if 'data' in item:
+                            if not isinstance(item['data'], str):
+                                raise TransportError('云桌面批量绘图的数据编码无效。')
+                            inline += len(item['data'])
+                    if total > BATCH_BYTES or inline > BATCH_INLINE:
+                        raise TransportError('云桌面批量绘图超过下载上限。')
+                    self.pending.extend(items)
+                else:
+                    self.pending.append(result)
+            item = self.pending[0]
+            if item.get('kind') != 'message' or 'codec' in item:
                 raise TransportError('云桌面中转消息类型无效。')
-            raw = self.verified_bytes(result, self.cursor + 1, wire.MAX_PACKET + wire.HEADER.size)
+            raw = self.verified_bytes(item, self.cursor + 1, wire.MAX_PACKET + wire.HEADER.size)
             data = io.BytesIO(raw)
             message = wire.read(data, DOWNSTREAM)
             if not message or data.read(1):
                 raise TransportError('云桌面中转消息边界无效。')
+            self.pending.popleft()
             self.cursor += 1
             return message
         return None
@@ -49,6 +79,9 @@ class _Provider(InstaBoxControl):
         ack = self._call('desktop', id=number, data=base64.b64encode(message).decode('ascii'))
         if type(ack.get('id')) is not int or ack['id'] != number:
             raise TransportError('云桌面中转回执不匹配。')
+        if 'confirmed' in ack and type(ack['confirmed']) is not bool:
+            raise TransportError('原桌面操作确认无效。')
+        return ack.get('confirmed', False)
 
     def close(self):
         with self.close_lock:
@@ -60,10 +93,22 @@ class _Provider(InstaBoxControl):
 
 
 class _Forward:
-    def __init__(self, port, pairing):
+    def __init__(self, port, pairing, size, wallpaper=False):
+        flags = 0
+        if wallpaper:
+            with socket.create_connection(('127.0.0.1', port), timeout=5) as query, query.makefile('rb') as reply:
+                query.sendall(wire.QUERY + pairing.encode('ascii') + b'\n')
+                capabilities = reply.read(wire.FEATURES.size)
+                if len(capabilities) == wire.FEATURES.size:
+                    magic, offered = wire.FEATURES.unpack(capabilities)
+                    if magic == wire.FEATURE_MAGIC:
+                        flags = offered & wire.WALLPAPER
         self.peer = socket.create_connection(('127.0.0.1', port), timeout=8)
         try:
-            self.peer.sendall(wire.AUTH + pairing.encode('ascii') + b'\n')
+            extended = bool(flags) or size != DEFAULT_SIZE
+            prefix = wire.AUTH_SIZE if extended else wire.AUTH
+            dimensions = wire.SESSION.pack(*size, flags) if extended else b''
+            self.peer.sendall(prefix + pairing.encode('ascii') + b'\n' + dimensions)
             self.peer.settimeout(None)
             self.reader = self.peer.makefile('rb')
         except BaseException:
@@ -85,7 +130,8 @@ class _Forward:
 
 class DesktopStream:
     """Blocking read(n) for the local GPU thread. Send controls from a separate thread."""
-    def __init__(self, peer):
+    def __init__(self, peer, *, size=DEFAULT_SIZE):
+        self.size = checked_size(size)
         self.peer = peer
         self.changed = threading.Condition()
         self.commands = deque()
@@ -93,7 +139,7 @@ class DesktopStream:
         self.input_lock = threading.Lock()
         self.ready = self.ended = self.closed = False
         self.problem = None
-        self.sent = self.confirmed = 0
+        self.sent = self.confirmed = self.ordered_ack = 0
         self.thread = threading.Thread(target=self._receive, name='GNOME drawing stream', daemon=True)
         self.thread.start()
 
@@ -123,14 +169,15 @@ class DesktopStream:
                         if self.closed:
                             return
                         if kind == wire.READY:
-                            if self.ready or wire.DIMENSIONS.unpack(body) != (800, 520):
+                            if self.ready or wire.DIMENSIONS.unpack(body) != self.size:
                                 raise TransportError('云桌面尺寸或就绪状态不符。')
                             self.ready = True
                         elif kind == wire.ACK:
                             seq, applied = wire.INPUT_ACK.unpack(body)
-                            if seq != self.sent or seq != self.confirmed + 1 or applied != 1:
+                            if seq != self.ordered_ack + 1 or seq > self.sent or applied != 1:
                                 raise TransportError('原桌面未确认此次操作。')
-                            self.confirmed = seq
+                            self.ordered_ack = seq
+                            self.confirmed = max(self.confirmed, seq)
                         elif kind == wire.UNAVAILABLE:
                             if not 1 <= body[0] <= len(wire.UNAVAILABLE_APPS):
                                 raise TransportError('云端图面提示无效。')
@@ -138,7 +185,7 @@ class DesktopStream:
                             if not self.unavailable or self.unavailable[-1] != app:
                                 self.unavailable.append(app)
                         else:
-                            if not self.ready or self.confirmed != self.sent or wire.FINAL.unpack(body) != (index, total, digest.digest()):
+                            if not self.ready or self.ordered_ack != self.sent or wire.FINAL.unpack(body) != (index, total, digest.digest()):
                                 raise TransportError('云桌面绘图末尾校验失败。')
                             self.ended = True
                         self.changed.notify_all()
@@ -185,8 +232,17 @@ class DesktopStream:
                     raise TransportError('输入序号已用尽。请重新连接。')
                 self.sent = number
             try:
-                self.peer.input(number, wire.packet(wire.INPUT, wire.SEQUENCE.pack(number) + command))
+                try:
+                    applied = self.peer.input(number, wire.packet(wire.INPUT, wire.SEQUENCE.pack(number) + command))
+                except RequestOutcomeUnknown:
+                    # HTTPS may lose both responses to the same idempotent
+                    # write. The independently ordered, authenticated source
+                    # ACK still determines its outcome, without another write.
+                    applied = False
                 with self.changed:
+                    if applied is True:
+                        self.confirmed = number
+                        self.changed.notify_all()
                     self.changed.wait_for(lambda: self.confirmed == number or self.closed or self.ended or self.problem, 25)
                     if self.confirmed != number:
                         raise TransportError('原桌面没有确认操作。')
@@ -200,12 +256,12 @@ class DesktopStream:
         return self._input(b'S')
 
     def move(self, x, y):
-        return self._input(encode_pointer(b'M', x, y))
+        return self._input(encode_pointer(b'M', x, y, size=self.size))
 
     def click(self, x, y, button='left'):
         if button not in ('left', 'right'):
             raise ValueError('只支持左键或右键。')
-        return self._input(encode_pointer(b'L' if button == 'left' else b'R', x, y))
+        return self._input(encode_pointer(b'L' if button == 'left' else b'R', x, y, size=self.size))
 
     def key(self, name):
         return self._input(encode_key(name))
@@ -242,11 +298,11 @@ def _credentials(port, pairing):
         raise ValueError('云桌面端口或配对码无效。')
 
 
-def connect(box, port, pairing):
+def connect(box, port, pairing, *, size=DEFAULT_SIZE, wallpaper=False):
     _credentials(port, pairing)
-    return DesktopStream(_Provider(box, port, pairing))
+    return DesktopStream(_Provider(box, port, pairing, checked_size(size), wallpaper), size=size)
 
 
-def connect_forwarded(port, pairing):
+def connect_forwarded(port, pairing, *, size=DEFAULT_SIZE, wallpaper=False):
     _credentials(port, pairing)
-    return DesktopStream(_Forward(port, pairing))
+    return DesktopStream(_Forward(port, pairing, checked_size(size), wallpaper), size=size)

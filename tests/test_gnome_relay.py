@@ -5,10 +5,12 @@ import json
 from pathlib import Path
 import struct
 import subprocess
+import threading
 import unittest
 from unittest.mock import patch
 
 from cloud_render import gnome_wire as wire
+from cloud_render import gnome_input, instabox_relay
 from cloud_render.gnome_relay import DesktopService
 from instabox import BridgeError
 from thin_client import gnome_transport as transport
@@ -19,11 +21,11 @@ class Source:
     """A controlled data/metadata pair to test routing, backpressure and input acknowledgement."""
     content = hashlib.shake_256(b'large test drawing').digest(1100000)
 
-    def __init__(self):
+    def __init__(self, size=gnome_input.DEFAULT_SIZE):
         self.stdout = asyncio.StreamReader()
         self.stdout.feed_data(self.content)
         self.events = asyncio.StreamReader()
-        self.events.feed_data(b'{"event":"ready","width":800,"height":520,"frames":1}\n')
+        self.events.feed_data(json.dumps(dict(event='ready', width=size[0], height=size[1], frames=1)).encode() + b'\n')
         self.events.feed_data(b'{"event":"unavailable","application":"chatgpt"}\n')
         self.events.feed_data(b'{"event":"unavailable","application":"chatgpt"}\n')
         self.events.feed_data(b'{"event":"unavailable","application":"wayland"}\n')
@@ -73,11 +75,13 @@ def read_exact(stream, size):
 class DesktopSessions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.sources = []
+        self.artwork = []
         self.retired = asyncio.Event()
 
         @asynccontextmanager
-        async def original():
-            source = Source()
+        async def original(*, size=gnome_input.DEFAULT_SIZE, wallpaper=False):
+            self.artwork.append(wallpaper)
+            source = Source(size)
             self.sources.append(source)
             try:
                 yield source, source.events
@@ -136,6 +140,187 @@ class DesktopSessions(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(not p.parent.exists() for p in paths))
         self.assertEqual(box.calls, [1, 1, 2, 2, 3, 3, 4, 4, 5, 5])
         self.assertEqual(len(self.sources[0].applied), 5)
+
+    async def test_explicit_source_size_and_private_provider_pointer_bounds(self):
+        def local_file(owner, index):
+            return (Path('/tmp') / ('clrp-' + owner.session) / f'msg-{index}.bin').open('rb')
+
+        def check(size, private):
+            width, height = size
+            box = LocalProvider()
+            with patch.object(InstaBoxControl, '_open_file', local_file):
+                stream = (transport.connect(box, self.port, self.token, size=size) if private
+                          else transport.connect_forwarded(self.port, self.token, size=size))
+                with stream:
+                    self.assertEqual(read_exact(stream, len(Source.content)), Source.content)
+                    with self.assertRaises(ValueError):
+                        stream.move(width, height - 1)
+                    with self.assertRaises(ValueError):
+                        stream.click(width - 1, height)
+                    self.assertTrue(stream.click(width - 1, height - 1))
+                    if private:
+                        self.assertEqual(box.calls, [1, 1])
+                    self.assertEqual(read_exact(stream, 11), b'after L' + struct.pack('!HH', width - 1, height - 1))
+
+        for size, private in [((1280, 900), False), ((1920, 1080), True)]:
+            self.retired.clear()
+            await asyncio.wait_for(asyncio.to_thread(check, size, private), 20)
+            await asyncio.wait_for(self.retired.wait(), 3)
+            self.assertEqual(len(self.sources[-1].applied), 1)
+
+    async def test_private_and_forwarded_clients_advertise_only_present_artwork(self):
+        def local_file(owner, index):
+            return (Path('/tmp') / ('clrp-' + owner.session) / f'msg-{index}.bin').open('rb')
+        def run(private, available):
+            with patch.object(InstaBoxControl, '_open_file', local_file):
+                peer = (transport.connect(LocalProvider(), self.port, self.token, wallpaper=available) if private
+                        else transport.connect_forwarded(self.port, self.token, wallpaper=available))
+                with peer:
+                    self.assertEqual(read_exact(peer, len(Source.content)), Source.content)
+        for private, available in [(True, True), (False, True), (True, False)]:
+            self.retired.clear()
+            await asyncio.wait_for(asyncio.to_thread(run, private, available), 12)
+            await asyncio.wait_for(self.retired.wait(), 3)
+        self.assertEqual(self.artwork, [True, True, False])
+
+    async def test_old_service_uses_original_800_stream_when_client_has_new_artwork(self):
+        logins = []
+        async def legacy(reader, writer):
+            login = await reader.readline()
+            logins.append(login)
+            if login == wire.AUTH + self.token.encode('ascii') + b'\n':
+                writer.write(wire.packet(wire.READY, wire.DIMENSIONS.pack(800, 520)))
+                data, _ = wire.pack_block(b'original graphics', 1, wire.ZERO)
+                writer.write(data)
+                await writer.drain()
+                await reader.read()
+            writer.close()
+            await writer.wait_closed()
+        server = await asyncio.start_server(legacy, '127.0.0.1', 0)
+        port = server.sockets[0].getsockname()[1]
+        def local():
+            with transport.connect(LocalProvider(), port, self.token, wallpaper=True) as peer:
+                self.assertEqual(read_exact(peer, 17), b'original graphics')
+        try:
+            await asyncio.wait_for(asyncio.to_thread(local), 12)
+        finally:
+            server.close()
+            await server.wait_closed()
+        self.assertEqual(logins, [wire.QUERY + self.token.encode('ascii') + b'\n',
+                                  wire.AUTH + self.token.encode('ascii') + b'\n'])
+
+    async def test_bad_size_or_pair_never_starts_a_source(self):
+        for token, size in [(self.token, (1919, 1080)), ('x' * 43, (1280, 900))]:
+            reader, writer = await asyncio.open_connection('127.0.0.1', self.port)
+            writer.write(wire.AUTH_SIZE + token.encode('ascii') + b'\n' + wire.SESSION.pack(*size, 0))
+            await writer.drain()
+            self.assertEqual(await asyncio.wait_for(reader.read(), 2), b'')
+            writer.close()
+            await writer.wait_closed()
+        self.assertFalse(self.sources)
+
+    def test_ready_must_match_request_and_helper_sizes_match_source(self):
+        self.assertEqual(instabox_relay.GNOME_SIZES, gnome_input.SUPPORTED_SIZES)
+        class WrongReady:
+            def receive(self):
+                return wire.READY, wire.DIMENSIONS.pack(800, 520)
+            def close(self):
+                pass
+        with transport.DesktopStream(WrongReady(), size=(1280, 900)) as stream:
+            with self.assertRaises(TransportError):
+                stream.read(1)
+        start = dict(op='start', session='a' * 32, port=2, pair='b' * 43)
+        for extra in (dict(width=1280), dict(protocol='gnome', height=900), dict(protocol='gnome', width=1280.0, height=900),
+                      dict(width=1920, height=1080), dict(protocol='gnome', width=1920, height=1200)):
+            with self.assertRaises(instabox_relay.RelayError):
+                instabox_relay.check_request({**start, **extra})
+
+    async def test_private_source_ack_survives_lost_responses_and_blocked_media(self):
+        # Stall the Windows poll after READY. The source must really apply both
+        # actions before local confirmation, while every older draw block and
+        # both ordered ACKs remain available for subsequent replay.
+        seen = []
+        allow_ack = asyncio.Event()
+        accepted = asyncio.Event()
+        finish = asyncio.Event()
+        async def original(reader, writer):
+            self.assertEqual(await reader.readline(), wire.AUTH + self.token.encode('ascii') + b'\n')
+            writer.write(wire.packet(wire.READY, wire.DIMENSIONS.pack(800, 520)))
+            chain = wire.ZERO
+            for index in range(1, 17):
+                packet, chain = wire.pack_block(bytes([index]) * 32, index, chain)
+                writer.write(packet)
+            await writer.drain()
+            for number in (1, 2):
+                kind, body = await wire.read_async(reader, {wire.INPUT})
+                self.assertEqual((kind, body), (wire.INPUT, wire.SEQUENCE.pack(number) + b'S'))
+                seen.append(number)
+                accepted.set()
+                await allow_ack.wait()
+                writer.write(wire.packet(wire.ACK, wire.INPUT_ACK.pack(number, 1)))
+                await writer.drain()
+            await finish.wait()
+            writer.close()
+            await writer.wait_closed()
+        server = await asyncio.start_server(original, '127.0.0.1', 0)
+        port = server.sockets[0].getsockname()[1]
+        class BlockedProvider(LocalProvider):
+            def __init__(self):
+                super().__init__()
+                self.unblock = threading.Event()
+            def exec(self, args, stdin, timeout):
+                req = json.loads(stdin)
+                if req['op'] == 'poll' and req['after'] >= 1:
+                    self.unblock.wait(8)
+                return super().exec(args, stdin, timeout)
+        provider = BlockedProvider()
+        stream = await asyncio.to_thread(transport.connect, provider, port, self.token)
+        try:
+            first = asyncio.create_task(asyncio.to_thread(stream.send_super))
+            await asyncio.wait_for(accepted.wait(), 3)
+            self.assertFalse(first.done())
+            allow_ack.set()
+            self.assertTrue(await asyncio.wait_for(first, 3))
+            self.assertTrue(await asyncio.wait_for(asyncio.to_thread(stream.send_super), 3))
+            self.assertEqual(seen, [1, 2])
+            self.assertEqual(provider.calls, [1, 1, 2, 2])
+            self.assertEqual((stream.confirmed, stream.ordered_ack), (2, 0))
+            provider.unblock.set()
+            draw = await asyncio.wait_for(asyncio.to_thread(read_exact, stream, 16 * 32), 7)
+            self.assertEqual(draw, b''.join(bytes([index]) * 32 for index in range(1, 17)))
+            for _ in range(100):
+                if stream.ordered_ack == 2:
+                    break
+                await asyncio.sleep(.025)
+            self.assertEqual(stream.ordered_ack, 2)
+        finally:
+            provider.unblock.set()
+            finish.set()
+            await asyncio.to_thread(stream.close)
+            server.close()
+            await server.wait_closed()
+
+    async def test_missing_both_http_input_replies_accepts_only_the_ordered_source_ack(self):
+        class NoInputReplies(LocalProvider):
+            def exec(self, args, stdin, timeout):
+                req = json.loads(stdin)
+                if req['op'] == 'desktop':
+                    self.calls.append(req['id'])
+                    subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=timeout, check=True)
+                    raise BridgeError('network', 'missing HTTP response')
+                return super().exec(args, stdin, timeout)
+        provider = NoInputReplies()
+        def local_file(owner, index):
+            return (Path('/tmp') / ('clrp-' + owner.session) / f'msg-{index}.bin').open('rb')
+        def local():
+            with patch.object(InstaBoxControl, '_open_file', local_file):
+                with transport.connect(provider, self.port, self.token) as stream:
+                    self.assertEqual(read_exact(stream, len(Source.content)), Source.content)
+                    self.assertTrue(stream.send_super())
+                    self.assertEqual(stream.ordered_ack, 1)
+        await asyncio.wait_for(asyncio.to_thread(local), 10)
+        self.assertEqual(self.sources[0].applied, [b'S'])
+        self.assertEqual(provider.calls, [1, 1])
 
     async def test_verifies_and_drains_final_frame_before_eof(self):
         stream = await asyncio.to_thread(transport.connect_forwarded, self.port, self.token)

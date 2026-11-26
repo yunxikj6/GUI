@@ -20,14 +20,16 @@ FILES = (
     ('cloud_render/wire.py', 'cloud_render/wire.py'),
     ('cloud_render/gnome_wire.py', 'cloud_render/gnome_wire.py'),
     ('cloud_render/gnome_input.py', 'cloud_render/gnome_input.py'),
+    ('cloud_render/gnome_wallpaper.py', 'cloud_render/gnome_wallpaper.py'),
     ('cloud_render/frame_delta.py', 'cloud_render/frame_delta.py'),
     ('cloud_render/instabox_relay.py', 'cloud_render/instabox_relay.py'),
 )
-CLIENT_FILES = ('winhttp.py', 'gnome_desktop.py', 'gnome_window.py', 'gnome_transport.py', 'virgl_windows.py', 'virgl_runtime.json',
+CLIENT_FILES = ('gnome_desktop.py', 'gnome_window.py', 'gnome_transport.py', 'virgl_windows.py', 'virgl_runtime.json',
                 'viewer.py', 'app_window.py', 'instabox_transport.py', 'index.html', 'renderer.js',
                 'viewer.js', 'input.js', 'viewer.css', 'vendor/canvaskit.js', 'vendor/canvaskit.wasm.gz',
                 'vendor/CanvasKit.json', 'vendor/CanvasKit-LICENSE.txt', 'vendor/DejaVu-COPYRIGHT.txt',
-                'vendor/Liberation-COPYRIGHT.txt', 'vendor/NotoSansCJK-OFL.txt')
+                'vendor/Liberation-COPYRIGHT.txt', 'vendor/NotoSansCJK-OFL.txt',
+                'vendor/ubuntu-noble/wallpaper.rgb.xz', 'vendor/ubuntu-noble/COPYRIGHT')
 WINDOWS_FILES = ('CloudLinuxWorkspace-x64.exe', 'CloudLinuxWorkspace-arm64.exe', 'Go-LICENSE.txt')
 
 

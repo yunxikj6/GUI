@@ -65,12 +65,17 @@ def _request(stream):
     return header, command, payload
 
 
-def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, max_bytes=_MAX_ARCHIVE):
+def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, max_bytes=_MAX_ARCHIVE,
+                  wallpaper=False):
     """Pump buffered requests to a dedicated GPU process.
 
     respond is the live GNOME connection during capture. scanout receives a
     resource descriptor and that local GPU's pixels, for presentation or timing.
     """
+    references_left = 0
+    if wallpaper and recording is not None:
+        from . import gnome_wallpaper
+        references_left = gnome_wallpaper.MAX_REFERENCES
     total = 0
     display_targets = {}
     with gpu.makefile('rb') as result:
@@ -91,8 +96,13 @@ def copy_commands(source, gpu, *, recording=None, respond=None, scanout=None, ma
             elif command == UNREF:
                 display_targets.pop(_WORD.unpack(payload)[0], None)
             if recording is not None:
-                recording.write(header)
-                recording.write(payload)
+                reference = gnome_wallpaper.put_reference(payload) if references_left and command == PUT else None
+                if reference is None:
+                    recording.write(header)
+                    recording.write(payload)
+                else:
+                    recording.write(reference)
+                    references_left -= 1
                 if command in (GET, SUBMIT):
                     recording.flush()
             gpu.sendall(header + payload)

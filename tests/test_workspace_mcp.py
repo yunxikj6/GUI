@@ -147,7 +147,7 @@ class WorkspaceMCP(unittest.IsolatedAsyncioTestCase):
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
         # Replace only the official API origin in this test child. The adapter has no URL flag.
-        shim = ("import sys, instabox, workspace_mcp; instabox.InstaBox.base=sys.argv.pop(1); "
+        shim = ("import sys, instabox, workspace_mcp; instabox.InstaBox.base=instabox.PROVIDER_ORIGIN=sys.argv.pop(1); "
                 "sys.exit(workspace_mcp.main())")
         args = ["-c", shim, self.provider, "--machine", MACHINE, "--project", PROJECT,
                 "--credential-source", "environment"]

@@ -65,6 +65,18 @@ class StreamTests(unittest.TestCase):
         self.assertEqual(outputs, [(4, 2, bytes([23]) * 32)])
         self.assertEqual(set(gpu.resources), {2})
 
+    def test_budget_for_desktop_surfaces_keeps_allocation_bounds(self):
+        def cost(fmt, width, height, last_level=0):
+            return vr._Resource.checked(vr.CREATE_ARGS.pack(2, 2, fmt, 138, width, height, 1, 1, last_level, 0)).budget
+        for fmt in (2, 20, 67, 134):
+            self.assertEqual(cost(fmt, 1920, 1080), 1920 * 1080 * 8)
+            self.assertEqual(cost(fmt, 1, 1), 4096)
+            self.assertEqual(cost(fmt, 65, 16), 2 * 512 * 16)
+            self.assertGreater(cost(fmt, 128, 128, 1), cost(fmt, 128, 128))
+            with self.assertRaises(vr.VirglError):
+                cost(fmt, 8192, 8192)
+        self.assertEqual(cost(104, 128, 128), 128 * 128 * 16)
+
     def test_malformed_streams_do_not_present(self):
         make = msg(vr.CREATE, vr.CREATE_ARGS.pack(*DISPLAY))
         cases = [b'', b'x', msg(vr.CAPS), msg(vr.RENDERER, b'other'), START*2,

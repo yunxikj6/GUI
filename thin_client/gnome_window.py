@@ -17,6 +17,10 @@ class WndClass(c.Structure):
                 ('brush', w.HBRUSH), ('menu', w.LPCWSTR), ('name', w.LPCWSTR)]
 
 
+class MonitorInfo(c.Structure):
+    _fields_ = [('size', w.DWORD), ('monitor', w.RECT), ('work', w.RECT), ('flags', w.DWORD)]
+
+
 class PaintStruct(c.Structure):
     _fields_ = [('dc', w.HDC), ('erase', w.BOOL), ('rect', w.RECT), ('restore', w.BOOL),
                 ('inc_update', w.BOOL), ('reserved', c.c_ubyte * 32)]
@@ -42,6 +46,9 @@ create = function(user, 'CreateWindowExW', w.HWND, w.DWORD, w.LPCWSTR, w.LPCWSTR
 default = function(user, 'DefWindowProcW', LRESULT, w.HWND, w.UINT, w.WPARAM, w.LPARAM)
 show = function(user, 'ShowWindow', w.BOOL, w.HWND, c.c_int)
 destroy = function(user, 'DestroyWindow', w.BOOL, w.HWND)
+get_pointer = function(user, 'GetCursorPos', w.BOOL, c.POINTER(w.POINT))
+monitor_from_point = function(user, 'MonitorFromPoint', w.HANDLE, w.POINT, w.DWORD)
+monitor_info = function(user, 'GetMonitorInfoW', w.BOOL, w.HANDLE, c.POINTER(MonitorInfo))
 adjust = function(user, 'AdjustWindowRect', w.BOOL, c.POINTER(w.RECT), w.DWORD, w.BOOL)
 begin = function(user, 'BeginPaint', w.HDC, w.HWND, c.POINTER(PaintStruct))
 end = function(user, 'EndPaint', w.BOOL, w.HWND, c.POINTER(PaintStruct))
@@ -90,6 +97,34 @@ def viewport(client_width, client_height, image_width, image_height):
 PRESENT = 0x8001
 
 
+def source_coordinate(position, displayed, source):
+    # Map the first and last visible pixel to the actual desktop edges, also
+    # when a high-resolution source is scaled down to a laptop screen.
+    distance = max(1, displayed - 1)
+    return (position * (source - 1) + distance // 2) // distance
+
+
+def initial_bounds(width, height, style):
+    # Keep the complete title bar and client area reachable on the monitor
+    # where the user is working. Source coordinates always retain their size.
+    rect = w.RECT(0, 0, width, height)
+    if not adjust(c.byref(rect), style, False):
+        raise c.WinError(c.get_last_error())
+    frame_w, frame_h = rect.right - rect.left - width, rect.bottom - rect.top - height
+    point = w.POINT()
+    get_pointer(c.byref(point))
+    monitor = monitor_from_point(point, 2)  # MONITOR_DEFAULTTONEAREST
+    info = MonitorInfo(size=c.sizeof(MonitorInfo))
+    if not monitor or not monitor_info(monitor, c.byref(info)):
+        return -2147483648, 0, width + frame_w, height + frame_h  # CW_USEDEFAULT
+    area = info.work
+    room_w, room_h = area.right - area.left, area.bottom - area.top
+    scale = min(1, max(1, room_w - frame_w) / width, max(1, room_h - frame_h) / height)
+    win_w = max(1, int(width * scale)) + frame_w
+    win_h = max(1, int(height * scale)) + frame_h
+    return area.left + (room_w - win_w) // 2, area.top + (room_h - win_h) // 2, win_w, win_h
+
+
 class NativeWindow:
     """Paint the latest local GPU scanout and return input in cloud coordinates."""
 
@@ -113,12 +148,9 @@ class NativeWindow:
         if not register(c.byref(wc)):
             raise c.WinError(c.get_last_error())
         style = 0x00CF0000
-        rect = w.RECT(0, 0, width, height)
         try:
-            if not adjust(c.byref(rect), style, False):
-                raise c.WinError(c.get_last_error())
-            self.hwnd = create(0, self._name, title, style, 0x100, 0x80, rect.right - rect.left,
-                               rect.bottom - rect.top, None, None, self._instance, None)
+            bounds = initial_bounds(width, height, style)
+            self.hwnd = create(0, self._name, title, style, *bounds, None, None, self._instance, None)
             if not self.hwnd:
                 raise c.WinError(c.get_last_error())
         except BaseException:
@@ -170,8 +202,8 @@ class NativeWindow:
                 if get_rect(hwnd, c.byref(rect)):
                     ox, oy, width, height = viewport(rect.right, rect.bottom, self.width, self.height)
                     if ox <= x < ox + width and oy <= y < oy + height:
-                        px = (x - ox) * self.width // width
-                        py = (y - oy) * self.height // height
+                        px = source_coordinate(x - ox, width, self.width)
+                        py = source_coordinate(y - oy, height, self.height)
                         if msg == WM_MOUSEMOVE:
                             self.on_input(('move', px, py))
                         else:

@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 from cloud_render.wire import Frame, Layer, encode_message, read_message
-from experiments import gnome_command_stream as mesa
+from cloud_render import gnome_commands as mesa
 from experiments.application_surface import ApplicationSurfaces, Binding, Commit, SurfaceError
 from thin_client.virgl_windows import replay
 

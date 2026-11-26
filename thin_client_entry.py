@@ -11,6 +11,8 @@ DEFAULT_DESKTOP_PORT = '17325'
 def add_arguments(parser):
     parser.add_argument('--instabox', action='store_true', help='使用 InstaBox 私有连接')
     parser.add_argument('--machine', help='InstaBox 实例 ID，只有一台时自动选择')
+    from cloud_render.gnome_input import SIZE_NAMES
+    parser.add_argument('--desktop-size', choices=SIZE_NAMES, help='新建 Ubuntu 桌面的尺寸')
     routes = parser.add_mutually_exclusive_group()
     routes.add_argument('--desktop-port', metavar='PORT', help='云端 GNOME 服务端口，默认 17325')
     routes.add_argument('--cloud-app', action='store_true', help='打开单独的云端 ChatGPT 原程序')
@@ -23,6 +25,8 @@ def start(options, parser):
     if options.desktop_port is not None and options.connect_port is not None:
         parser.error('桌面端口和单应用连接端口不能同时指定')
     app = options.cloud_app or options.connect_port is not None
+    if app and options.desktop_size is not None:
+        parser.error('--desktop-size 只适用于云端桌面')
     if app:
         port = options.connect_port
         direct = options.instabox or options.machine is not None
@@ -38,6 +42,8 @@ def start(options, parser):
         parser.error('云端连接端口必须在 1 到 65535 之间')
     arguments = ['--instabox'] if direct else []
     arguments.extend(['--port', str(int(port))])
+    if options.desktop_size is not None:
+        arguments.extend(['--size', options.desktop_size])
     if options.machine is not None:
         arguments.extend(['--machine', options.machine])
     if app:

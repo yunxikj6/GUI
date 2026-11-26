@@ -29,6 +29,10 @@ class TransportError(OSError):
     pass
 
 
+class RequestOutcomeUnknown(TransportError):
+    """The provider may have accepted an input whose HTTP responses were lost."""
+
+
 class InstaBoxControl:
     """One authenticated provider helper and its session-private transfer files."""
 
@@ -52,6 +56,8 @@ class InstaBoxControl:
                 break
             except BridgeError as exc:
                 if attempt or exc.code != 'network' or (self.stop.is_set() and op != 'close'):
+                    if op == 'desktop' and exc.code == 'network' and not self.stop.is_set():
+                        raise RequestOutcomeUnknown('未收到此次操作的中转响应。') from None
                     raise TransportError('InstaBox 中转请求失败。') from None
         try:
             result = json.loads(raw)
