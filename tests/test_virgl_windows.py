@@ -1,0 +1,96 @@
+import io
+from pathlib import Path
+import struct
+import tempfile
+import unittest
+
+from thin_client import virgl_windows as vr
+
+
+def msg(opcode, body=b''):
+    length = len(body) if opcode == vr.RENDERER else (len(body) + 3) // 4
+    return vr.HEADER.pack(length, opcode) + body
+
+
+START = msg(vr.RENDERER, b'gnome-shell')
+DISPLAY = (1, 2, 2, 138, 4, 2, 1, 1, 0, 0)
+DESC = (1, 0, 0, 0, 0, 0, 0, 4, 2, 1, 32)
+
+
+class Chunked(io.BytesIO):
+    def read(self, n):
+        return super().read(min(n, 3))
+
+
+class Gpu:
+    def __init__(self):
+        self.resources = {}
+        self.submissions = []
+        self.uploads = []
+
+    def start_context(self):
+        pass
+
+    def create(self, args):
+        self.resources[args[0]] = args
+
+    def unref(self, handle):
+        del self.resources[handle]
+
+    def submit(self, body):
+        self.submissions.append(body)
+
+    def transfer(self, desc, payload, scanout):
+        if payload is not None:
+            self.uploads.append(payload)
+        if scanout:
+            return bytes([23]) * desc[-1]
+
+
+class StreamTests(unittest.TestCase):
+    def test_fragmented_inline_upload_and_only_full_display_readback(self):
+        stream = bytearray(START + msg(vr.VERSION, vr.WORD.pack(0)))
+        stream += msg(vr.CREATE, vr.CREATE_ARGS.pack(*DISPLAY))
+        # Mesa emits staging buffers with array_size 0. Even an unaligned
+        # number of upload bytes is transmitted without trailing padding.
+        stream += msg(vr.CREATE, vr.CREATE_ARGS.pack(2, 0, 64, 16, 55, 1, 1, 0, 0, 0))
+        stream += msg(vr.PUT, vr.TRANSFER.pack(2, 0, 0, 0, 8, 0, 0, 3, 1, 1, 3) + b'abc')
+        stream += msg(vr.SUBMIT, vr.WORD.pack(0))
+        stream += msg(vr.GET, vr.TRANSFER.pack(1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 4))
+        stream += msg(vr.GET, vr.TRANSFER.pack(*DESC)) + msg(vr.UNREF, vr.WORD.pack(1))
+        gpu, outputs = Gpu(), []
+        vr._play(Chunked(stream), gpu, lambda w, h, data: outputs.append((w, h, data)))
+        self.assertEqual(gpu.uploads, [b'abc'])
+        self.assertEqual(gpu.submissions, [vr.WORD.pack(0)])
+        self.assertEqual(outputs, [(4, 2, bytes([23]) * 32)])
+        self.assertEqual(set(gpu.resources), {2})
+
+    def test_malformed_streams_do_not_present(self):
+        make = msg(vr.CREATE, vr.CREATE_ARGS.pack(*DISPLAY))
+        cases = [b'', b'x', msg(vr.CAPS), msg(vr.RENDERER, b'other'), START*2,
+                 START + msg(vr.VERSION, vr.WORD.pack(1)),
+                 START + vr.HEADER.pack(vr.MAX_MESSAGE, vr.SUBMIT),
+                 START + vr.HEADER.pack(11, vr.PUT) + vr.TRANSFER.pack(*DESC),
+                 START + vr.HEADER.pack(15, vr.CREATE),
+                 START + make + make,
+                 START + msg(vr.GET, vr.TRANSFER.pack(*DESC)),
+                 START + make + msg(vr.GET, vr.TRANSFER.pack(1, 0, 0, 0, 0, 0, 0, 4, 2, 1, vr.MAX_MESSAGE + 1)),
+                 START + make + msg(vr.GET, vr.TRANSFER.pack(1, 0, 0, 0, 1, 0, 0, 4, 2, 1, 32)),
+                 START + msg(vr.CREATE, vr.CREATE_ARGS.pack(8, 2, 2, 138, 8192, 8192, 1, 1, 0, 0)),
+                 START + msg(vr.UNREF, vr.WORD.pack(8)), START + vr.HEADER.pack(0, 99)]
+        for index, case in enumerate(cases):
+            with self.subTest(index=index), self.assertRaises(vr.VirglError):
+                vr._play(Chunked(case), Gpu(), lambda *_: self.fail('unexpected scanout'))
+
+    def test_runtime_requires_exact_official_dependency_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            with self.assertRaises(vr.VirglError):
+                vr._runtime(path)
+            (path / 'other.dll').write_bytes(b'invalid')
+            with self.assertRaises(vr.VirglError):
+                vr._runtime(path)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,0 +1,51 @@
+{
+  "architecture": "win-amd64",
+  "rendererVersion": "1.3.0",
+  "packages": [
+    {
+      "name": "virglrenderer",
+      "source": "https://repo.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-virglrenderer-1.3.0-1-any.pkg.tar.zst",
+      "packagePage": "https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-virglrenderer",
+      "sha256": "a3fa9f88cb49f769bfc1129276ad2a73bcc2f76972e4bb7e6ad32be2c40eaefb",
+      "license": "spdx:MIT",
+      "files": {
+        "ucrt64/bin/libvirglrenderer-1.dll": "92d4266b479b4eaf91b518d01533d49efe1bee8c00bc515d16b7e34e406c7322",
+        "ucrt64/share/licenses/virglrenderer/COPYING": "3b32caf16e2402c2aff2b716858713f3e1feded85c25e71bf829816ee5009402"
+      }
+    },
+    {
+      "name": "libepoxy",
+      "source": "https://repo.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-libepoxy-1.5.10-7-any.pkg.tar.zst",
+      "packagePage": "https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-libepoxy",
+      "sha256": "c6c6994e8ec49071f06cc1fae475406bdf17603d4687ad0bcac2e11078cfd7c8",
+      "license": "spdx:MIT",
+      "files": {
+        "ucrt64/bin/libepoxy-0.dll": "dc4055b53d0d6507740e9f3be18c9f2b1318faa531b9b2913eef3c5332fffedc",
+        "ucrt64/share/licenses/libepoxy/COPYING": "8d5144666f9c4df9bbd69b8900086d5979259152a1060421cdcc0fb9061a1c12"
+      }
+    },
+    {
+      "name": "libwinpthread",
+      "source": "https://repo.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-libwinpthread-14.0.0.r598.ge3d18511f-1-any.pkg.tar.zst",
+      "packagePage": "https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-libwinpthread",
+      "sha256": "c35d6be83d141c8cfbb61f1637dd4b53aac8f5562d766aa26d0741c40bad4e4d",
+      "license": "spdx:MIT AND BSD-3-Clause",
+      "files": {
+        "ucrt64/bin/libwinpthread-1.dll": "94a9a4e2fe27b4bc827a4b209e9deb4cc3dc34bc025df06b849144f9d4c588f8",
+        "ucrt64/share/licenses/libwinpthread/COPYING": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177"
+      }
+    },
+    {
+      "name": "libgcc",
+      "source": "https://repo.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-libgcc-16.2.0-7-any.pkg.tar.zst",
+      "packagePage": "https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-libgcc",
+      "sha256": "bc0ae31c582e0847964b4c8c4b55bb2404a9b7ddce7ebf0b176b6693b76e0c62",
+      "license": "spdx:GPL-3.0-or-later WITH GCC-exception-3.1 AND GFDL-1.3-or-later",
+      "files": {
+        "ucrt64/bin/libgcc_s_seh-1.dll": "44f6318f96eb2aaf6e90400bb1178ab6d55b01ae2cf24846d6b30d96e87e89dd",
+        "ucrt64/share/licenses/libgcc/COPYING.RUNTIME": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+        "ucrt64/share/licenses/libgcc/COPYING3": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+      }
+    }
+  ]
+}

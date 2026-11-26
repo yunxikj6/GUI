@@ -6,9 +6,22 @@ GNOME Shell 与 Mutter 在应用侧完成布局、焦点和动画。Mesa 的 vir
 
 ![独立 Linux 窗口通过 GNOME 的原始 GPU 命令重绘活动概览](gnome-command-window.png)
 
-一次实时测试把采集侧和显示侧放在独立的 Linux 命名空间，两者通过同一物理机上的 TCP 连接传输 8,678,236 字节绘图请求。本机两次按下 Super，两个按键分别到达源端 GNOME，活动概览关闭后再次展开。源端与显示端各自运行软件 GPU。48 次输出逐字节相同，从本机实际窗口读回的 48 次像素也全部吻合。该次测试使用专用的 Super 键回传通道，完整桌面输入与真实跨网时延仍需验收。
+一次实时测试把采集侧和显示侧放在独立的 Linux 命名空间，两者通过同一物理机上的 TCP 连接传输 8,678,236 字节绘图请求。本机两次按下 Super，两个按键分别到达源端 GNOME，活动概览关闭后再次展开。源端与显示端各自运行软件 GPU。48 次输出逐字节相同，从本机实际窗口读回的 48 次像素也全部吻合。该次测试使用专用的 Super 键回传通道，这次测量使用同一台机器。
 
 ![本机窗口用实时绘图指令显示原版 GNOME 活动概览](gnome-live-overview.png)
+
+## 在真实 InstaBox 上验证桌面
+
+两个独立的临时会话运行 Ubuntu 24.04 的 GNOME Shell 46 和 Mutter。本机只收到 Mesa 绘图请求。每次从本机按两次 Super，源端都记录到桌面退出并重新进入活动概览。客户端在每一帧用独立原生窗口读回像素。两次会话分别有 112/112 帧、97/97 帧与源端匹配。录制覆盖这两个无应用窗口的 GNOME 桌面，测试结束后均清理云端进程和临时文件。[逐次测量](measurements/gnome-private-command-stream.json)
+
+| 会话 | 原始命令 | 压缩传输正文 | 绘制调用 | 资源上传 | 整屏上传 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 第一次 | 9,793,452 B | 524,775 B | 2,859 | 998 | 0 |
+| 第二次 | 9,470,924 B | 467,864 B | 2,377 | 978 | 0 |
+
+![在独立本机窗口中操作真实云端 GNOME](gnome-cloud-native-window.png)
+
+第二次会话的同一份命令另在 Win64 CPython、WGL 和 MSYS2 原版 VirGL 上回放。运行环境是 Wine 10，软件 GPU 产生的 97 帧均与云端原桌面逐字节相同。Win32 原生窗口通过 GDI 显示本机产生的结果，独立读取最后一帧的 416,000 个像素与预期 RGB 全部吻合。窗口也识别了鼠标定位、右键点击、导航键和活动概览快捷键。物理 Windows 11 驱动和桌面应用的独立绘制仍需分别验证。[Win64 解码器](../thin_client/virgl_windows.py) · [可见窗口实测](gnome-cloud-win32.png)
 
 ## 在独立 Linux 显示环境复现
 
@@ -42,4 +55,4 @@ python3 experiments/gnome_command_stream.py replay --gpu "$display_dir/gpu" \
   ffplay -loglevel error -f rawvideo -pixel_format bgr0 -video_size 800x520 -i -
 ```
 
-当前只核对了嵌套 Mutter 的单个 800 × 520 软件显示目标。Linux 实验与 Windows 包内已发布的 ChatGPT 绘图路径分别验收。完整桌面的跨主机资源传输、Windows GPU 呈现、输入回传和桌面上应用窗口的合成都仍待实测。
+当前跨机逐帧记录覆盖单个 800 × 520 的嵌套 Mutter 显示目标。独立的 ChatGPT 客户端使用原厂 Skia 指令。GNOME 合成器可以接收普通应用已经绘好的窗口纹理，因此每一种应用还需要核验其自身的绘图来源。

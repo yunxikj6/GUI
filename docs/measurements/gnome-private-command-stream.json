@@ -1,0 +1,207 @@
+{
+  "reproducedInTwoDisjointCloudTempSessions": true,
+  "cloudHost": "InstaBox Debian 13 x86_64, uid 1000",
+  "originalCloudRuntime": "GNOME Shell 46 (Ubuntu Noble AMD64), Mutter/Mesa, user namespace, isolated network, private X display",
+  "localWindow": "Native Linux window with local Mesa virgl replay and independent X11 capture",
+  "verifiedSourceRootArchiveSHA256": "7a9dec2933e3f00e84d9effd1ac1195b55b30b76d1d7489d1869a80aa131b4e7",
+  "observedCloudShellExecutable": {
+    "matched": [
+      {
+        "cloudPid": 130782,
+        "uid": "1000",
+        "matchingStagedOfficialElf": true,
+        "readOnlyHost": true
+      }
+    ],
+    "expectedGnomeElfSHA256": "afb135d53dd2ee5483bf03d0e60895f8d04d48be897827012f4e473e608002eb"
+  },
+  "runs": [
+    {
+      "commandBytes": 9793452,
+      "compressedCommandBytes": 524775,
+      "commandSha256": "ea44c498a856a93af1cd8e5d4a2655ef854157bff1440eefe793fc6eac72f86d",
+      "sourceScanoutHashesMatched": 112,
+      "distinctScanouts": 82,
+      "drawCalls": 2859,
+      "uploads": 998,
+      "wholeDisplayUploads": 0,
+      "elapsedSeconds": 15.014,
+      "cloudPressedSuperAtFrames": [
+        59,
+        88
+      ],
+      "verifiedCleanup": {
+        "directoryAbsent": true,
+        "processesBelongingToDeletedScope": 0
+      }
+    },
+    {
+      "commandBytes": 9470924,
+      "compressedCommandBytes": 467864,
+      "commandSha256": "96cff321457e58d85b6f687b1101e5aa515261aad167d8d80ad6c1587a1a73b9",
+      "sourceScanoutHashesMatched": 97,
+      "distinctScanouts": 67,
+      "drawCalls": 2377,
+      "uploads": 978,
+      "wholeDisplayUploads": 0,
+      "elapsedSeconds": 16.345,
+      "cloudPressedSuperAtFrames": [
+        43,
+        70
+      ],
+      "verifiedCleanup": {
+        "directoryAbsent": true,
+        "processesBelongingToDeletedScope": 0
+      }
+    }
+  ],
+  "windowsReplay": {
+    "system": "Win64 CPython on Wine 10, x64 UCRT MSYS2 VirGL and WGL llvmpipe",
+    "input": "original commands from the second real InstaBox session, replayed after capture",
+    "cloudScanouts": 97,
+    "matches": 97,
+    "distinctFrames": 67,
+    "sourceBGRX8SHA256": [
+      "81c5891954c40f0837a7cc5089aad7245ee91759e29bcd6b67ab207c4be677eb",
+      "e44a0f5585f64a480327ce0249b4e150c3fec612928dbb7df350e81f176ce4d3",
+      "90f06b8f2c4bcc9cc3e098da451723cf96f07c1e522dc53d82a49af8346d0995",
+      "06f6744157330ff5876646bc074a3d174f4f7b5582a630ff07109b0db8ff145e",
+      "9e60080d5831dbe37528706856d26c30f67aecd738f1f4b7a8656e1a90ff423b",
+      "bfa926d9345f1827634f6e9d8f048c19befb9944e342aa96d2766c88f7303bde",
+      "4102fe1540729beed78fb001124b25fa7acdc7992acba9a15d4606aa5d609e46",
+      "f6ed5baebf4b0aedb27847c98fc3b46bf3ee1ce856a403feb7b7d76016a15f4b",
+      "f6ed5baebf4b0aedb27847c98fc3b46bf3ee1ce856a403feb7b7d76016a15f4b",
+      "2289d761da3ae32363484d0086865b78eac1428496f41db0a4c2902c3b201d1e",
+      "f4b5d9489557865b636996438da4b44835df7ee196a65ef8094e9bdee90bd53d",
+      "8789f25e2d985f8e05105681f17afc5906fdd30fdc4375c5d7187eb64b2aa533",
+      "f39d2f09a2269cb257e38bbc1af5506f840960fd73742e56d0f5200817fb8517",
+      "8559e6767041e421dc671fb1bdc82d77d2716b06b3fdf2e370c8df3709991ac0",
+      "4511e4fde0a74ad929e8b0dc792faf9ba59fec515c39893ee92d934593a13991",
+      "7a6fe769964ad9d50fc875b31e1bb25bfa5416cd60f63e1d9023e85a58029ff0",
+      "7136cb845b89f32032c96e4e8e9f83dd1b3f18ba969ca37df89be67a03a69a06",
+      "7136cb845b89f32032c96e4e8e9f83dd1b3f18ba969ca37df89be67a03a69a06",
+      "7136cb845b89f32032c96e4e8e9f83dd1b3f18ba969ca37df89be67a03a69a06",
+      "7136cb845b89f32032c96e4e8e9f83dd1b3f18ba969ca37df89be67a03a69a06",
+      "ea54472f1612f0d7530c0f79ee85274aece410efaba51a773e363563e6392679",
+      "10b491756819d0904a82c84f2ab0e1b3c2a22dfc3a5df562fd83ab08ee772230",
+      "fb8e6faba96af0af0de4d26ec931eecdf7128208b1e2d668002563278d385820",
+      "3b3d36569c195cc5788d66f1e3952ee4aa6f6cb0d3910d5e448a88d7962ac616",
+      "4b164bf4f3cc59f039bcada01b8f4a620349a4f7e1d36c685151a2b3ca15ffcb",
+      "ecdbd75f7094d9b2832a1fac3e9efbd981d4317917b46b6d7be1829c82528ea1",
+      "d14782fffbb16fa256c62641db5eee6d8acac613c565487928aa2d3da8c10824",
+      "d14782fffbb16fa256c62641db5eee6d8acac613c565487928aa2d3da8c10824",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "162b68dd3bdc405c7a18a3f01e95c7f03bcf9768d4591cb8ecebb43315826753",
+      "342217659159c96aca5dea879f948056baf3544093cb521e6926044ec4ce74c5",
+      "7bcb2d9752f4e3821d8f7dde1eb5fc9a5ee9beb7d18014015ab45e10757ea61f",
+      "fe53c3a84adbad8a08f94f2262d2176057a98044d74296c451e62a5d91a52a8e",
+      "fe53c3a84adbad8a08f94f2262d2176057a98044d74296c451e62a5d91a52a8e",
+      "131709de1c2673a1401b3bd893ad223012b78814415b3ffc4eae73f5d60bb1a3",
+      "477c76f18309a0603ab1418ff2e7cade8020d7e8b63f07b284bbf68ac167c9e7",
+      "477c76f18309a0603ab1418ff2e7cade8020d7e8b63f07b284bbf68ac167c9e7",
+      "45eb7357f8246f3fb6fa014ea9709f53d40257d3e90d1701fa31b7ea03c00441",
+      "e80b2ed67022fea1a3b85676ab8d19db13a97aa0615164d7f6a91cbd1ed27944",
+      "e80b2ed67022fea1a3b85676ab8d19db13a97aa0615164d7f6a91cbd1ed27944",
+      "e68a409678c962b5d052c2ab846981ef7abea9e294e5491b7fb5b0200bfc0a82",
+      "e68a409678c962b5d052c2ab846981ef7abea9e294e5491b7fb5b0200bfc0a82",
+      "906d64a5a1be429cd940efb46bec2b3f94215a92e4f4cdc6290ecba232a3619a",
+      "2535e7a34942ecbe6a58e8a11656c38786ac43bae5d50a43eec222f63045b1f8",
+      "2535e7a34942ecbe6a58e8a11656c38786ac43bae5d50a43eec222f63045b1f8",
+      "01a1ecea35fbaadcedb5ea3e55947919cdc3f8f67eaccdf5464033d7521ef2cb",
+      "7dd147d6e0c1320223dd010dda8f5b8c167129c917af72c8cd7ee18b680da954",
+      "7dd147d6e0c1320223dd010dda8f5b8c167129c917af72c8cd7ee18b680da954",
+      "295ee32db873c9e5159c893c2718cb779b100b10cab66acccd6c6573a17b571a",
+      "295ee32db873c9e5159c893c2718cb779b100b10cab66acccd6c6573a17b571a",
+      "6a973232e8577fd3c99738aaab3d0079f1b0422ea0c89e7aa8eba720d35c205f",
+      "4bae41a65fde149e798d001acea1ce93ef4219a612511e1857c65c2ded264a3f",
+      "64b8a3a9cf2fb2e004ab84c32fb52cb3d1bfa9ee6e90d5bbbbe56ceac99358a9",
+      "96a3335e4d584fe870d4a08d5c2835c13f7a7153c1e1f2cc3f2196c8afa72104",
+      "47b2115ed7d9647af8c966eeb8c8bb17b5044bec29ed7aedfd43a9e0531beeb9",
+      "31946f411d9ea0a471b0d8aa18083e801ccf615b3e43680fda951af685570333",
+      "03ecadb5ed2d89ba45d246c799aa93bdef9901a1b237eb9279d86c0bbc1b6493",
+      "6a16085ebfc14761358b367d64eabeccc4c0b40aaf1721213bbde21d322d0fd8",
+      "70d68ac650ca2d560bb5cac7867cd79bab097d13e310de2f764cee048000d6f4",
+      "70d68ac650ca2d560bb5cac7867cd79bab097d13e310de2f764cee048000d6f4",
+      "70d68ac650ca2d560bb5cac7867cd79bab097d13e310de2f764cee048000d6f4",
+      "5582800751399385001fa89172280c982b2503a9ab3347a2d9da7a5153cbc7cc",
+      "5582800751399385001fa89172280c982b2503a9ab3347a2d9da7a5153cbc7cc",
+      "ac2ba6f4113ad1983fc743e6f30bf27e0e44eb31a86d902e1d832226235b76af",
+      "ac2ba6f4113ad1983fc743e6f30bf27e0e44eb31a86d902e1d832226235b76af",
+      "40f626d910cd91adfd3c3e1dfee9d8370ab554347c7f39e3d6bd0a9841781a65",
+      "ee489784e947c77499ccc79f7ad76f190a027088949e410dd75c24bec568b673",
+      "ee489784e947c77499ccc79f7ad76f190a027088949e410dd75c24bec568b673",
+      "1b7fb0f7fcc7cf2e71592404ebd98b858af0c413962e576c9247eef084368526",
+      "1b7fb0f7fcc7cf2e71592404ebd98b858af0c413962e576c9247eef084368526",
+      "b81502480170e7cc204f146d84c5de87838dc3869df9f076159a2fd6e25a4f7a",
+      "050063e8c3995047e16d1dec63e0916758dfb7e9e276ab350d5c56a0908e986b",
+      "2e98f1984bf9e82361fb1e14c2aeb9b2a13f9989354fd933ad45016f3265cac1",
+      "fce8ba90c80d2913c2aa4e7c1d024072e06a61a2702d87241555cba690c2d18f",
+      "d0ecac6a477bf3e4592fecfc3efae95db5150336d0345e726abfbf982b48f302",
+      "c7deb42075d111e8949775d94e0dee8025df824b3c7340f06532f70cd67ec813",
+      "9036051f86b7c3c48321417a2dc42ad09320f1291104ffdbcc2d8ae79abc5a13",
+      "b64c6160d10d445b9dcc06c2092a0a3a84cb9cfddae9796649b1163c9391f991",
+      "0bb6cf586107609dde71089187bba4b28b1492c21fe3c72507c472e9378b7c83",
+      "f2fc97b71815e3e267315f45a1d683d228da005f9262cb93d71a35f030a98a4e",
+      "2714b7e6d5c4eaba40b34fb53767ad0ac863f565d6b0a9eadf4588be6568e6e5",
+      "cf533eace573cd0316edf42c3c9da9219930d16d867f5194004bcf0d0da55c56",
+      "b81f5c7aa6ee8be90c50bb27a599fbed6efe76c348029352e671aae92f79a743",
+      "821bfeacfeaff222f0636fec525eb01d1a66019f042754ebac0894915387f94e",
+      "ab4f9591da15c2591711a39dff84db763066e8f1b1ca72e5605d063f94fe5e4f",
+      "5d056e2e50ce452a27b665506b58f3d1016325a6f81ac4abd518fb3b00d21e18",
+      "fe53c3a84adbad8a08f94f2262d2176057a98044d74296c451e62a5d91a52a8e",
+      "fe53c3a84adbad8a08f94f2262d2176057a98044d74296c451e62a5d91a52a8e"
+    ],
+    "win32WM_PAINT": 97,
+    "visibleClientArea": {
+      "method": "independent XGetImage of the visible Win32 client area at 1:1 scale",
+      "size": [
+        800,
+        520
+      ],
+      "matchingPixels": 416000,
+      "rgbSHA256": "decfd99819fa3e5061f19dcd9ce20d17f639485c90ba17b0ca29a4ecf594207c"
+    },
+    "nativeWindowInputCapturedLocally": [
+      [
+        "move",
+        380,
+        249
+      ],
+      [
+        "super"
+      ],
+      [
+        "super"
+      ],
+      [
+        "key",
+        "Tab"
+      ],
+      [
+        "key",
+        "Shift+Tab"
+      ],
+      [
+        "move",
+        171,
+        201
+      ],
+      [
+        "click",
+        171,
+        201,
+        "right"
+      ]
+    ],
+    "physicalWindows11": "not tested"
+  }
+}
