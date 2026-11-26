@@ -103,7 +103,7 @@ def drive(out):
 
 async def titlebar(top, page, pid, out, *, interactive=False):
     before = None if interactive else await geometry(page)
-    photo = None if interactive else await page.screenshot()
+    photo = None if interactive else await page.screenshot(caret='initial')
     done = asyncio.get_running_loop().create_future()
     top.once('Tracing.tracingComplete', lambda result: done.set_result(result))
     await top.send(
@@ -241,7 +241,7 @@ async def observe_interactive(page, out, native_layers):
             return
         if await geometry(page) == SUPPORTED_GEOMETRY:
             start = (out / 'owner.log').stat().st_size
-            digest = business_digest(Image.open(BytesIO(await page.screenshot())))
+            digest = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
             references += 1
             if not cache.find(digest):
                 publish(out / 'pending-scene.json', {'businessRgbSha256': digest})
@@ -254,7 +254,7 @@ async def observe_interactive(page, out, native_layers):
                     retry = time.monotonic() < retry_until
                     await asyncio.sleep(0.1)
                     continue
-                end_digest = business_digest(Image.open(BytesIO(await page.screenshot())))
+                end_digest = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
                 references += 1
                 if (
                     digest == end_digest
@@ -329,9 +329,9 @@ async def collect(out, *, live=False, interactive=False, pair=None):
             await asyncio.sleep(0.8)
             require(await geometry(page) == (1090, 760, 1, 1026, 36, 'light'), 'application changed geometry')
             start_log = (out / 'owner.log').stat().st_size
-            before = business_digest(Image.open(BytesIO(await page.screenshot())))
+            before = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
             frame = await capture_frame(page, sequence)
-            after = business_digest(Image.open(BytesIO(await page.screenshot())))
+            after = business_digest(Image.open(BytesIO(await page.screenshot(caret='initial'))))
             require(
                 before == after and page.url == APP_PAGE and _exclusive_page(page),
                 'application changed while its picture was captured',
