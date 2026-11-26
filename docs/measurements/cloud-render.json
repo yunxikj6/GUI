@@ -187,8 +187,8 @@
   },
   "standalonePackage": {
     "download": "../../releases/thin-windows/cloud-workspace.zip",
-    "bytes": 24133124,
-    "sha256": "35a7c4dc8e2a3b7b2558c15d8d4c404edd77643e86fa115c323d9d2ebadddf58",
+    "bytes": 24133545,
+    "sha256": "346ff39155d498ea566aaa59d0d2566af900d40ca16671d9cb08e87705d6a332",
     "entries": 82,
     "archiveValidation": "Verified every SHA256SUMS entry, both native launchers and the complete private Windows runtime. This ZIP includes the GNOME command viewer and the explicit ChatGPT app mode.",
     "runtime": "Official Windows x64 CPython 3.13.17 embeddable and MSYS2 VirGL. The ChatGPT app mode additionally uses installed Microsoft Edge and bundled CanvasKit.",
@@ -541,8 +541,8 @@
   "gnomeDesktopMeasurements": "gnome-private-command-stream.json",
   "originalDesktopPackage": {
     "download": "../../releases/original-win64/cloud-workspace.zip",
-    "bytes": 58279904,
-    "sha256": "ceec7cf2251129e8060157b31c1326d8a8cdf9a3eabb9b8ffcf7f57baf96f6f1",
+    "bytes": 58280832,
+    "sha256": "8abed38d866a27f6bc71df4197ec8ee79ab89d65ba3b07e36fbb142251fe862d",
     "entries": 93,
     "source": "Original GNOME Shell plus source-identified ChatGPT rendering commands, Win64 CanvasKit and VirGL; signed-out window tests."
   },
