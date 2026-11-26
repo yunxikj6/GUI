@@ -10,19 +10,63 @@ from contextlib import asynccontextmanager, suppress
 from cloud_render.chatgpt_process import APP_PAGE
 from cloud_render.chromium_capture import _exclusive_page
 from cloud_render.gnome_input import decode_input
-from cloud_render.service import _COMMIT, _FOCUS_MATCH, _Focus
+from cloud_render.service import _COMMIT, _FOCUSED, _FOCUS_MATCH, _Focus
 
 from .controls import require
 
 FOCUS = struct.Struct('!IB')
 _ALLOWED = """s => !!s.node?.isConnected && s.node.ownerDocument.hasFocus()
     && (s.node.isContentEditable || s.node.matches('textarea:read-write, input:read-write'))"""
-_COMMIT_FOCUSED = '(s, text) => (' + _ALLOWED + ')(s) && (' + _COMMIT + ')(s, text)'
-_EDIT_ACTION = (
-    '(s, command) => (' + _ALLOWED + ')(s) && (' + _FOCUS_MATCH + ")(s, 'edit')"
-    ' && s.node.ownerDocument.execCommand(command)'
+# Keep one token while this very action produced the expected native field state.
+# External edits, blur-and-return and a different target invalidate the saved handle.
+_APPLY = (
+    '(s, [command, text]) => { const matches = (' + _FOCUS_MATCH + ');'
+    'const allowed = (' + _ALLOWED + '); const focused = (' + _FOCUSED + ');'
+    'const commit = ('
+    + _COMMIT
+    + """);
+    if (!allowed(s) || !matches(s, 'edit')) return false;
+    const n=s.node, doc=n.ownerDocument, form=s.form && Number.isInteger(s.start) && Number.isInteger(s.end);
+    let expected, start, end;
+    if (form) {
+        let left=s.start, right=s.end;
+        if (command==='selectAll') {
+            expected=s.value; start=0; end=s.value.length;
+        } else {
+            if (left===right && command!=='insertText') {
+                // For a range, the expected edit does not depend on grapheme boundaries.
+                // At a collapsed caret preserve the token only for a simple ASCII deletion.
+                if (command==='delete' && left>0 && /^[ -~]$/.test(s.value[left-1])) left--;
+                else if (command==='forwardDelete' && right<s.value.length && /^[ -~]$/.test(s.value[right])) right++;
+            }
+            const inserted=command==='insertText' ? text : '';
+            expected=s.value.slice(0,left)+inserted+s.value.slice(right); start=end=left+inserted.length;
+        }
+    }
+    let lost=false, edits=0, unexpected=false;
+    const blur=()=>{lost=true};
+    const nativeInput=e=>{
+        edits++;
+        const types={insertText:'insertText',delete:'deleteContentBackward',forwardDelete:'deleteContentForward'};
+        if (!e.isTrusted || e.target!==n || e.inputType!==types[command]) unexpected=true;
+    };
+    n.addEventListener('blur',blur,true);
+    n.addEventListener('input',nativeInput,true);
+    try {
+        const applied=command==='insertText' ? commit(s,text) : doc.execCommand(command);
+        if (applied && form && !lost && !unexpected && n===focused() && allowed(s)
+             && n.value===expected && n.selectionStart===start && n.selectionEnd===end
+             && edits===(expected!==s.value ? 1 : 0)) {
+            s.value=n.value; s.start=start; s.end=end; s.direction=n.selectionDirection; s.dirty=false;
+        }
+        return applied;
+    } finally {
+        n.removeEventListener('blur',blur,true);
+        n.removeEventListener('input',nativeInput,true);
+    }
+}"""
 )
-_EDIT_COMMANDS = {b'A': 'selectAll', b'B': 'delete', b'D': 'forwardDelete'}
+_EDIT_COMMANDS = {b'A': 'selectAll', b'B': 'delete', b'D': 'forwardDelete', b'T': 'insertText'}
 
 
 class Editor:
@@ -70,15 +114,13 @@ class Editor:
 
     async def apply(self, command):
         op, args = decode_input(command)
-        if op != b'T' and op not in _EDIT_COMMANDS:
+        if op not in _EDIT_COMMANDS:
             return False
         async with self.lock:
             if not await self.check() or args[0] != self.revision:
                 return False
-            if op in _EDIT_COMMANDS:
-                applied = await self.focus.handle.evaluate(_EDIT_ACTION, _EDIT_COMMANDS[op])
-            else:
-                applied = await self.focus.handle.evaluate(_COMMIT_FOCUSED, args[1])
+            action = [_EDIT_COMMANDS[op], args[1] if op == b'T' else '']
+            applied = await self.focus.handle.evaluate(_APPLY, action)
             await self.check()
             return bool(applied)
 

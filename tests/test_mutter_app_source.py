@@ -219,5 +219,5 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
                     editor.focus.handle.evaluate.assert_not_awaited()
                     with patch('experiments.mutter_app.editor.decode_input', return_value=(op, (7,))):
                         self.assertTrue(await editor.apply(op))
-                    self.assertEqual(editor.focus.handle.evaluate.await_args.args[1], command)
+                    self.assertEqual(editor.focus.handle.evaluate.await_args.args[1], [command, ''])
                     editor.focus.handle.evaluate.reset_mock()
