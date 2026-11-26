@@ -1,6 +1,7 @@
 """Install the pinned original application and its cloud-only observer in a disposable guest."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import urllib.request
@@ -17,6 +18,7 @@ PACKAGES = (
 )
 # Both hashes were independently matched to the vendor APT archive and the originating ELF.
 PACKAGE = {
+    "url": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_26.1120.50957_amd64.deb",
     "size": 501426562,
     "sha256": "e8ab38df96d6070fd5d4582a606490637728243bb529e9edae19b3f0a6e664d2",
 }
@@ -49,6 +51,22 @@ def download(record, destination):
             destination.unlink(missing_ok=True)
             if attempt:
                 raise
+
+
+def fetch_vendor(directory):
+    """Fetch the same package named by the vendor's signed APT index, on the cloud host."""
+    archive = directory / "verified-chatgpt.deb"
+    with tempfile.TemporaryDirectory(dir=directory, prefix="vendor-download-") as scratch:
+        candidate = Path(scratch) / "chatgpt.deb"
+        try:
+            download(PACKAGE, candidate)
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(
+                "云机未能下载并校验指定版本。可从官方渠道取得安装包，用 --chatgpt-deb FILE 启动。"
+            ) from exc
+        # Publish the complete, verified inode without overwriting another file.
+        os.link(candidate, archive)
+    return archive
 
 
 def stage(local_deb, directory):
