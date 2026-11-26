@@ -221,3 +221,21 @@ class SourceEditorTest(unittest.IsolatedAsyncioTestCase):
                         self.assertTrue(await editor.apply(op))
                     self.assertEqual(editor.focus.handle.evaluate.await_args.args[1], [command, ''])
                     editor.focus.handle.evaluate.reset_mock()
+
+    async def test_idle_original_surface_never_requests_an_application_screenshot(self):
+        from unittest.mock import AsyncMock, Mock, patch
+
+        from experiments.mutter_app.capture import observe_interactive
+
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            page = Mock()
+            page.is_closed.return_value = False
+            page.screenshot = AsyncMock()
+
+            async def finish(_):
+                (out / 'controller-closed').touch()
+
+            with patch('experiments.mutter_app.capture.asyncio.sleep', side_effect=finish):
+                await observe_interactive(page, out, ())
+            page.screenshot.assert_not_awaited()

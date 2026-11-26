@@ -223,22 +223,39 @@ class DrawingCache:
 async def observe_interactive(page, out, native_layers):
     """Observe the changing original surface without recognizing pages, fields or labels."""
     cache = DrawingCache(out)
+    request_path = out / 'requested-scene.json'
+    last = None
+    references = attempts = 0
+    retry_until = 0.0
+    retry = False
     while not (out / 'controller-closed').exists() and not page.is_closed():
+        request = json.loads(request_path.read_text()) if request_path.is_file() else None
+        if request is None or (request == last and not retry) or cache.find(request['businessRgbSha256']):
+            await asyncio.sleep(0.04)
+            continue
+        if request != last:
+            last = request
+            retry_until = time.monotonic() + 4
+        retry = False
         if not _exclusive_page(page) or page.url != APP_PAGE:
             return
         if await geometry(page) == SUPPORTED_GEOMETRY:
             start = (out / 'owner.log').stat().st_size
             digest = business_digest(Image.open(BytesIO(await page.screenshot())))
+            references += 1
             if not cache.find(digest):
                 publish(out / 'pending-scene.json', {'businessRgbSha256': digest})
+                attempts += 1
                 try:
                     frame = await capture_frame(page, cache.sequence + 1)
                 except CaptureError:
-                    # Animation, unsupported effects and geometry changes cannot
-                    # authorize a drawing. The source may advance to a supported commit.
-                    await asyncio.sleep(0.4)
+                    # A later physical commit may supply a supported active tree.
+                    publish(out / 'capture-counts.json', {'references': references, 'traces': attempts})
+                    retry = time.monotonic() < retry_until
+                    await asyncio.sleep(0.1)
                     continue
                 end_digest = business_digest(Image.open(BytesIO(await page.screenshot())))
+                references += 1
                 if (
                     digest == end_digest
                     and _exclusive_page(page)
@@ -249,7 +266,9 @@ async def observe_interactive(page, out, native_layers):
                         Frame(frame.sequence, frame.width, frame.height, frame.layers + native_layers)
                     )
                     cache.add(digest, raw, start)
-        await asyncio.sleep(0.25)
+                else:
+                    retry = time.monotonic() < retry_until
+        publish(out / 'capture-counts.json', {'references': references, 'traces': attempts})
 
 
 async def collect(out, *, live=False, interactive=False, pair=None):

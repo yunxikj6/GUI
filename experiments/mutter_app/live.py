@@ -39,8 +39,9 @@ def initialize(channel):
         os.mkfifo(channel / name, 0o600)
     (channel / 'focus.events').touch(mode=0o600, exist_ok=False)
     session = secrets.token_hex(32)
-    publish(channel / 'session.json', {'session': session, 'exe': ORIGINAL_SHA256})
     publish(channel / 'editor-capabilities.json', {'session': session, 'flags': 2 | 4 | 8})
+    # The bridge watches this final rename before negotiating source capabilities.
+    publish(channel / 'session.json', {'session': session, 'exe': ORIGINAL_SHA256})
 
 
 class LiveInput:
@@ -171,6 +172,8 @@ class Inspector:
         self.revision = 0
         self.last_picture = None
         self.cached_asset = None
+        self.requested = None
+        self.request_time = 0.0
         self.counts = {'shell': 0, 'cursor': 0, 'unapproved': 0}
         self.counts.update({'approved': 0} if interactive else {'before': 0, 'after': 0})
 
@@ -195,21 +198,28 @@ class Inspector:
     def manual_scene(self, source_digest, journal_byte):
         """Use the original drawing only if it matches this physical application commit."""
         scenes = self.out / 'scenes.json'
-        if not scenes.exists():
-            wait_for(scenes.is_file, 'original application did not supply its first drawing', 75)
-        approvals = json.loads(scenes.read_text())
+        approvals = json.loads(scenes.read_text()) if scenes.is_file() else {}
         if source_digest not in approvals:
+            now = time.monotonic()
+            if self.requested != source_digest or now - self.request_time > 2:
+                self.requested, self.request_time = source_digest, now
+                publish(
+                    self.out / 'requested-scene.json',
+                    {'businessRgbSha256': source_digest, 'witnessByte': journal_byte},
+                )
+            if not scenes.exists():
+                wait_for(scenes.is_file, 'original application did not supply its first drawing', 75)
             pending = self.out / 'pending-scene.json'
             if (
                 pending.is_file()
                 and json.loads(pending.read_text()).get('businessRgbSha256') == source_digest
             ):
-                # The original GPU continues independently while an already observed
-                # state is being captured. Superseded and unknown states remain on hold.
                 until = time.monotonic() + 1.5
                 while time.monotonic() < until and source_digest not in approvals:
                     time.sleep(0.03)
                     approvals = json.loads(scenes.read_text())
+            else:
+                approvals = json.loads(scenes.read_text())
         state = approvals.get(source_digest)
         if state is None or journal_byte < state['witnessByteStart']:
             return None, None

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager, suppress
 from cloud_render.chatgpt_process import APP_PAGE
 from cloud_render.chromium_capture import _exclusive_page
 from cloud_render.gnome_input import decode_input
-from cloud_render.service import _COMMIT, _FOCUSED, _FOCUS_MATCH, _Focus
+from cloud_render.service import _COMMIT, _FOCUS_MATCH, _FOCUSED, _Focus
 
 from .controls import require
 
