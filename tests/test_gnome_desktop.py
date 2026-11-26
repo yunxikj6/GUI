@@ -84,6 +84,48 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(events, [(520, 327, 'right')])
         self.assertEqual(output, [(800, 520), b'local scanout', 'closed'])
 
+    def test_committed_text_and_select_all_keep_the_window_focus_token_and_order(self):
+        focused = 1 << 140
+        frame, sent, closed = threading.Event(), threading.Event(), threading.Event()
+        peer = Mock()
+        peer.text_focus.return_value = focused
+        peer.pop_unavailable.return_value = None
+        peer.close.side_effect = closed.set
+        peer.select_all.side_effect = lambda revision: sent.set()
+
+        class Window:
+            def __init__(self, title, width, height, submit):
+                self.submit = submit
+                self.typed = False
+
+            def present(self, pixels):
+                frame.set()
+                return True
+
+            def pump(self):
+                if frame.is_set() and not self.typed:
+                    self.typed = True
+                    revision = self.text_focus()
+                    self.submit(('text', revision, '你好'))
+                    self.submit(('select-all', revision))
+                return not sent.is_set()
+
+            def set_title(self, title):
+                pass
+
+            def close(self):
+                pass
+
+        def replay(session, on_scanout):
+            on_scanout(WIDTH, HEIGHT, b'local scanout')
+            self.assertTrue(closed.wait(2))
+
+        present_session(lambda: peer, replay, Window)
+        peer.commit_text.assert_called_once_with(focused, '你好')
+        peer.select_all.assert_called_once_with(focused)
+        first = [c[0] for c in peer.method_calls if c[0] in ('commit_text', 'select_all')]
+        self.assertEqual(first, ['commit_text', 'select_all'])
+
     def test_rejected_source_frame_stops_and_releases_session(self):
         closed = threading.Event()
 

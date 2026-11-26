@@ -117,6 +117,8 @@ def present_session(connect, replay, open_window, *, size=DEFAULT_SIZE, retain_o
                     session.key(*args)
                 elif kind == 'text':
                     session.commit_text(*args)
+                elif kind == 'select-all':
+                    session.select_all(*args)
         except Exception as exc:
             fail(exc)
 

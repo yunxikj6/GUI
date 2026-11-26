@@ -260,6 +260,11 @@ class NativeWindow:
             if msg == WM_KEYDOWN and not (lp & (1 << 30)):
                 ctrl = get_key_state(VK_CONTROL) < 0
                 shift = get_key_state(VK_SHIFT) < 0
+                if wp == ord('A') and ctrl and not shift and get_key_state(VK_MENU) >= 0:
+                    revision = self.text_focus()
+                    if revision is not None:
+                        self.on_input(('select-all', revision))
+                        return 0
                 if wp == 0x1b and ctrl and not shift:
                     self.on_input(('super',))
                     return 0
